@@ -162,17 +162,28 @@ public class OllamaLlmClient implements LlmClient {
                 );
             }
 
+            // Parse possible scenarios for ambiguous intents
+            List<String> possibleScenarios = new ArrayList<>();
+            if (node.has("possibleScenarios") && node.get("possibleScenarios").isArray()) {
+                for (JsonNode scenario : node.get("possibleScenarios")) {
+                    possibleScenarios.add(scenario.asText());
+                }
+            }
+
             String scenario = node.has("scenario") ? node.get("scenario").asText() : "UNKNOWN";
             double confidence = node.has("confidence") ? node.get("confidence").asDouble() : 0.0;
+            String reasoning = node.has("reasoning") ? node.get("reasoning").asText() : null;
 
-            log.debug("Parsed intent - scenario: {}, confidence: {}, params: {}, missing: {}", 
-                    scenario, confidence, params, missingParams);
+            log.debug("Parsed intent - scenario: {}, confidence: {}, params: {}, missing: {}, reasoning: {}", 
+                    scenario, confidence, params, missingParams, reasoning);
 
             return IntentResult.builder()
                     .scenario(scenario)
                     .confidence(confidence)
                     .params(params)
                     .missingParams(missingParams)
+                    .possibleScenarios(possibleScenarios.isEmpty() ? null : possibleScenarios)
+                    .reasoning(reasoning)
                     .build();
         } catch (Exception e) {
             log.error("Error parsing intent result from response: {}", response, e);

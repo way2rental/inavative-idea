@@ -43,6 +43,15 @@ ollama:
   timeout-seconds: 120
   enabled: true
 
+# Intent Detection Configuration
+intent:
+  confidence:
+    threshold: 0.75        # Minimum confidence for direct execution
+    low-threshold: 0.60    # Below this, ask for clarification
+  require-confirmation:
+    enabled: true          # Require user confirmation for moderate confidence
+    threshold: 0.85        # Above this, no confirmation needed
+
 # JWT Configuration
 jwt:
   secret: your-256-bit-secret-key-for-jwt-token-generation-change-in-production
