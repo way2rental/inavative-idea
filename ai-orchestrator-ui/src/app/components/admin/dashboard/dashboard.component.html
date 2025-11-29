@@ -81,7 +81,7 @@
               <p class="text-amber-400 text-sm mt-1">P95: {{ metrics?.p95ResponseTime || 0 }}ms</p>
             </div>
             <div class="w-14 h-14 bg-amber-500/20 rounded-xl flex items-center justify-center">
-              <svg class="w-7 h-7 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -102,7 +102,7 @@
               </p>
             </div>
             <div class="w-14 h-14 bg-purple-500/20 rounded-xl flex items-center justify-center">
-              <svg class="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -169,7 +169,7 @@
                 <span class="text-slate-400">{{ metrics?.avgIntentDetectionMs || 0 }}ms</span>
               </div>
               <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
-                <div class="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full" 
+                <div class="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full"
                      [style.width.%]="((metrics?.avgIntentDetectionMs || 0) / (metrics?.avgTotalMs || 1)) * 100"></div>
               </div>
             </div>
