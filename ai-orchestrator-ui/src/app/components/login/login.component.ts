@@ -8,8 +8,7 @@ import { AuthService } from '../../services/auth.service';
   selector: 'app-login',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './login.component.html',
-  styleUrl: './login.component.scss'
+  templateUrl: './login.component.html'
 })
 export class LoginComponent {
   username = '';
@@ -17,7 +16,11 @@ export class LoginComponent {
   isLoading = false;
   errorMessage = '';
 
-  roles = ['USER', 'ADMIN', 'OPERATOR'];
+  roles = [
+    { value: 'USER', label: 'User', description: 'Basic access to chat features' },
+    { value: 'ADMIN', label: 'Administrator', description: 'Full access to all features' },
+    { value: 'OPERATOR', label: 'Operator', description: 'Access to operations and monitoring' }
+  ];
 
   constructor(
     private authService: AuthService,
@@ -39,7 +42,7 @@ export class LoginComponent {
       },
       error: (error) => {
         console.error('Login error:', error);
-        this.errorMessage = 'Login failed. Please try again.';
+        this.errorMessage = 'Login failed. Please check if the backend is running.';
         this.isLoading = false;
       }
     });

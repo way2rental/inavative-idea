@@ -1,0 +1,120 @@
+<div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+  <!-- Header -->
+  <div class="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <a routerLink="/admin" class="text-slate-400 hover:text-white transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </a>
+          <div>
+            <h1 class="text-2xl font-bold gradient-text">Chat Sessions</h1>
+            <p class="text-slate-400 text-sm mt-1">Monitor active and past user sessions</p>
+          </div>
+        </div>
+        <div class="text-slate-400 text-sm">
+          Total: {{ totalElements }} sessions
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    @if (isLoading) {
+      <div class="flex items-center justify-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+      </div>
+    } @else {
+      <!-- Sessions Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        @for (session of sessions; track session.id) {
+          <div class="card p-6 hover:border-primary-500/50 transition-all duration-300">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-gradient-to-br from-primary-500 to-purple-500 rounded-full flex items-center justify-center">
+                  <span class="text-white font-bold text-lg">{{ session.userId.charAt(0).toUpperCase() }}</span>
+                </div>
+                <div>
+                  <p class="text-white font-medium">{{ session.userId }}</p>
+                  <p class="text-slate-400 text-xs font-mono">{{ session.sessionId }}</p>
+                </div>
+              </div>
+              @if (session.active) {
+                <span class="badge-success flex items-center gap-1">
+                  <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                  Active
+                </span>
+              } @else {
+                <span class="badge bg-slate-500/20 text-slate-400 border border-slate-500/30">Ended</span>
+              }
+            </div>
+
+            <div class="space-y-3">
+              <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
+                <span class="text-slate-400 text-sm">Messages</span>
+                <span class="text-white font-bold text-lg">{{ session.messageCount }}</span>
+              </div>
+
+              <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
+                <span class="text-slate-400 text-sm">Started</span>
+                <span class="text-slate-300 text-sm">{{ getTimeSince(session.startTime) }}</span>
+              </div>
+
+              <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
+                <span class="text-slate-400 text-sm">Last Activity</span>
+                <span class="text-slate-300 text-sm">{{ getTimeSince(session.lastActivityTime) }}</span>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-slate-700">
+              <div class="flex items-center gap-2">
+                @if (session.active) {
+                  <div class="flex items-center gap-1 text-emerald-400 text-xs">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    User is currently chatting
+                  </div>
+                } @else {
+                  <div class="text-slate-500 text-xs">
+                    Session ended at {{ session.lastActivityTime | date:'short' }}
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (sessions.length === 0) {
+        <div class="card p-12 text-center">
+          <svg class="w-16 h-16 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <h3 class="text-xl font-semibold text-white mb-2">No Sessions Yet</h3>
+          <p class="text-slate-400">Chat sessions will appear here once users start interacting.</p>
+        </div>
+      }
+
+      <!-- Pagination -->
+      @if (sessions.length > 0) {
+        <div class="mt-8 flex items-center justify-between">
+          <div class="text-slate-400 text-sm">
+            Page {{ currentPage + 1 }} of {{ Math.ceil(totalElements / pageSize) }}
+          </div>
+          <div class="flex gap-2">
+            <button (click)="prevPage()" [disabled]="currentPage === 0" class="btn-secondary" [class.opacity-50]="currentPage === 0">
+              Previous
+            </button>
+            <button (click)="nextPage()" [disabled]="(currentPage + 1) * pageSize >= totalElements" class="btn-secondary"
+              [class.opacity-50]="(currentPage + 1) * pageSize >= totalElements">
+              Next
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+</div>

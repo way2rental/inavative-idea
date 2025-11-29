@@ -1,0 +1,209 @@
+<div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+  <!-- Header -->
+  <div class="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <a routerLink="/admin" class="text-slate-400 hover:text-white transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </a>
+          <div>
+            <h1 class="text-2xl font-bold gradient-text">Audit Logs</h1>
+            <p class="text-slate-400 text-sm mt-1">Monitor all AI interactions and system activity</p>
+          </div>
+        </div>
+        <div class="text-slate-400 text-sm">
+          Total: {{ totalElements }} records
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Filters -->
+    <div class="card p-4 mb-6">
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[200px]">
+          <input type="text" [(ngModel)]="filterUserId" placeholder="Filter by User ID..."
+            class="input-field text-sm">
+        </div>
+        <div class="flex-1 min-w-[200px]">
+          <input type="text" [(ngModel)]="filterScenarioCode" placeholder="Filter by Scenario..."
+            class="input-field text-sm">
+        </div>
+        <button (click)="applyFilters()" class="btn-primary">Apply Filters</button>
+        <button (click)="clearFilters()" class="btn-secondary">Clear</button>
+      </div>
+    </div>
+
+    @if (isLoading) {
+      <div class="flex items-center justify-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+      </div>
+    } @else {
+      <!-- Logs Table -->
+      <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-slate-800/50">
+              <tr>
+                <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">User</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Query</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Scenario</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Confidence</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Time</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Date</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-700/50">
+              @for (log of logs; track log.id) {
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                  <td class="px-6 py-4">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 bg-primary-500/20 rounded-full flex items-center justify-center">
+                        <span class="text-xs font-medium text-primary-400">{{ log.userId.charAt(0).toUpperCase() }}</span>
+                      </div>
+                      <span class="text-white text-sm">{{ log.userId }}</span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <p class="text-slate-300 text-sm max-w-xs truncate">{{ log.userQuery }}</p>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span class="badge-info">{{ log.scenarioCode }}</span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span [class]="getConfidenceColor(log.confidence)" class="font-medium">
+                      {{ (log.confidence * 100).toFixed(0) }}%
+                    </span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span class="text-slate-400 text-sm">{{ log.executionTimeMs }}ms</span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span class="text-slate-400 text-sm">{{ log.createdAt | date:'short' }}</span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <button (click)="viewDetails(log)" class="text-primary-400 hover:text-primary-300 text-sm">
+                      View Details
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (logs.length === 0) {
+          <div class="p-12 text-center">
+            <svg class="w-16 h-16 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <h3 class="text-xl font-semibold text-white mb-2">No Logs Found</h3>
+            <p class="text-slate-400">No audit logs match your filters.</p>
+          </div>
+        }
+
+        <!-- Pagination -->
+        @if (logs.length > 0) {
+          <div class="px-6 py-4 border-t border-slate-700 flex items-center justify-between">
+            <div class="text-slate-400 text-sm">
+              Showing {{ currentPage * pageSize + 1 }} to {{ Math.min((currentPage + 1) * pageSize, totalElements) }} of {{ totalElements }}
+            </div>
+            <div class="flex gap-2">
+              <button (click)="prevPage()" [disabled]="currentPage === 0" class="btn-secondary text-sm" [class.opacity-50]="currentPage === 0">
+                Previous
+              </button>
+              <button (click)="nextPage()" [disabled]="(currentPage + 1) * pageSize >= totalElements" class="btn-secondary text-sm"
+                [class.opacity-50]="(currentPage + 1) * pageSize >= totalElements">
+                Next
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Detail Modal -->
+  @if (selectedLog) {
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="card w-full max-w-2xl max-h-[90vh] overflow-hidden">
+        <div class="p-6 border-b border-slate-700">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-white">Log Details</h2>
+            <button (click)="closeDetails()" class="text-slate-400 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6 overflow-y-auto max-h-[60vh] space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="p-4 bg-slate-900/50 rounded-lg">
+              <p class="text-slate-400 text-xs mb-1">Session ID</p>
+              <p class="text-white font-mono text-sm">{{ selectedLog.sessionId }}</p>
+            </div>
+            <div class="p-4 bg-slate-900/50 rounded-lg">
+              <p class="text-slate-400 text-xs mb-1">User ID</p>
+              <p class="text-white">{{ selectedLog.userId }}</p>
+            </div>
+          </div>
+
+          <div class="p-4 bg-slate-900/50 rounded-lg">
+            <p class="text-slate-400 text-xs mb-1">User Query</p>
+            <p class="text-white">{{ selectedLog.userQuery }}</p>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4">
+            <div class="p-4 bg-slate-900/50 rounded-lg">
+              <p class="text-slate-400 text-xs mb-1">Detected Intent</p>
+              <span class="badge-info">{{ selectedLog.detectedIntent }}</span>
+            </div>
+            <div class="p-4 bg-slate-900/50 rounded-lg">
+              <p class="text-slate-400 text-xs mb-1">Confidence</p>
+              <span [class]="getConfidenceColor(selectedLog.confidence)" class="font-bold text-lg">
+                {{ (selectedLog.confidence * 100).toFixed(1) }}%
+              </span>
+            </div>
+            <div class="p-4 bg-slate-900/50 rounded-lg">
+              <p class="text-slate-400 text-xs mb-1">Execution Time</p>
+              <span class="text-white font-bold text-lg">{{ selectedLog.executionTimeMs }}ms</span>
+            </div>
+          </div>
+
+          <div class="p-4 bg-slate-900/50 rounded-lg">
+            <p class="text-slate-400 text-xs mb-1">Extracted Parameters</p>
+            <pre class="text-emerald-400 text-sm overflow-x-auto">{{ formatJson(selectedLog.paramsExtracted) }}</pre>
+          </div>
+
+          <div class="p-4 bg-slate-900/50 rounded-lg">
+            <p class="text-slate-400 text-xs mb-1">Generated Response</p>
+            <p class="text-white text-sm whitespace-pre-wrap">{{ selectedLog.responseGenerated }}</p>
+          </div>
+
+          @if (selectedLog.errorDetails) {
+            <div class="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <p class="text-red-400 text-xs mb-1">Error Details</p>
+              <p class="text-red-300 text-sm">{{ selectedLog.errorDetails }}</p>
+            </div>
+          }
+
+          <div class="p-4 bg-slate-900/50 rounded-lg">
+            <p class="text-slate-400 text-xs mb-1">Timestamp</p>
+            <p class="text-white">{{ selectedLog.createdAt | date:'full' }}</p>
+          </div>
+        </div>
+
+        <div class="p-6 border-t border-slate-700">
+          <button (click)="closeDetails()" class="btn-primary w-full">Close</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

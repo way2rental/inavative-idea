@@ -1,0 +1,255 @@
+<div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+  <!-- Header -->
+  <div class="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <a routerLink="/admin" class="text-slate-400 hover:text-white transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </a>
+          <div>
+            <h1 class="text-2xl font-bold gradient-text">Scenario Management</h1>
+            <p class="text-slate-400 text-sm mt-1">Configure and manage AI scenarios</p>
+          </div>
+        </div>
+        <button (click)="openCreateModal()" class="btn-primary flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          Add Scenario
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    @if (isLoading) {
+      <div class="flex items-center justify-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+      </div>
+    } @else {
+      <!-- Scenarios Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        @for (scenario of scenarios; track scenario.id) {
+          <div class="card p-6 hover:border-primary-500/50 transition-all duration-300">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h3 class="text-lg font-semibold text-white">{{ scenario.scenarioName }}</h3>
+                <p class="text-slate-400 text-sm font-mono">{{ scenario.scenarioCode }}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                @if (scenario.active) {
+                  <span class="badge-success">Active</span>
+                } @else {
+                  <span class="badge-danger">Inactive</span>
+                }
+              </div>
+            </div>
+
+            <p class="text-slate-300 text-sm mb-4">{{ scenario.description }}</p>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+              <span class="badge-info">{{ scenario.executionType }}</span>
+              <span class="badge-warning">{{ scenario.securityLevel }}</span>
+              @if (scenario.httpMethod) {
+                <span class="badge bg-purple-500/20 text-purple-400 border border-purple-500/30">{{ scenario.httpMethod }}</span>
+              }
+            </div>
+
+            <div class="mb-4 p-3 bg-slate-900/50 rounded-lg">
+              <p class="text-slate-400 text-xs mb-1">Required Parameters:</p>
+              <div class="flex flex-wrap gap-1">
+                @for (param of scenario.requiredParams; track param) {
+                  <span class="px-2 py-0.5 bg-slate-700 text-slate-300 rounded text-xs font-mono">{{ param }}</span>
+                }
+              </div>
+            </div>
+
+            @if (scenario.sqlQuery) {
+              <div class="mb-4 p-3 bg-slate-900/50 rounded-lg">
+                <p class="text-slate-400 text-xs mb-1">SQL Query:</p>
+                <code class="text-emerald-400 text-xs break-all">{{ scenario.sqlQuery }}</code>
+              </div>
+            }
+
+            @if (scenario.httpUrl) {
+              <div class="mb-4 p-3 bg-slate-900/50 rounded-lg">
+                <p class="text-slate-400 text-xs mb-1">HTTP URL:</p>
+                <code class="text-primary-400 text-xs break-all">{{ scenario.httpUrl }}</code>
+              </div>
+            }
+
+            <div class="flex items-center justify-between pt-4 border-t border-slate-700">
+              <div class="text-slate-500 text-xs">
+                Version {{ scenario.promptVersion }}
+              </div>
+              <div class="flex items-center gap-2">
+                <button (click)="testScenario(scenario)" class="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Test
+                </button>
+                <button (click)="openEditModal(scenario)" class="btn-secondary text-sm py-1.5 px-3">Edit</button>
+                <button (click)="toggleStatus(scenario)" class="text-sm py-1.5 px-3 rounded-lg transition-all"
+                  [class]="scenario.active ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'">
+                  {{ scenario.active ? 'Disable' : 'Enable' }}
+                </button>
+                <button (click)="deleteScenario(scenario)" class="btn-danger text-sm py-1.5 px-3">Delete</button>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (scenarios.length === 0) {
+        <div class="card p-12 text-center">
+          <svg class="w-16 h-16 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          <h3 class="text-xl font-semibold text-white mb-2">No Scenarios Yet</h3>
+          <p class="text-slate-400 mb-6">Get started by creating your first AI scenario.</p>
+          <button (click)="openCreateModal()" class="btn-primary">Create First Scenario</button>
+        </div>
+      }
+    }
+  </div>
+
+  <!-- Modal -->
+  @if (showModal) {
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="card w-full max-w-3xl max-h-[90vh] overflow-hidden">
+        <div class="p-6 border-b border-slate-700">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-white">{{ isEditing ? 'Edit Scenario' : 'Create New Scenario' }}</h2>
+            <button (click)="closeModal()" class="text-slate-400 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6 overflow-y-auto max-h-[60vh]">
+          <form class="space-y-6">
+            <!-- Basic Info -->
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Scenario Code</label>
+                <input type="text" [(ngModel)]="formData.scenarioCode" name="scenarioCode"
+                  class="input-field" placeholder="e.g., TXN_STATUS" [disabled]="isEditing">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Scenario Name</label>
+                <input type="text" [(ngModel)]="formData.scenarioName" name="scenarioName"
+                  class="input-field" placeholder="e.g., Transaction Status">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Description</label>
+              <textarea [(ngModel)]="formData.description" name="description" rows="2"
+                class="input-field" placeholder="Describe what this scenario does..."></textarea>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Execution Type</label>
+                <select [(ngModel)]="formData.executionType" name="executionType" class="input-field">
+                  <option value="DB_QUERY">DB Query</option>
+                  <option value="HTTP_CALL">HTTP Call</option>
+                  <option value="COMPOSITE">Composite</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Security Level</label>
+                <select [(ngModel)]="formData.securityLevel" name="securityLevel" class="input-field">
+                  <option value="NORMAL">Normal</option>
+                  <option value="SENSITIVE">Sensitive</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Status</label>
+                <select [(ngModel)]="formData.active" name="active" class="input-field">
+                  <option [ngValue]="true">Active</option>
+                  <option [ngValue]="false">Inactive</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Required Parameters (comma-separated)</label>
+              <input type="text" [(ngModel)]="formData.requiredParams" name="requiredParams"
+                class="input-field" placeholder="e.g., transactionId, accountId">
+            </div>
+
+            <!-- DB Query Config -->
+            @if (formData.executionType === 'DB_QUERY') {
+              <div class="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                <h4 class="text-emerald-400 font-medium mb-3">Database Query Configuration</h4>
+                <label class="block text-sm font-medium text-slate-300 mb-2">SQL Query</label>
+                <textarea [(ngModel)]="formData.sqlQuery" name="sqlQuery" rows="3"
+                  class="input-field font-mono text-sm" placeholder="SELECT * FROM table WHERE id = :paramId"></textarea>
+              </div>
+            }
+
+            <!-- HTTP Call Config -->
+            @if (formData.executionType === 'HTTP_CALL') {
+              <div class="p-4 bg-primary-500/10 border border-primary-500/30 rounded-lg">
+                <h4 class="text-primary-400 font-medium mb-3">HTTP Call Configuration</h4>
+                <div class="grid grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Method</label>
+                    <select [(ngModel)]="formData.httpMethod" name="httpMethod" class="input-field">
+                      <option value="GET">GET</option>
+                      <option value="POST">POST</option>
+                    </select>
+                  </div>
+                  <div class="col-span-3">
+                    <label class="block text-sm font-medium text-slate-300 mb-2">URL</label>
+                    <input type="text" [(ngModel)]="formData.httpUrl" name="httpUrl"
+                      class="input-field font-mono text-sm" placeholder="/api/endpoint/{param}">
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Request Mapping (JSON)</label>
+                    <textarea [(ngModel)]="formData.requestMapping" name="requestMapping" rows="3"
+                      class="input-field font-mono text-sm" placeholder='{"field": "value"}'></textarea>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Response Mapping (JSON)</label>
+                    <textarea [(ngModel)]="formData.responseMapping" name="responseMapping" rows="3"
+                      class="input-field font-mono text-sm" placeholder='{"displayField": "$.data.field"}'></textarea>
+                  </div>
+                </div>
+              </div>
+            }
+
+            <!-- Prompts -->
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Intent Prompt (Optional)</label>
+              <textarea [(ngModel)]="formData.intentPrompt" name="intentPrompt" rows="3"
+                class="input-field" placeholder="Custom prompt for intent detection..."></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Response Template (Optional)</label>
+              <textarea [(ngModel)]="formData.responseTemplate" name="responseTemplate" rows="3"
+                class="input-field" placeholder="Custom template for response formatting..."></textarea>
+            </div>
+          </form>
+        </div>
+
+        <div class="p-6 border-t border-slate-700 flex justify-end gap-3">
+          <button (click)="closeModal()" class="btn-secondary">Cancel</button>
+          <button (click)="saveScenario()" class="btn-primary">{{ isEditing ? 'Update' : 'Create' }} Scenario</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

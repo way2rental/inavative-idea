@@ -1,64 +1,232 @@
-<div class="chat-container">
-  <div class="chat-header">
-    <h2>AI Assistant</h2>
-    <button class="clear-btn" (click)="clearChat()">Clear Chat</button>
-  </div>
-
-  <div class="messages-container">
-    @if (messages.length === 0) {
-      <div class="welcome-message">
-        <h3>Welcome to AI Orchestrator</h3>
-        <p>I can help you with:</p>
-        <ul>
-          <li>Check transaction status (e.g., "What's the status of transaction TXN123?")</li>
-          <li>File processing status (e.g., "Check status of file salary_batch.csv")</li>
-          <li>Account summary (e.g., "Show summary for account ACC456")</li>
-        </ul>
-      </div>
-    }
-
-    @for (message of messages; track message.timestamp) {
-      <div class="message" [class.user]="message.role === 'user'" [class.assistant]="message.role === 'assistant'" [class.loading]="message.isLoading">
-        <div class="message-avatar">
-          @if (message.role === 'user') {
-            <span>👤</span>
-          } @else {
-            <span>🤖</span>
-          }
+<div class="h-screen flex bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+  <!-- Sidebar -->
+  <div class="w-72 border-r border-slate-700/50 bg-slate-900/50 backdrop-blur-sm flex flex-col"
+       [class.hidden]="!showSidebar" [class.lg:flex]="true">
+    <!-- Logo -->
+    <div class="p-6 border-b border-slate-700/50">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-500 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
         </div>
-        <div class="message-content">
-          @if (message.isLoading) {
-            <div class="loading-dots">
-              <span></span>
-              <span></span>
-              <span></span>
+        <div>
+          <h1 class="text-lg font-bold gradient-text">AI Orchestrator</h1>
+          <p class="text-xs text-slate-400">Enterprise Chat</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Info -->
+    <div class="p-4 border-b border-slate-700/50">
+      <div class="flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl">
+        <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full flex items-center justify-center">
+          <span class="text-white font-bold">{{ getCurrentUser().charAt(0).toUpperCase() }}</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-white font-medium truncate">{{ getCurrentUser() }}</p>
+          <p class="text-xs text-slate-400">{{ getUserRole() }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flex-1 overflow-y-auto p-4">
+      <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">Quick Actions</p>
+      <div class="space-y-2">
+        @for (action of quickActions; track action.label) {
+          <button (click)="sendMessage(action.query)" 
+            class="w-full text-left p-3 rounded-xl bg-slate-800/30 hover:bg-slate-700/50 transition-all group">
+            <div class="flex items-center gap-3">
+              <span class="text-xl">{{ action.icon }}</span>
+              <span class="text-slate-300 text-sm group-hover:text-white transition-colors">{{ action.label }}</span>
             </div>
-          } @else {
-            <p>{{ message.content }}</p>
-          }
-          <span class="message-time">{{ message.timestamp | date:'shortTime' }}</span>
-        </div>
+          </button>
+        }
       </div>
-    }
+
+      <div class="mt-6">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">Navigation</p>
+        <a routerLink="/admin" class="flex items-center gap-3 p-3 rounded-xl bg-slate-800/30 hover:bg-primary-500/20 transition-all group">
+          <svg class="w-5 h-5 text-slate-400 group-hover:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span class="text-slate-300 text-sm group-hover:text-white">Admin Panel</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Bottom Actions -->
+    <div class="p-4 border-t border-slate-700/50 space-y-2">
+      <button (click)="clearChat()" class="w-full btn-secondary flex items-center justify-center gap-2 text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+        Clear Chat
+      </button>
+      <button (click)="logout()" class="w-full btn-danger flex items-center justify-center gap-2 text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+        Logout
+      </button>
+    </div>
   </div>
 
-  <div class="input-container">
-    <textarea
-      [(ngModel)]="inputMessage"
-      (keypress)="onKeyPress($event)"
-      placeholder="Type your message here..."
-      [disabled]="isLoading"
-      rows="2"
-    ></textarea>
-    <button 
-      class="send-btn" 
-      (click)="sendMessage()" 
-      [disabled]="isLoading || !inputMessage.trim()">
-      @if (isLoading) {
-        <span class="spinner"></span>
+  <!-- Main Chat Area -->
+  <div class="flex-1 flex flex-col">
+    <!-- Chat Header -->
+    <div class="h-16 border-b border-slate-700/50 bg-slate-900/30 backdrop-blur-sm flex items-center justify-between px-6">
+      <div class="flex items-center gap-4">
+        <button (click)="toggleSidebar()" class="lg:hidden text-slate-400 hover:text-white">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div>
+          <h2 class="text-white font-semibold">AI Assistant</h2>
+          <p class="text-xs text-slate-400">
+            @if (isStreaming) {
+              <span class="flex items-center gap-1">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                Streaming response...
+              </span>
+            } @else if (isLoading) {
+              <span class="flex items-center gap-1">
+                <span class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                Thinking...
+              </span>
+            } @else {
+              <span class="flex items-center gap-1">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                Online
+              </span>
+            }
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="badge-success text-xs">Ollama Connected</span>
+      </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div #messagesContainer class="flex-1 overflow-y-auto p-6">
+      @if (messages.length === 0) {
+        <!-- Welcome Screen -->
+        <div class="h-full flex items-center justify-center">
+          <div class="text-center max-w-lg">
+            <div class="w-20 h-20 bg-gradient-to-br from-primary-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary-500/25">
+              <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <h2 class="text-2xl font-bold gradient-text mb-3">Welcome to AI Orchestrator</h2>
+            <p class="text-slate-400 mb-8">
+              I'm your enterprise AI assistant. I can help you check transaction status, 
+              file processing, account summaries, and more.
+            </p>
+            <div class="grid grid-cols-2 gap-3">
+              @for (action of quickActions; track action.label) {
+                <button (click)="sendMessage(action.query)"
+                  class="p-4 card-hover text-left transition-all">
+                  <span class="text-2xl mb-2 block">{{ action.icon }}</span>
+                  <p class="text-white font-medium text-sm">{{ action.label }}</p>
+                </button>
+              }
+            </div>
+          </div>
+        </div>
       } @else {
-        Send
+        <!-- Chat Messages -->
+        <div class="space-y-6 max-w-4xl mx-auto">
+          @for (message of messages; track message.timestamp) {
+            <div class="flex gap-4" [class.flex-row-reverse]="message.role === 'user'">
+              <!-- Avatar -->
+              <div class="flex-shrink-0">
+                @if (message.role === 'user') {
+                  <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full flex items-center justify-center">
+                    <span class="text-white font-bold text-sm">{{ getCurrentUser().charAt(0).toUpperCase() }}</span>
+                  </div>
+                } @else {
+                  <div class="w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-500 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                }
+              </div>
+
+              <!-- Message Content -->
+              <div class="flex-1 max-w-[80%]" [class.text-right]="message.role === 'user'">
+                <div class="inline-block text-left"
+                  [class]="message.role === 'user' 
+                    ? 'bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-2xl rounded-tr-sm px-5 py-3 shadow-lg shadow-primary-500/20' 
+                    : 'bg-slate-800/50 text-slate-200 rounded-2xl rounded-tl-sm px-5 py-3 border border-slate-700/50'">
+                  @if (message.isLoading) {
+                    <div class="flex items-center gap-2">
+                      <div class="flex gap-1">
+                        <span class="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style="animation-delay: 0s"></span>
+                        <span class="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></span>
+                        <span class="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+                      </div>
+                      <span class="text-slate-400 text-sm">Thinking...</span>
+                    </div>
+                  } @else {
+                    <p class="whitespace-pre-wrap leading-relaxed">{{ message.content }}</p>
+                  }
+                </div>
+                <p class="text-xs text-slate-500 mt-1.5" [class.text-right]="message.role === 'user'">
+                  {{ message.timestamp | date:'shortTime' }}
+                </p>
+              </div>
+            </div>
+          }
+        </div>
       }
-    </button>
+    </div>
+
+    <!-- Input Area -->
+    <div class="border-t border-slate-700/50 bg-slate-900/30 backdrop-blur-sm p-4">
+      <div class="max-w-4xl mx-auto">
+        <div class="flex gap-3">
+          <div class="flex-1 relative">
+            <textarea
+              [(ngModel)]="inputMessage"
+              (keypress)="onKeyPress($event)"
+              placeholder="Type your message here... (Press Enter to send)"
+              [disabled]="isLoading"
+              rows="1"
+              class="w-full px-5 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-400 
+                     focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all resize-none
+                     disabled:opacity-50 disabled:cursor-not-allowed"
+            ></textarea>
+          </div>
+          <button 
+            (click)="sendMessage()" 
+            [disabled]="isLoading || !inputMessage.trim()"
+            class="px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium 
+                   hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg shadow-primary-500/25
+                   disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none
+                   flex items-center gap-2">
+            @if (isLoading) {
+              <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            } @else {
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            }
+            Send
+          </button>
+        </div>
+        <p class="text-xs text-slate-500 mt-2 text-center">
+          AI responses are generated by Ollama LLM. Always verify important information.
+        </p>
+      </div>
+    </div>
   </div>
 </div>

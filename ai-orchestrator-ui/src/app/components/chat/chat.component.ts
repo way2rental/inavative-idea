@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ChatMessage, ChatRequest, ChatResponse } from '../../models/chat.model';
@@ -8,51 +9,109 @@ import { ChatMessage, ChatRequest, ChatResponse } from '../../models/chat.model'
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './chat.component.html',
-  styleUrl: './chat.component.scss'
+  imports: [CommonModule, FormsModule, RouterModule],
+  templateUrl: './chat.component.html'
 })
-export class ChatComponent {
+export class ChatComponent implements AfterViewChecked {
+  @ViewChild('messagesContainer') private messagesContainer!: ElementRef;
+  
   messages: ChatMessage[] = [];
   inputMessage = '';
   sessionId: string | null = null;
   isLoading = false;
+  isStreaming = false;
+  streamingContent = '';
+  showSidebar = true;
+
+  quickActions = [
+    { icon: '💳', label: 'Transaction Status', query: 'What is the status of transaction TXN123?' },
+    { icon: '📁', label: 'File Status', query: 'Check status of file salary_batch.csv' },
+    { icon: '📊', label: 'Account Summary', query: 'Show summary for account ACC456' },
+    { icon: '💰', label: 'Balance Inquiry', query: 'What is my current balance?' }
+  ];
 
   constructor(
     private apiService: ApiService,
     private authService: AuthService
   ) {}
 
-  sendMessage(): void {
-    if (!this.inputMessage.trim() || this.isLoading) return;
+  ngAfterViewChecked(): void {
+    this.scrollToBottom();
+  }
+
+  scrollToBottom(): void {
+    try {
+      this.messagesContainer.nativeElement.scrollTop = this.messagesContainer.nativeElement.scrollHeight;
+    } catch(err) {}
+  }
+
+  sendMessage(query?: string): void {
+    const message = query || this.inputMessage;
+    if (!message.trim() || this.isLoading) return;
 
     const userMessage: ChatMessage = {
       role: 'user',
-      content: this.inputMessage,
+      content: message,
       timestamp: new Date()
     };
     this.messages.push(userMessage);
 
-    const loadingMessage: ChatMessage = {
-      role: 'assistant',
-      content: 'Thinking...',
-      timestamp: new Date(),
-      isLoading: true
-    };
-    this.messages.push(loadingMessage);
-
     const request: ChatRequest = {
       userId: this.authService.getCurrentUser()?.username || 'anonymous',
-      query: this.inputMessage,
+      query: message,
       sessionId: this.sessionId || undefined
     };
 
     this.inputMessage = '';
     this.isLoading = true;
 
+    // Try streaming first
+    this.streamMessage(request);
+  }
+
+  streamMessage(request: ChatRequest): void {
+    this.isStreaming = true;
+    this.streamingContent = '';
+    
+    const assistantMessage: ChatMessage = {
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isLoading: true
+    };
+    this.messages.push(assistantMessage);
+
+    // Use regular chat as EventSource may not be available
+    this.apiService.chatStream(request).subscribe({
+      next: (chunk: string) => {
+        this.streamingContent += chunk;
+        assistantMessage.content = this.streamingContent;
+        assistantMessage.isLoading = false;
+      },
+      error: () => {
+        // Fallback to regular chat
+        this.messages.pop();
+        this.regularChat(request);
+      },
+      complete: () => {
+        this.isLoading = false;
+        this.isStreaming = false;
+        assistantMessage.isLoading = false;
+      }
+    });
+  }
+
+  regularChat(request: ChatRequest): void {
+    const loadingMessage: ChatMessage = {
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isLoading: true
+    };
+    this.messages.push(loadingMessage);
+
     this.apiService.chat(request).subscribe({
       next: (response: ChatResponse) => {
-        // Remove loading message
         this.messages = this.messages.filter(m => !m.isLoading);
         
         const assistantMessage: ChatMessage = {
@@ -67,12 +126,11 @@ export class ChatComponent {
       },
       error: (error) => {
         console.error('Chat error:', error);
-        // Remove loading message
         this.messages = this.messages.filter(m => !m.isLoading);
         
         const errorMessage: ChatMessage = {
           role: 'assistant',
-          content: 'Sorry, an error occurred. Please try again.',
+          content: 'Sorry, I encountered an error. Please try again or check if the backend is running.',
           timestamp: new Date()
         };
         this.messages.push(errorMessage);
@@ -91,5 +149,22 @@ export class ChatComponent {
       event.preventDefault();
       this.sendMessage();
     }
+  }
+
+  getCurrentUser(): string {
+    return this.authService.getCurrentUser()?.username || 'User';
+  }
+
+  getUserRole(): string {
+    return this.authService.getCurrentUser()?.role || 'USER';
+  }
+
+  logout(): void {
+    this.authService.logout();
+    window.location.href = '/login';
+  }
+
+  toggleSidebar(): void {
+    this.showSidebar = !this.showSidebar;
   }
 }
