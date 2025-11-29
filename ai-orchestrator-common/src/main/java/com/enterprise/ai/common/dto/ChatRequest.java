@@ -11,7 +11,7 @@ import java.util.Map;
 
 /**
  * Request DTO for chat interactions.
- * Supports regular queries, confirmations, and clarifications.
+ * Supports regular queries, confirmations, clarifications, and dry-run mode.
  */
 @Data
 @Builder
@@ -52,6 +52,14 @@ public class ChatRequest {
      * Pending scenario (passed back from confirmation flow)
      */
     private String pendingScenario;
+
+    /**
+     * Dry-run mode flag.
+     * When true, executes everything except calling real backend.
+     * Returns what would have happened without making actual changes.
+     */
+    @Builder.Default
+    private boolean dryRun = false;
 
     /**
      * Types of chat requests

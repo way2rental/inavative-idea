@@ -55,6 +55,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/ollama/health").permitAll()
+                        .requestMatchers("/api/v2/scenario/test").permitAll()  // Sandbox tester
+                        .requestMatchers("/api/v2/scenario/tests/**").permitAll()  // Test results
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()

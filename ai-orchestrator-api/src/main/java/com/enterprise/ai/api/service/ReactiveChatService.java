@@ -1,7 +1,7 @@
 package com.enterprise.ai.api.service;
 
 import com.enterprise.ai.common.dto.*;
-import com.enterprise.ai.core.router.DbDrivenScenarioRouter;
+import com.enterprise.ai.core.router.DynamicScenarioRouter;
 import com.enterprise.ai.data.entity.AiAuditLog;
 import com.enterprise.ai.data.entity.ChatMessage;
 import com.enterprise.ai.data.entity.ChatSession;
@@ -26,6 +26,7 @@ import java.util.*;
 
 /**
  * Reactive chat service with non-blocking Ollama calls and SSE streaming support.
+ * Uses DynamicScenarioRouter for config-driven scenario execution.
  * Implements 3-layer protection system with performance logging.
  */
 @Slf4j
@@ -36,7 +37,7 @@ public class ReactiveChatService {
             "(yes|y|yeah|yep|sure|ok|okay|proceed|confirm|haan|ha|theek hai).*";
 
     private final ReactiveLlmClient llmClient;
-    private final DbDrivenScenarioRouter scenarioRouter;
+    private final DynamicScenarioRouter scenarioRouter;
     private final RbacService rbacService;
     private final IntentValidationService validationService;
     private final PerformanceLoggingService perfService;
@@ -51,9 +52,12 @@ public class ReactiveChatService {
     private final long maxOllamaTimeoutMs;
     private final long maxDbTimeoutMs;
 
+    // Dry-run mode flag
+    private final boolean dryRunMode;
+
     public ReactiveChatService(
             ReactiveLlmClient llmClient,
-            DbDrivenScenarioRouter scenarioRouter,
+            DynamicScenarioRouter scenarioRouter,
             RbacService rbacService,
             IntentValidationService validationService,
             PerformanceLoggingService perfService,
@@ -64,7 +68,8 @@ public class ReactiveChatService {
             OllamaProperties ollamaProperties,
             @Value("${runtime.protection.max-execution-time-ms:60000}") long maxExecutionTimeMs,
             @Value("${runtime.protection.max-ollama-timeout-ms:120000}") long maxOllamaTimeoutMs,
-            @Value("${runtime.protection.max-db-timeout-ms:5000}") long maxDbTimeoutMs) {
+            @Value("${runtime.protection.max-db-timeout-ms:5000}") long maxDbTimeoutMs,
+            @Value("${runtime.dry-run-mode:false}") boolean dryRunMode) {
         this.llmClient = llmClient;
         this.scenarioRouter = scenarioRouter;
         this.rbacService = rbacService;
@@ -78,12 +83,20 @@ public class ReactiveChatService {
         this.maxExecutionTimeMs = maxExecutionTimeMs;
         this.maxOllamaTimeoutMs = maxOllamaTimeoutMs;
         this.maxDbTimeoutMs = maxDbTimeoutMs;
+        this.dryRunMode = dryRunMode;
     }
 
     /**
      * Process chat request reactively (non-blocking).
      */
     public Mono<ChatResponse> processChatReactive(ChatRequest request) {
+        return processChatReactive(request, request.isDryRun() || dryRunMode);
+    }
+
+    /**
+     * Process chat request with explicit dry-run mode.
+     */
+    public Mono<ChatResponse> processChatReactive(ChatRequest request, boolean dryRun) {
         String executionId = UUID.randomUUID().toString();
         PerformanceLoggingService.ExecutionTracker tracker = perfService.startTracking(executionId)
                 .withUserId(request.getUserId());
@@ -96,7 +109,7 @@ public class ReactiveChatService {
             
             // Handle confirmation/clarification responses
             if (request.isConfirmationResponse() || request.isClarificationResponse()) {
-                return handleSpecialResponses(request, sessionId, executionId, tracker);
+                return handleSpecialResponses(request, sessionId, executionId, tracker, dryRun);
             }
             
             // Save user message
@@ -120,7 +133,7 @@ public class ReactiveChatService {
                         log.info("Detected intent: scenario={}, confidence={}", 
                                 intent.getScenario(), intent.getConfidence());
                     })
-                    .flatMap(intent -> processIntent(intent, request, sessionId, executionId, tracker, requestTime))
+                    .flatMap(intent -> processIntent(intent, request, sessionId, executionId, tracker, requestTime, dryRun))
                     .doOnSuccess(response -> tracker.complete())
                     .doOnError(e -> {
                         tracker.markFailed();
@@ -188,7 +201,8 @@ public class ReactiveChatService {
             String sessionId,
             String executionId,
             PerformanceLoggingService.ExecutionTracker tracker,
-            Instant requestTime) {
+            Instant requestTime,
+            boolean dryRun) {
         
         // Validation
         tracker.startValidation();
@@ -210,7 +224,7 @@ public class ReactiveChatService {
         }
 
         // Execute scenario (non-blocking)
-        return executeScenarioReactive(intent, request, sessionId, executionId, tracker, requestTime);
+        return executeScenarioReactive(intent, request, sessionId, executionId, tracker, requestTime, dryRun);
     }
 
     private Mono<ChatResponse> executeScenarioReactive(
@@ -219,7 +233,8 @@ public class ReactiveChatService {
             String sessionId,
             String executionId,
             PerformanceLoggingService.ExecutionTracker tracker,
-            Instant requestTime) {
+            Instant requestTime,
+            boolean dryRun) {
         
         ScenarioRequest scenarioRequest = ScenarioRequest.builder()
                 .scenario(intent.getScenario())
@@ -230,7 +245,8 @@ public class ReactiveChatService {
 
         tracker.startDbExecution();
         
-        return scenarioRouter.routeReactive(scenarioRequest)
+        // Use DynamicScenarioRouter with dry-run support
+        return scenarioRouter.routeReactive(scenarioRequest, dryRun)
                 .timeout(Duration.ofMillis(maxDbTimeoutMs))
                 .doOnSuccess(r -> tracker.endDbExecution())
                 .flatMap(result -> {
@@ -271,7 +287,8 @@ public class ReactiveChatService {
             ChatRequest request, 
             String sessionId, 
             String executionId,
-            PerformanceLoggingService.ExecutionTracker tracker) {
+            PerformanceLoggingService.ExecutionTracker tracker,
+            boolean dryRun) {
         
         if (request.isConfirmationResponse()) {
             saveMessageSync(sessionId, "user", request.getQuery());
@@ -286,7 +303,7 @@ public class ReactiveChatService {
                             .missingParams(List.of())
                             .build();
                     tracker.withScenario(intent.getScenario());
-                    return executeScenarioReactive(intent, request, sessionId, executionId, tracker, Instant.now());
+                    return executeScenarioReactive(intent, request, sessionId, executionId, tracker, Instant.now(), dryRun);
                 }
             }
             
@@ -297,12 +314,13 @@ public class ReactiveChatService {
         }
         
         // Handle clarification response
-        return handleClarificationResponseReactive(request, sessionId, executionId, tracker);
+        return handleClarificationResponseReactive(request, sessionId, executionId, tracker, dryRun);
     }
 
     private Mono<ChatResponse> handleClarificationResponseReactive(
             ChatRequest request, String sessionId, String executionId,
-            PerformanceLoggingService.ExecutionTracker tracker) {
+            PerformanceLoggingService.ExecutionTracker tracker,
+            boolean dryRun) {
         
         saveMessageSync(sessionId, "user", request.getQuery());
         
@@ -338,7 +356,7 @@ public class ReactiveChatService {
                                     });
                         }
                         
-                        return executeScenarioReactive(intent, request, sessionId, executionId, tracker, Instant.now());
+                        return executeScenarioReactive(intent, request, sessionId, executionId, tracker, Instant.now(), dryRun);
                     });
         }
         

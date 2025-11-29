@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>AI Orchestrator Core</name>
-    <description>Core scenario engine, router, and executor framework</description>
+    <description>Core scenario engine, dynamic router, and pluggable executor framework</description>
 
     <dependencies>
         <!-- Internal modules -->
@@ -43,6 +43,22 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- Spring JDBC for QueryExecutor -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
+        <!-- Resilience4j for circuit breaker in HttpCallExecutor -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-reactor</artifactId>
         </dependency>
     </dependencies>
 </project>
