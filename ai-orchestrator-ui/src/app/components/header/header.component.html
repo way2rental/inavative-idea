@@ -1,0 +1,16 @@
+<header class="app-header">
+  <div class="header-content">
+    <div class="logo">
+      <span class="logo-icon">🤖</span>
+      <span class="logo-text">AI Orchestrator</span>
+    </div>
+
+    @if (currentUser) {
+      <div class="user-info">
+        <span class="user-name">{{ currentUser.username }}</span>
+        <span class="user-role">{{ currentUser.role }}</span>
+        <button class="logout-btn" (click)="logout()">Logout</button>
+      </div>
+    }
+  </div>
+</header>

@@ -1,0 +1,64 @@
+<div class="chat-container">
+  <div class="chat-header">
+    <h2>AI Assistant</h2>
+    <button class="clear-btn" (click)="clearChat()">Clear Chat</button>
+  </div>
+
+  <div class="messages-container">
+    @if (messages.length === 0) {
+      <div class="welcome-message">
+        <h3>Welcome to AI Orchestrator</h3>
+        <p>I can help you with:</p>
+        <ul>
+          <li>Check transaction status (e.g., "What's the status of transaction TXN123?")</li>
+          <li>File processing status (e.g., "Check status of file salary_batch.csv")</li>
+          <li>Account summary (e.g., "Show summary for account ACC456")</li>
+        </ul>
+      </div>
+    }
+
+    @for (message of messages; track message.timestamp) {
+      <div class="message" [class.user]="message.role === 'user'" [class.assistant]="message.role === 'assistant'" [class.loading]="message.isLoading">
+        <div class="message-avatar">
+          @if (message.role === 'user') {
+            <span>👤</span>
+          } @else {
+            <span>🤖</span>
+          }
+        </div>
+        <div class="message-content">
+          @if (message.isLoading) {
+            <div class="loading-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          } @else {
+            <p>{{ message.content }}</p>
+          }
+          <span class="message-time">{{ message.timestamp | date:'shortTime' }}</span>
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="input-container">
+    <textarea
+      [(ngModel)]="inputMessage"
+      (keypress)="onKeyPress($event)"
+      placeholder="Type your message here..."
+      [disabled]="isLoading"
+      rows="2"
+    ></textarea>
+    <button 
+      class="send-btn" 
+      (click)="sendMessage()" 
+      [disabled]="isLoading || !inputMessage.trim()">
+      @if (isLoading) {
+        <span class="spinner"></span>
+      } @else {
+        Send
+      }
+    </button>
+  </div>
+</div>

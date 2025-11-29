@@ -1,0 +1,93 @@
+# AI Orchestrator Application Configuration
+
+spring:
+  application:
+    name: ai-orchestrator
+
+  # Database Configuration
+  datasource:
+    url: jdbc:mysql://localhost:3306/ai_orchestrator?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  # Redis Configuration (optional)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+
+# Server Configuration
+server:
+  port: 8080
+
+# Ollama Configuration
+ollama:
+  base-url: http://localhost:11434
+  model: llama3:8b
+  timeout-seconds: 60
+  enabled: true
+
+# JWT Configuration
+jwt:
+  secret: your-256-bit-secret-key-for-jwt-token-generation-change-in-production
+  expiration: 86400000  # 24 hours in milliseconds
+
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      ollama:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30000
+        permittedNumberOfCallsInHalfOpenState: 3
+  ratelimiter:
+    instances:
+      ollama:
+        limitForPeriod: 10
+        limitRefreshPeriod: 1s
+        timeoutDuration: 5s
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.enterprise.ai: DEBUG
+    org.springframework.security: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# OpenAPI Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method

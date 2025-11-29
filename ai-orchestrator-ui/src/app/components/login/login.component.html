@@ -1,0 +1,56 @@
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-header">
+      <h1>🤖 AI Orchestrator</h1>
+      <p>Enterprise Scenario-Driven AI Platform</p>
+    </div>
+
+    <form (ngSubmit)="login()" class="login-form">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input
+          type="text"
+          id="username"
+          [(ngModel)]="username"
+          name="username"
+          placeholder="Enter your username"
+          [disabled]="isLoading"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="role">Role</label>
+        <select
+          id="role"
+          [(ngModel)]="role"
+          name="role"
+          [disabled]="isLoading"
+        >
+          @for (r of roles; track r) {
+            <option [value]="r">{{ r }}</option>
+          }
+        </select>
+      </div>
+
+      @if (errorMessage) {
+        <div class="error-message">
+          {{ errorMessage }}
+        </div>
+      }
+
+      <button type="submit" class="login-btn" [disabled]="isLoading">
+        @if (isLoading) {
+          <span class="spinner"></span>
+          Logging in...
+        } @else {
+          Login
+        }
+      </button>
+    </form>
+
+    <div class="login-footer">
+      <p>Note: This is a demo login for testing purposes.</p>
+      <p>Different roles have access to different scenarios.</p>
+    </div>
+  </div>
+</div>
