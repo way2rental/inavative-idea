@@ -12,8 +12,8 @@ import com.enterprise.ai.llm.client.ReactiveLlmClient;
 import com.enterprise.ai.llm.config.OllamaProperties;
 import com.enterprise.ai.security.rbac.RbacService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -30,7 +30,6 @@ import java.util.*;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ReactiveChatService {
 
     private static final String AFFIRMATIVE_PATTERN = 
@@ -47,10 +46,39 @@ public class ReactiveChatService {
     private final ObjectMapper objectMapper;
     private final OllamaProperties ollamaProperties;
 
-    // Runtime protection limits
-    private static final long MAX_EXECUTION_TIME_MS = 60000; // 60 seconds total
-    private static final long MAX_OLLAMA_TIMEOUT_MS = 120000; // 120 seconds for LLM
-    private static final long MAX_DB_TIMEOUT_MS = 5000; // 5 seconds for DB
+    // Configurable runtime protection limits
+    private final long maxExecutionTimeMs;
+    private final long maxOllamaTimeoutMs;
+    private final long maxDbTimeoutMs;
+
+    public ReactiveChatService(
+            ReactiveLlmClient llmClient,
+            DbDrivenScenarioRouter scenarioRouter,
+            RbacService rbacService,
+            IntentValidationService validationService,
+            PerformanceLoggingService perfService,
+            ChatSessionRepository sessionRepository,
+            ChatMessageRepository messageRepository,
+            AiAuditLogRepository auditLogRepository,
+            ObjectMapper objectMapper,
+            OllamaProperties ollamaProperties,
+            @Value("${runtime.protection.max-execution-time-ms:60000}") long maxExecutionTimeMs,
+            @Value("${runtime.protection.max-ollama-timeout-ms:120000}") long maxOllamaTimeoutMs,
+            @Value("${runtime.protection.max-db-timeout-ms:5000}") long maxDbTimeoutMs) {
+        this.llmClient = llmClient;
+        this.scenarioRouter = scenarioRouter;
+        this.rbacService = rbacService;
+        this.validationService = validationService;
+        this.perfService = perfService;
+        this.sessionRepository = sessionRepository;
+        this.messageRepository = messageRepository;
+        this.auditLogRepository = auditLogRepository;
+        this.objectMapper = objectMapper;
+        this.ollamaProperties = ollamaProperties;
+        this.maxExecutionTimeMs = maxExecutionTimeMs;
+        this.maxOllamaTimeoutMs = maxOllamaTimeoutMs;
+        this.maxDbTimeoutMs = maxDbTimeoutMs;
+    }
 
     /**
      * Process chat request reactively (non-blocking).
@@ -85,7 +113,7 @@ public class ReactiveChatService {
                     : llmClient.detectIntent(request.getQuery(), sessionContext);
             
             return intentMono
-                    .timeout(Duration.ofMillis(MAX_OLLAMA_TIMEOUT_MS))
+                    .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
                     .doOnSuccess(intent -> {
                         tracker.endIntentDetection();
                         tracker.withScenario(intent.getScenario());
@@ -99,7 +127,7 @@ public class ReactiveChatService {
                         tracker.complete();
                     });
         })
-        .timeout(Duration.ofMillis(MAX_EXECUTION_TIME_MS))
+        .timeout(Duration.ofMillis(maxExecutionTimeMs))
         .onErrorResume(e -> {
             log.error("Error processing chat request: {}", e.getMessage());
             return Mono.just(buildErrorResponse(request.getSessionId(), 
@@ -147,7 +175,7 @@ public class ReactiveChatService {
                     .flatMapMany(result -> 
                             llmClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery()));
         })
-        .timeout(Duration.ofMillis(MAX_EXECUTION_TIME_MS))
+        .timeout(Duration.ofMillis(maxExecutionTimeMs))
         .onErrorResume(e -> {
             log.error("Streaming error: {}", e.getMessage());
             return Flux.just("An error occurred. Please try again.");
@@ -203,13 +231,13 @@ public class ReactiveChatService {
         tracker.startDbExecution();
         
         return scenarioRouter.routeReactive(scenarioRequest)
-                .timeout(Duration.ofMillis(MAX_DB_TIMEOUT_MS))
+                .timeout(Duration.ofMillis(maxDbTimeoutMs))
                 .doOnSuccess(r -> tracker.endDbExecution())
                 .flatMap(result -> {
                     // Format response (non-blocking)
                     tracker.startFormatting();
                     return llmClient.formatResponse(intent.getScenario(), result, request.getQuery())
-                            .timeout(Duration.ofMillis(MAX_OLLAMA_TIMEOUT_MS))
+                            .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
                             .doOnSuccess(r -> tracker.endFormatting())
                             .map(formattedResponse -> {
                                 saveMessageSync(sessionId, "assistant", formattedResponse);

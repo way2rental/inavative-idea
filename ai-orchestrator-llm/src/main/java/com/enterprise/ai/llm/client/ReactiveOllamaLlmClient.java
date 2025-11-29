@@ -236,15 +236,25 @@ public class ReactiveOllamaLlmClient implements ReactiveLlmClient {
 
     // ===== NON-BLOCKING OLLAMA CALLS =====
 
-    private Mono<String> callOllamaNonBlocking(String model, String prompt, boolean stream) {
+    // LLM parameters - configurable
+    private static final double DEFAULT_TEMPERATURE = 0.3;
+    private static final double STREAMING_TEMPERATURE = 0.4;
+    private static final int DEFAULT_NUM_PREDICT = 1024;
+
+    private Map<String, Object> buildRequestBody(String model, String prompt, boolean stream, double temperature) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("model", model);
         requestBody.put("prompt", prompt);
         requestBody.put("stream", stream);
         requestBody.put("options", Map.of(
-                "temperature", 0.3,
-                "num_predict", 1024
+                "temperature", temperature,
+                "num_predict", DEFAULT_NUM_PREDICT
         ));
+        return requestBody;
+    }
+
+    private Mono<String> callOllamaNonBlocking(String model, String prompt, boolean stream) {
+        Map<String, Object> requestBody = buildRequestBody(model, prompt, stream, DEFAULT_TEMPERATURE);
 
         log.debug("Calling Ollama [non-blocking] model={}, prompt length={}", model, prompt.length());
 
@@ -271,14 +281,7 @@ public class ReactiveOllamaLlmClient implements ReactiveLlmClient {
     }
 
     private Flux<String> callOllamaStreaming(String model, String prompt) {
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("prompt", prompt);
-        requestBody.put("stream", true);
-        requestBody.put("options", Map.of(
-                "temperature", 0.4,
-                "num_predict", 1024
-        ));
+        Map<String, Object> requestBody = buildRequestBody(model, prompt, true, STREAMING_TEMPERATURE);
 
         log.debug("Calling Ollama [streaming] model={}", model);
 
@@ -293,10 +296,6 @@ public class ReactiveOllamaLlmClient implements ReactiveLlmClient {
                         JsonNode node = objectMapper.readTree(line);
                         if (node.has("response")) {
                             String token = node.get("response").asText();
-                            boolean done = node.has("done") && node.get("done").asBoolean();
-                            if (done) {
-                                return Flux.just(token);
-                            }
                             return Flux.just(token);
                         }
                         return Flux.empty();
