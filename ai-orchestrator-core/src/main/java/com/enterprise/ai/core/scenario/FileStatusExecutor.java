@@ -2,18 +2,27 @@ package com.enterprise.ai.core.scenario;
 
 import com.enterprise.ai.common.dto.ScenarioRequest;
 import com.enterprise.ai.common.dto.ScenarioResult;
+import com.enterprise.ai.core.client.BusinessDataClient;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
 
-import java.time.Instant;
-import java.util.HashMap;
+import java.time.Duration;
 import java.util.Map;
 
 /**
- * Sample File Status executor.
- * This is a placeholder implementation - in production, it would query the database.
+ * File Status executor with real HTTP calls to business data service.
+ * Supports both sync and async execution modes.
  */
-public class FileStatusExecutor implements ScenarioExecutor {
+@Slf4j
+@RequiredArgsConstructor
+public class FileStatusExecutor implements ScenarioExecutor, ReactiveScenarioExecutor {
 
     public static final String SCENARIO_CODE = "FILE_STATUS";
+    private static final long MAX_EXECUTION_TIME_MS = 30000; // 30 seconds
+    private static final long DB_TIMEOUT_MS = 5000; // 5 seconds
+
+    private final BusinessDataClient businessDataClient;
 
     @Override
     public String getScenarioCode() {
@@ -22,22 +31,39 @@ public class FileStatusExecutor implements ScenarioExecutor {
 
     @Override
     public ScenarioResult execute(ScenarioRequest request) {
-        String fileName = (String) request.getParams().get("fileName");
+        // Blocking execution (for backwards compatibility)
+        return executeReactive(request)
+                .block(Duration.ofMillis(MAX_EXECUTION_TIME_MS));
+    }
 
-        // In production, this would query the database
-        // For now, return sample data
-        Map<String, Object> data = new HashMap<>();
-        data.put("fileName", fileName);
-        data.put("status", "PROCESSED");
-        data.put("totalRecords", 1000);
-        data.put("successRecords", 985);
-        data.put("failedRecords", 15);
-        data.put("processedAt", Instant.now().toString());
+    @Override
+    public Mono<ScenarioResult> executeReactive(ScenarioRequest request) {
+        log.info("Executing FILE_STATUS scenario for fileName: {}", request.getParams().get("fileName"));
+        
+        return businessDataClient.fetchBusinessData(SCENARIO_CODE, request.getParams())
+                .timeout(Duration.ofMillis(DB_TIMEOUT_MS))
+                .map(data -> ScenarioResult.builder()
+                        .scenario(SCENARIO_CODE)
+                        .data(data)
+                        .success(true)
+                        .build())
+                .doOnSuccess(r -> log.debug("FILE_STATUS executed successfully"))
+                .doOnError(e -> log.error("FILE_STATUS execution failed: {}", e.getMessage()))
+                .onErrorReturn(ScenarioResult.builder()
+                        .scenario(SCENARIO_CODE)
+                        .data(Map.of("error", "Failed to fetch file status"))
+                        .success(false)
+                        .errorMessage("Service temporarily unavailable")
+                        .build());
+    }
 
-        return ScenarioResult.builder()
-                .scenario(SCENARIO_CODE)
-                .data(data)
-                .success(true)
-                .build();
+    @Override
+    public long getMaxExecutionTimeMs() {
+        return MAX_EXECUTION_TIME_MS;
+    }
+
+    @Override
+    public long getDbTimeoutMs() {
+        return DB_TIMEOUT_MS;
     }
 }
