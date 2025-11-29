@@ -160,7 +160,7 @@ public class ConfigCacheService {
     @CacheEvict(value = "roleScenarioMap", allEntries = true)
     public void mapRoleToScenario(String role, String scenarioCode) {
         RoleScenarioMap mapping = RoleScenarioMap.builder()
-                .role(role)
+                .roleName(role)
                 .scenarioCode(scenarioCode)
                 .build();
         roleScenarioMapRepository.save(mapping);
@@ -172,7 +172,7 @@ public class ConfigCacheService {
 
     @CacheEvict(value = "roleScenarioMap", allEntries = true)
     public void unmapRoleFromScenario(String role, String scenarioCode) {
-        roleScenarioMapRepository.findByRoleAndScenarioCode(role, scenarioCode)
+        roleScenarioMapRepository.findByRoleNameAndScenarioCode(role, scenarioCode)
                 .ifPresent(m -> {
                     roleScenarioMapRepository.delete(m);
                     Set<String> scenarios = roleToScenariosMap.get(role);
@@ -211,10 +211,10 @@ public class ConfigCacheService {
         roleToScenariosMap.clear();
         scenarioToRolesMap.clear();
         roleScenarioMapRepository.findAll().forEach(m -> {
-            roleToScenariosMap.computeIfAbsent(m.getRole(), k -> ConcurrentHashMap.newKeySet())
+            roleToScenariosMap.computeIfAbsent(m.getRoleName(), k -> ConcurrentHashMap.newKeySet())
                     .add(m.getScenarioCode());
             scenarioToRolesMap.computeIfAbsent(m.getScenarioCode(), k -> ConcurrentHashMap.newKeySet())
-                    .add(m.getRole());
+                    .add(m.getRoleName());
         });
         log.info("Role-scenario mapping cache refreshed with {} roles", roleToScenariosMap.size());
     }
