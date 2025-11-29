@@ -32,6 +32,12 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ChatService {
 
+    /**
+     * Pattern for detecting affirmative responses (supports English and Hinglish).
+     */
+    private static final String AFFIRMATIVE_PATTERN = 
+            "(yes|y|yeah|yep|sure|ok|okay|proceed|confirm|haan|ha|theek hai).*";
+
     private final LlmClient llmClient;
     private final ScenarioRouter scenarioRouter;
     private final RbacService rbacService;
@@ -265,11 +271,17 @@ public class ChatService {
             String sessionContext = getSessionContext(sessionId);
             
             // Detect intent again with clarified context
-            IntentResult intent = llmClient.detectIntent(clarifiedQuery, sessionContext);
+            IntentResult detectedIntent = llmClient.detectIntent(clarifiedQuery, sessionContext);
             
-            // Force the scenario to what user selected
-            intent.setScenario(selectedScenario);
-            intent.setConfidence(0.95);  // User clarified
+            // Create a new intent with user-selected scenario (using builder for immutability)
+            IntentResult intent = IntentResult.builder()
+                    .scenario(selectedScenario)
+                    .confidence(0.95)  // User clarified
+                    .params(detectedIntent.getParams())
+                    .missingParams(detectedIntent.getMissingParams())
+                    .possibleScenarios(null)
+                    .reasoning("User selected from clarification options")
+                    .build();
             
             // Continue with normal validation (check params)
             IntentValidationService.ValidationResult validation = 
@@ -343,7 +355,7 @@ public class ChatService {
     private boolean isAffirmativeResponse(String response) {
         if (response == null) return false;
         String lower = response.toLowerCase().trim();
-        return lower.matches("(yes|y|yeah|yep|sure|ok|okay|proceed|confirm|haan|ha|theek hai).*");
+        return lower.matches(AFFIRMATIVE_PATTERN);
     }
 
     /**
