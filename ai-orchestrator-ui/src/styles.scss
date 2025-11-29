@@ -3,7 +3,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Global Styles for AI Orchestrator */
+/* Google Fonts - Roboto & Montserrat */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap');
+
+/* Axis Bank Global Styles */
 
 * {
   margin: 0;
@@ -13,99 +16,152 @@
 
 html, body {
   height: 100%;
-  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #0f172a;
-  color: #f8fafc;
+  font-family: 'Roboto', 'Segoe UI', Arial, sans-serif;
+  background-color: #F5F5F5;
+  color: #333333;
 }
 
-/* Custom scrollbar styling */
+/* Axis Bank scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1e293b;
+  background: #F0F0F0;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #97144D;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #6D0F37;
 }
 
-/* Focus outline */
+/* Focus outline - Axis burgundy */
 :focus-visible {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid #97144D;
   outline-offset: 2px;
 }
 
-/* Custom Tailwind components */
+/* Axis Bank Custom Components */
 @layer components {
-  .btn-primary {
-    @apply px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg font-medium 
-           hover:from-primary-600 hover:to-primary-700 transition-all duration-200 shadow-lg 
-           shadow-primary-500/25 hover:shadow-primary-500/40 disabled:opacity-50 disabled:cursor-not-allowed;
+  /* Primary Button - Axis Burgundy */
+  .btn-axis {
+    @apply px-6 py-3 bg-axis-burgundy text-white rounded-lg font-medium 
+           hover:bg-axis-maroon transition-all duration-200 shadow-md
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
   
-  .btn-secondary {
-    @apply px-4 py-2 bg-slate-700 text-slate-200 rounded-lg font-medium 
-           hover:bg-slate-600 transition-all duration-200 border border-slate-600;
-  }
-  
-  .btn-danger {
-    @apply px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-medium 
-           hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-lg shadow-red-500/25;
-  }
-  
-  .btn-success {
-    @apply px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-lg font-medium 
-           hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-lg shadow-emerald-500/25;
-  }
-  
-  .card {
-    @apply bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 shadow-xl;
-  }
-  
-  .card-hover {
-    @apply card hover:border-primary-500/50 hover:shadow-primary-500/10 transition-all duration-300;
-  }
-  
-  .input-field {
-    @apply w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-slate-200 
-           placeholder-slate-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 
+  .btn-axis-outline {
+    @apply px-6 py-3 bg-transparent text-axis-burgundy border-2 border-axis-burgundy 
+           rounded-lg font-medium hover:bg-axis-burgundy hover:text-white 
            transition-all duration-200;
   }
   
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium 
+           hover:bg-gray-200 transition-all duration-200 border border-gray-300;
+  }
+  
+  .btn-danger {
+    @apply px-4 py-2 bg-red-600 text-white rounded-lg font-medium 
+           hover:bg-red-700 transition-all duration-200;
+  }
+  
+  .btn-success {
+    @apply px-4 py-2 bg-green-600 text-white rounded-lg font-medium 
+           hover:bg-green-700 transition-all duration-200;
+  }
+  
+  /* Card Styles */
+  .card-axis {
+    @apply bg-white rounded-2xl shadow-card border border-gray-100;
+  }
+  
+  .card-hover {
+    @apply card-axis hover:shadow-elevated transition-all duration-300;
+  }
+  
+  /* Input Fields */
+  .input-axis {
+    @apply w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-800 
+           placeholder-gray-400 focus:border-axis-burgundy focus:ring-2 focus:ring-axis-burgundy/20 
+           transition-all duration-200;
+  }
+  
+  /* Badges */
   .badge {
-    @apply px-2 py-1 text-xs font-medium rounded-full;
+    @apply px-3 py-1 text-xs font-medium rounded-full;
   }
   
   .badge-success {
-    @apply badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30;
+    @apply badge bg-green-100 text-green-700;
   }
   
   .badge-warning {
-    @apply badge bg-amber-500/20 text-amber-400 border border-amber-500/30;
+    @apply badge bg-amber-100 text-amber-700;
   }
   
   .badge-danger {
-    @apply badge bg-red-500/20 text-red-400 border border-red-500/30;
+    @apply badge bg-red-100 text-red-700;
   }
   
   .badge-info {
-    @apply badge bg-blue-500/20 text-blue-400 border border-blue-500/30;
+    @apply badge bg-blue-100 text-blue-700;
   }
   
-  .glass-panel {
-    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl;
+  .badge-axis {
+    @apply badge bg-axis-burgundy/10 text-axis-burgundy;
   }
   
-  .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-400 via-purple-400 to-pink-400;
+  /* Chat Widget Specific */
+  .chat-bubble-user {
+    @apply bg-axis-burgundy text-white rounded-2xl rounded-br-sm px-4 py-3;
+  }
+  
+  .chat-bubble-bot {
+    @apply bg-white text-gray-800 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm border border-gray-100;
+  }
+  
+  /* Service Button Pills - Like AHA */
+  .service-pill {
+    @apply flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full 
+           text-sm text-gray-700 hover:border-axis-burgundy hover:text-axis-burgundy 
+           transition-all duration-200 cursor-pointer;
+  }
+  
+  .service-pill-active {
+    @apply service-pill border-axis-burgundy text-axis-burgundy bg-axis-burgundy/5;
+  }
+  
+  /* Axis Bank Header */
+  .axis-header {
+    @apply bg-axis-burgundy text-white;
+  }
+  
+  /* Floating Chat Button */
+  .chat-fab {
+    @apply fixed bottom-6 right-6 w-16 h-16 bg-axis-burgundy text-white rounded-full 
+           shadow-chat flex items-center justify-center cursor-pointer 
+           hover:bg-axis-maroon transition-all duration-300 z-50;
+  }
+  
+  /* Chat Container */
+  .chat-container {
+    @apply fixed bottom-24 right-6 w-96 h-[600px] bg-white rounded-2xl shadow-elevated 
+           flex flex-col overflow-hidden z-40 animate-slide-up;
+  }
+  
+  /* Status Indicator */
+  .status-online {
+    @apply w-2 h-2 bg-green-500 rounded-full;
+  }
+  
+  .status-offline {
+    @apply w-2 h-2 bg-gray-400 rounded-full;
   }
 }

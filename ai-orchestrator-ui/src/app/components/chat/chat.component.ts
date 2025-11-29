@@ -22,12 +22,29 @@ export class ChatComponent implements AfterViewChecked {
   isStreaming = false;
   streamingContent = '';
   showSidebar = true;
+  isChatOpen = true; // Chat widget open by default
 
+  // Quick actions for main page
   quickActions = [
     { icon: '💳', label: 'Transaction Status', query: 'What is the status of transaction TXN123?' },
     { icon: '📁', label: 'File Status', query: 'Check status of file salary_batch.csv' },
     { icon: '📊', label: 'Account Summary', query: 'Show summary for account ACC456' },
     { icon: '💰', label: 'Balance Inquiry', query: 'What is my current balance?' }
+  ];
+
+  // Quick services for AHA-style chat widget
+  quickServices = [
+    { icon: '🏦', label: 'Open Current Account', query: 'How to open a current account?', isNew: false },
+    { icon: '💰', label: 'Open Savings Account', query: 'How to open a savings account?', isNew: false },
+    { icon: '📈', label: 'Open Fixed Deposit', query: 'How to open a fixed deposit?', isNew: false },
+    { icon: '💳', label: 'Credit Card', query: 'Tell me about credit card services', isNew: false },
+    { icon: '🏠', label: 'Retail Loan Services', query: 'What retail loan services are available?', isNew: true },
+    { icon: '📊', label: 'Account', query: 'Show my account details', isNew: false },
+    { icon: '💵', label: 'Debit Card', query: 'Debit card related queries', isNew: false },
+    { icon: '📱', label: 'WhatsApp Banking', query: 'How to use WhatsApp banking?', isNew: true },
+    { icon: '🔗', label: 'API Support', query: 'API integration support', isNew: false },
+    { icon: '🏢', label: 'Corporate Banking', query: 'Corporate banking services', isNew: true },
+    { icon: '💼', label: 'Neo For Business', query: 'Tell me about Neo for Business', isNew: false }
   ];
 
   constructor(
@@ -41,8 +58,14 @@ export class ChatComponent implements AfterViewChecked {
 
   scrollToBottom(): void {
     try {
-      this.messagesContainer.nativeElement.scrollTop = this.messagesContainer.nativeElement.scrollHeight;
+      if (this.messagesContainer) {
+        this.messagesContainer.nativeElement.scrollTop = this.messagesContainer.nativeElement.scrollHeight;
+      }
     } catch(err) {}
+  }
+
+  toggleChat(): void {
+    this.isChatOpen = !this.isChatOpen;
   }
 
   sendMessage(query?: string): void {
