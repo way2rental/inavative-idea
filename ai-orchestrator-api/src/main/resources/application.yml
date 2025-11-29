@@ -40,7 +40,7 @@ server:
 ollama:
   base-url: http://localhost:11434
   model: llama3:8b
-  timeout-seconds: 60
+  timeout-seconds: 120
   enabled: true
 
 # JWT Configuration
@@ -54,10 +54,22 @@ resilience4j:
     instances:
       ollama:
         slidingWindowSize: 10
-        minimumNumberOfCalls: 5
+        minimumNumberOfCalls: 3
         failureRateThreshold: 50
         waitDurationInOpenState: 30000
         permittedNumberOfCallsInHalfOpenState: 3
+        slowCallDurationThreshold: 60000
+        slowCallRateThreshold: 80
+  retry:
+    instances:
+      ollama:
+        maxAttempts: 3
+        waitDuration: 1000
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - com.enterprise.ai.common.exception.LlmException
+          - org.springframework.web.reactive.function.client.WebClientResponseException
   ratelimiter:
     instances:
       ollama:
@@ -71,6 +83,7 @@ logging:
     root: INFO
     com.enterprise.ai: DEBUG
     org.springframework.security: INFO
+    io.github.resilience4j: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
 
