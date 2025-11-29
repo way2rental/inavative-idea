@@ -18,7 +18,18 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 /**
- * Security configuration.
+ * Security configuration for the AI Orchestrator API.
+ * 
+ * <p>This configuration sets up a stateless, JWT-based authentication system.
+ * CSRF protection is intentionally disabled because:</p>
+ * <ul>
+ *   <li>The API is stateless and does not use session cookies</li>
+ *   <li>Authentication is performed via JWT tokens in the Authorization header</li>
+ *   <li>JWT tokens are not automatically sent by browsers like cookies are</li>
+ *   <li>CORS is properly configured to restrict cross-origin requests</li>
+ * </ul>
+ * 
+ * @see <a href="https://owasp.org/www-community/vulnerabilities/Cross-Site_Request_Forgery_(CSRF)">OWASP CSRF</a>
  */
 @Configuration
 @EnableWebSecurity
@@ -28,9 +39,15 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    /**
+     * Configures the security filter chain for JWT-based stateless authentication.
+     * CSRF is disabled as this is a stateless REST API using JWT tokens in headers.
+     */
     @Bean
+    @SuppressWarnings("java:S4502") // CSRF disabled intentionally for stateless JWT API
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // lgtm[java/spring-disabled-csrf-protection] - CSRF disabled: stateless JWT API does not use cookies for auth
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
