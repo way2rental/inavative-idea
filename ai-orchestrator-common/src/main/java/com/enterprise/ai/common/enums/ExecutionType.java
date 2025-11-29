@@ -15,19 +15,7 @@ public enum ExecutionType {
      * Execute HTTP GET or safe POST calls.
      * URL must be in whitelist.
      */
-    HTTP_CALL,
-
-    /**
-     * Read files from allowed paths (read-only).
-     * Path must be in whitelist.
-     */
-    FILE_READ,
-
-    /**
-     * Consume messages from Kafka topics (read-only).
-     * No produce operations allowed.
-     */
-    KAFKA_CONSUME;
+    HTTP_CALL;
 
     /**
      * Check if this execution type is supported.

@@ -49,8 +49,4 @@ public class ScenarioConfig {
             ObjectMapper objectMapper) {
         return new HttpCallExecutor(webClientBuilder, readOnlyEnforcement, objectMapper);
     }
-
-    // REMOVED: TxnStatusExecutor - now handled by HttpCallExecutor via config
-    // REMOVED: FileStatusExecutor - now handled by HttpCallExecutor via config
-    // REMOVED: AccountSummaryExecutor - now handled by QueryExecutor via config
 }

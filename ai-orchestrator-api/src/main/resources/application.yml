@@ -58,7 +58,7 @@ server:
 # ============================================
 ollama:
   base-url: http://localhost:11434
-  model: llama3:8b                    # Fallback model
+  model: mistral:7b                    # Fallback model
   intent-model: enterprise-intent      # Custom Modelfile for intent detection
   formatter-model: enterprise-formatter # Custom Modelfile for response formatting
   timeout-seconds: 120                 # Hard Ollama timeout (2 minutes)
