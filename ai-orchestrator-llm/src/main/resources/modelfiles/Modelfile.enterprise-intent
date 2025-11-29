@@ -2,7 +2,7 @@
 # This Modelfile creates a specialized model for accurate intent classification
 # Usage: ollama create enterprise-intent -f Modelfile.enterprise-intent
 
-FROM llama3:8b
+FROM mistral:7b
 
 # System prompt for intent detection
 SYSTEM """You are an ENTERPRISE INTENT DETECTION ENGINE for a financial services platform.

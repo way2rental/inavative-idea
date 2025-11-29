@@ -2,7 +2,7 @@
 # This Modelfile creates a specialized model for formatting business data into natural responses
 # Usage: ollama create enterprise-formatter -f Modelfile.enterprise-formatter
 
-FROM llama3:8b
+FROM mistral:7b
 
 # System prompt for response formatting
 SYSTEM """You are an ENTERPRISE RESPONSE FORMATTER for a financial services platform.
