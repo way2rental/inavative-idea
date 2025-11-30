@@ -318,6 +318,11 @@ public class ReactiveOllamaLlmClient implements ReactiveLlmClient {
                         return Flux.error(new LlmException("Failed to parse streaming response", e));
                     }
                 })
+                // Buffer tokens into chunks for smoother streaming
+                // Send every 5 tokens or every 100ms, whichever comes first
+                .bufferTimeout(5, Duration.ofMillis(100))
+                .map(tokens -> String.join("", tokens))  // Join buffered tokens
+                .filter(chunk -> !chunk.isEmpty())
                 .doOnComplete(() -> log.debug("Streaming flux completed"))
                 .doOnError(e -> log.error("Streaming flux error: {}", e.getMessage()))
                 .timeout(Duration.ofSeconds(properties.getTimeoutSeconds()), Flux.empty());
@@ -362,7 +367,7 @@ public class ReactiveOllamaLlmClient implements ReactiveLlmClient {
                 Scenario: %s
                 User query: "%s"
                 Raw data: %s
-                
+                SYSTEM : You are a banking Assistant of Axisbank.
                 Format this data into a natural, helpful response following enterprise formatting rules.
                 Keep it under 150 words. Use emojis appropriately.
                 """.formatted(scenarioCode, userQuery, dataJson);
@@ -377,6 +382,10 @@ public class ReactiveOllamaLlmClient implements ReactiveLlmClient {
                 log.warn("No JSON found in Ollama response, returning UNKNOWN intent");
                 return createUnknownIntent();
             }
+
+            // Fix: Remove invalid escape sequences (like \_ which Jackson can't parse)
+            // LLM sometimes returns ACCOUNT\_SUMMARY instead of ACCOUNT_SUMMARY
+            jsonPart = jsonPart.replaceAll("\\\\_", "_");
 
             JsonNode node = objectMapper.readTree(jsonPart);
 

@@ -3,7 +3,7 @@
   flex-direction: column;
   height: 100%;
   max-width: 900px;
-  margin: 0 auto;
+  margin: 100 auto;
   padding: 20px;
   background-color: #f8f9fa;
   border-radius: 12px;
@@ -62,7 +62,7 @@
     text-align: left;
     max-width: 500px;
     margin: 0 auto;
-    
+
     li {
       margin-bottom: 10px;
       color: #555;
@@ -78,7 +78,7 @@
 
   &.user {
     flex-direction: row-reverse;
-    
+
     .message-content {
       background-color: #007bff;
       color: white;
@@ -113,7 +113,7 @@
 .message-content {
   max-width: 70%;
   padding: 12px 18px;
-  
+
   p {
     margin: 0;
     line-height: 1.5;
@@ -131,7 +131,7 @@
 .loading-dots {
   display: flex;
   gap: 4px;
-  
+
   span {
     width: 8px;
     height: 8px;

@@ -63,11 +63,14 @@ public class RbacService {
             return;
         }
 
-        // Group by role and collect scenario codes
+        // Group by role and collect scenario codes (normalized to uppercase)
         Map<String, Set<String>> newCache = mappings.stream()
                 .collect(Collectors.groupingBy(
                         RoleScenarioMap::getRoleName,
-                        Collectors.mapping(RoleScenarioMap::getScenarioCode, Collectors.toSet())
+                        Collectors.mapping(
+                                mapping -> mapping.getScenarioCode().toUpperCase(),
+                                Collectors.toSet()
+                        )
                 ));
 
         roleScenarioCache.clear();
@@ -130,18 +133,26 @@ public class RbacService {
 
     /**
      * Check if a role is authorized for a scenario.
+     * Case-insensitive to handle LLM returning lowercase scenario names.
      */
-    @Cacheable(value = "rbacCache", key = "#role + ':' + #scenarioCode")
+    @Cacheable(value = "rbacCache", key = "#role + ':' + #scenarioCode.toUpperCase()")
     public boolean isAuthorized(String role, String scenarioCode) {
         if (!initialized) {
             log.warn("RBAC not initialized, denying access");
             return false;
         }
 
-        Set<String> allowedScenarios = roleScenarioCache.get(role);
-        boolean authorized = allowedScenarios != null && allowedScenarios.contains(scenarioCode);
+        // Normalize scenario code to uppercase for comparison
+        String normalizedScenario = scenarioCode.toUpperCase();
 
-        log.trace("Authorization check: role={}, scenario={}, authorized={}", role, scenarioCode, authorized);
+        Set<String> allowedScenarios = roleScenarioCache.get(role);
+        boolean authorized = allowedScenarios != null && allowedScenarios.contains(normalizedScenario);
+
+        if (!authorized) {
+            log.debug("Authorization check: role={}, scenario={} (normalized={}), authorized=false",
+                     role, scenarioCode, normalizedScenario);
+        }
+
         return authorized;
     }
 

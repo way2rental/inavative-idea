@@ -68,21 +68,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/v2/scenario/tests/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        
+                        .requestMatchers("/error").permitAll()  // Allow error page (prevents "response already committed")
+
                         // Streaming endpoints - authenticated users
                         .requestMatchers("/api/v2/chat/stream").authenticated()
                         .requestMatchers("/api/v2/chat/events/**").authenticated()
                         
                         // Admin-only endpoints - scenarios, settings, URL whitelist, cache
-                        .requestMatchers("/api/admin/scenarios/**").hasRole("ADMIN")
-                        .requestMatchers("/api/admin/url-whitelist/**").hasRole("ADMIN")
-                        .requestMatchers("/api/admin/cache/**").hasRole("ADMIN")
-                        .requestMatchers("/api/admin/dashboard/**").hasRole("ADMIN")
-                        
-                        // Operator endpoints - audit logs and sessions (also accessible to admin)
-                        .requestMatchers("/api/admin/audit-logs/**").hasAnyRole("ADMIN", "OPERATOR")
-                        .requestMatchers("/api/admin/sessions/**").hasAnyRole("ADMIN", "OPERATOR")
-                        
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
                         // All other requests require authentication
                         .anyRequest().authenticated()
                 )

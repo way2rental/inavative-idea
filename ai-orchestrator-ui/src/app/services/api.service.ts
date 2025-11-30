@@ -45,7 +45,8 @@ export class ApiService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'text/event-stream'  // Important for SSE
       },
       body: JSON.stringify(request)
     }).then(async response => {
@@ -63,13 +64,50 @@ export class ApiService {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        subject.next(chunk);
+        // Decode chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE messages in buffer
+        const lines = buffer.split('\n');
+
+        // Keep last incomplete line in buffer
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          // SSE format: "data: message" or "data:message" (with or without space)
+          if (line.startsWith('data:')) {
+            // Handle both "data: " (with space) and "data:" (without space)
+            const data = line.startsWith('data: ')
+              ? line.substring(6)  // Remove "data: "
+              : line.substring(5); // Remove "data:"
+
+            // Send even empty strings (they might be intentional line breaks)
+            subject.next(data);
+          }
+          // Ignore comment lines starting with ":"
+          // Also handle plain text for backwards compatibility
+          else if (line.trim() && !line.startsWith(':')) {
+            subject.next(line);
+          }
+        }
+      }
+
+      // Process any remaining data in buffer
+      if (buffer.trim()) {
+        if (buffer.startsWith('data:')) {
+          const data = buffer.startsWith('data: ')
+            ? buffer.substring(6)
+            : buffer.substring(5);
+          subject.next(data);
+        } else if (!buffer.startsWith(':')) {
+          subject.next(buffer);
+        }
       }
 
       subject.complete();
