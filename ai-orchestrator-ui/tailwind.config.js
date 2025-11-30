@@ -26,6 +26,7 @@ module.exports = {
         },
         'axis-burgundy': '#97144D',
         'axis-maroon': '#6D0F37',
+        'bank-bg': '#F5F5F5',
       },
       fontFamily: {
         sans: ['Roboto', 'Segoe UI', 'Arial', 'sans-serif'],

@@ -123,10 +123,11 @@ public class ConfigCacheService {
     }
 
     @CacheEvict(value = "urlWhitelist", allEntries = true)
-    public HttpUrlWhitelist addWhitelistedUrl(String urlPattern, String description, String addedBy) {
+    public HttpUrlWhitelist addWhitelistedUrl(String urlPattern, String description, String allowedMethods, String addedBy) {
         HttpUrlWhitelist whitelist = HttpUrlWhitelist.builder()
                 .urlPattern(urlPattern)
                 .description(description)
+                .allowedMethods(allowedMethods != null ? allowedMethods : "GET")
                 .addedBy(addedBy)
                 .active(true)
                 .build();

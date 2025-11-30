@@ -30,6 +30,13 @@ public class HttpUrlWhitelist {
     @Column(length = 255)
     private String description;
 
+    @Column(name = "allowed_methods", length = 50)
+    @Builder.Default
+    private String allowedMethods = "GET";
+
+    @Column(name = "added_by", length = 100)
+    private String addedBy;
+
     @Column(name = "active")
     @Builder.Default
     private Boolean active = true;

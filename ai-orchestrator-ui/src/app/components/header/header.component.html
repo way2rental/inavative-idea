@@ -1,16 +1,45 @@
-<header class="app-header">
-  <div class="header-content">
-    <div class="logo">
-      <span class="logo-icon">🤖</span>
-      <span class="logo-text">AI Orchestrator</span>
-    </div>
-
-    @if (currentUser) {
-      <div class="user-info">
-        <span class="user-name">{{ currentUser.username }}</span>
-        <span class="user-role">{{ currentUser.role }}</span>
-        <button class="logout-btn" (click)="logout()">Logout</button>
+<!-- Axis Bank Header -->
+<header class="bg-axis-burgundy text-white shadow-md">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+    <div class="flex items-center justify-between">
+      <!-- Logo -->
+      <div class="flex items-center gap-3">
+        <a routerLink="/chat" class="flex items-center gap-2 hover:opacity-90 transition-opacity">
+          <svg class="h-10 w-10" viewBox="0 0 40 40" fill="currentColor">
+            <path d="M20 5 L35 35 L5 35 Z"/>
+          </svg>
+          <div>
+            <span class="text-xl font-bold tracking-wide">AXIS BANK</span>
+            <p class="text-white/70 text-xs">AI Orchestrator</p>
+          </div>
+        </a>
       </div>
-    }
+
+      <!-- Navigation -->
+      <nav class="hidden md:flex items-center gap-6 text-sm">
+        <a routerLink="/chat" class="hover:underline">Chat</a>
+        <a routerLink="/admin" class="hover:underline">Admin Dashboard</a>
+        <a routerLink="/admin/scenarios" class="hover:underline">Scenarios</a>
+      </nav>
+
+      <!-- User Info -->
+      @if (currentUser) {
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center">
+              <span class="text-white font-bold text-sm">{{ currentUser.username.charAt(0).toUpperCase() }}</span>
+            </div>
+            <div class="hidden sm:block">
+              <p class="text-sm font-medium">{{ currentUser.username }}</p>
+              <p class="text-xs text-white/70">{{ currentUser.role }}</p>
+            </div>
+          </div>
+          <button (click)="logout()" 
+            class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-colors">
+            Logout
+          </button>
+        </div>
+      }
+    </div>
   </div>
 </header>
