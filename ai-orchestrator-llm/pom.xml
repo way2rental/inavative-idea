@@ -17,7 +17,7 @@
     <description>Ollama LLM client integration and prompt management</description>
 
     <properties>
-        <spring-ai.version>1.0.0-M3</spring-ai.version>
+        <spring-ai.version>1.0.0-M6</spring-ai.version>
     </properties>
 
     <dependencyManagement>
@@ -50,6 +50,7 @@
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
+            <version>${spring-ai.version}</version>
         </dependency>
 
         <!-- Spring WebFlux for reactive HTTP client -->
