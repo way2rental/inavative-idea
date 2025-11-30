@@ -170,19 +170,18 @@ public class ReactiveChatService {
         }
         log.debug("Pre-flight auth check passed: user has roles {}", userRoles);
 
+        // Get or create session BEFORE the reactive chain
+        String sessionId = getOrCreateSessionSync(request);
+        saveMessageSync(sessionId, "user", request.getQuery());
+        String sessionContext = getSessionContextSync(sessionId);
+
         // Cache the intent detection to avoid re-execution
-        Mono<IntentResult> intentMono = Mono.defer(() -> {
-            String sessionId = getOrCreateSessionSync(request);
-            saveMessageSync(sessionId, "user", request.getQuery());
-            String sessionContext = getSessionContextSync(sessionId);
-            
-            return llmClient.detectIntent(request.getQuery(), sessionContext)
-                    .timeout(Duration.ofMillis(maxOllamaTimeoutMs));
-        })
-        .doOnSuccess(intent -> log.info("Intent detected for streaming: scenario={}, confidence={}",
-                intent.getScenario(), intent.getConfidence()))
-        .doOnError(e -> log.error("Intent detection failed in streaming: {}", e.getMessage()))
-        .cache(); // Cache to avoid re-executing intent detection
+        Mono<IntentResult> intentMono = llmClient.detectIntent(request.getQuery(), sessionContext)
+                .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
+                .doOnSuccess(intent -> log.info("Intent detected for streaming: scenario={}, confidence={}",
+                        intent.getScenario(), intent.getConfidence()))
+                .doOnError(e -> log.error("Intent detection failed in streaming: {}", e.getMessage()))
+                .cache(); // Cache to avoid re-executing intent detection
 
         // Now build the response flux with progress indicators
         return Flux.concat(
@@ -197,12 +196,26 @@ public class ReactiveChatService {
                     if (!validation.isValid()) {
                         String message = validation.validationMessage();
                         log.debug("Validation failed, returning error message");
+
+                        // Log validation failure to audit
+                        Instant requestTime = Instant.now();
+                        logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                requestTime, Instant.now(), false,
+                                "Validation failed: " + message, intent, null);
+
                         return Flux.just("\n" + message);
                     }
 
                     // Authorization check (roles already validated above)
                     if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
                         log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
+
+                        // Log authorization failure to audit
+                        Instant requestTime = Instant.now();
+                        logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                requestTime, Instant.now(), false,
+                                "Authorization denied for roles: " + userRoles, intent, null);
+
                         return Flux.just(String.format("\n❌ You don't have permission to access this information.\nYour roles: %s\nRequired scenario: %s", userRoles, intent.getScenario()));
                     }
 
@@ -221,14 +234,39 @@ public class ReactiveChatService {
                             Flux.just("\n📊 Fetching data...\n"),
                             scenarioRouter.routeReactive(scenarioRequest)
                                     .timeout(Duration.ofMillis(maxDbTimeoutMs))
-                                    .doOnSuccess(result -> log.debug("Scenario executed, starting streaming response"))
-                                    .doOnError(e -> log.error("Scenario execution failed: {}", e.getMessage()))
+                                    .doOnSuccess(result -> {
+                                        log.debug("Scenario executed, starting streaming response");
+                                        // Log successful execution to audit
+                                        Instant requestTime = Instant.now();
+                                        logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                                requestTime, Instant.now(), true, null, intent, result);
+                                    })
+                                    .doOnError(e -> {
+                                        log.error("Scenario execution failed: {}", e.getMessage());
+                                        // Log execution failure to audit
+                                        Instant requestTime = Instant.now();
+                                        logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                                requestTime, Instant.now(), false,
+                                                "Scenario execution failed: " + e.getMessage(), intent, null);
+                                    })
                                     .flatMapMany(result -> {
                                         log.debug("Formatting response as stream");
+
+                                        // Collect the response to save it later
+                                        final StringBuilder responseCollector = new StringBuilder();
+
                                         return Flux.concat(
                                                 Flux.just("\n"),
                                                 llmClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery())
-                                                        .doOnComplete(() -> log.debug("Response streaming completed"))
+                                                        .doOnNext(chunk -> responseCollector.append(chunk))
+                                                        .doOnComplete(() -> {
+                                                            log.debug("Response streaming completed");
+                                                            // Save the complete assistant response
+                                                            String completeResponse = responseCollector.toString().trim();
+                                                            if (!completeResponse.isEmpty()) {
+                                                                saveMessageSync(sessionId, "assistant", completeResponse);
+                                                            }
+                                                        })
                                                         .doOnError(e -> log.error("Response streaming error: {}", e.getMessage()))
                                         );
                                     })
@@ -580,6 +618,10 @@ public class ReactiveChatService {
         if (request.getSessionId() != null) {
             Optional<ChatSession> existing = sessionRepository.findBySessionId(request.getSessionId());
             if (existing.isPresent()) {
+                // Update lastActivityAt to track session activity
+                ChatSession session = existing.get();
+                session.setLastActivityAt(Instant.now());
+                sessionRepository.save(session);
                 return request.getSessionId();
             }
         }

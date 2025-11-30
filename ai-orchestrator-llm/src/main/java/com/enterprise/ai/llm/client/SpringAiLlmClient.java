@@ -218,7 +218,7 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
                 .build();
     }
 
-    // ===== FALLBACK METHODS =====
+    // ===== FALLBACK METHODS ====
 
     public IntentResult detectIntentFallback(String userInput, String sessionContext, Throwable t) {
         log.warn("Fallback for detectIntent due to: {}", t.getMessage());

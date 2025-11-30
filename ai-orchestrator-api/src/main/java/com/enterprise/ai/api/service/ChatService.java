@@ -417,6 +417,10 @@ public class ChatService {
         if (request.getSessionId() != null) {
             Optional<ChatSession> existing = sessionRepository.findBySessionId(request.getSessionId());
             if (existing.isPresent()) {
+                // Update lastActivityAt to track session activity
+                ChatSession session = existing.get();
+                session.setLastActivityAt(Instant.now());
+                sessionRepository.save(session);
                 return request.getSessionId();
             }
         }

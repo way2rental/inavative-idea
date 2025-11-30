@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.time.Duration;
 
 /**
  * Entity for audit logs.
@@ -49,4 +50,18 @@ public class AiAuditLog {
 
     @Column(name = "raw_result_json", columnDefinition = "JSON")
     private String rawResultJson;
+
+    @Column(name = "execution_time_ms")
+    private Integer executionTimeMs;
+
+    /**
+     * Calculate and set execution time from request and response times
+     */
+    @PrePersist
+    @PreUpdate
+    public void calculateExecutionTime() {
+        if (requestTime != null && responseTime != null) {
+            executionTimeMs = (int) Duration.between(requestTime, responseTime).toMillis();
+        }
+    }
 }

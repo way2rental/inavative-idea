@@ -123,7 +123,7 @@ export class AdminService {
     let params = new HttpParams().set('page', page.toString()).set('size', size.toString());
     if (filters?.userId) params = params.set('userId', filters.userId);
     if (filters?.scenarioCode) params = params.set('scenarioCode', filters.scenarioCode);
-    
+
     return this.http.get<{ content: AuditLog[]; totalElements: number }>(`${this.baseUrl}/admin/audit-logs`, { params }).pipe(
       catchError(this.handleError('getAuditLogs', { content: [], totalElements: 0 }))
     );
@@ -179,12 +179,37 @@ export class AdminService {
   }
 
   removeRbacMapping(role: string, scenarioCode: string): Observable<string> {
-    return this.http.delete<string>(`${this.baseUrl}/admin/rbac/mappings`, { 
-      body: { role, scenarioCode } 
+    return this.http.delete<string>(`${this.baseUrl}/admin/rbac/mappings`, {
+      body: { role, scenarioCode }
     });
   }
 
   refreshRbacCache(): Observable<string> {
     return this.http.post<string>(`${this.baseUrl}/admin/rbac/refresh`, {});
+  }
+
+  // Analytics APIs
+  getRequestsOverTime(hours: number = 24, interval: number = 4): Observable<any> {
+    return this.http.get(`${this.baseUrl}/admin/analytics/requests-over-time?hours=${hours}&interval=${interval}`).pipe(
+      catchError(this.handleError('getRequestsOverTime', { labels: [], data: [], period: '' }))
+    );
+  }
+
+  getResponseDistribution(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/admin/analytics/response-distribution`).pipe(
+      catchError(this.handleError('getResponseDistribution', { labels: [], data: [], average: 0 }))
+    );
+  }
+
+  getSuccessRateTrend(weeks: number = 4): Observable<any> {
+    return this.http.get(`${this.baseUrl}/admin/analytics/success-rate-trend?weeks=${weeks}`).pipe(
+      catchError(this.handleError('getSuccessRateTrend', { labels: [], data: [], overall: 0 }))
+    );
+  }
+
+  getScenarioUsage(limit: number = 5): Observable<any> {
+    return this.http.get(`${this.baseUrl}/admin/analytics/scenario-usage?limit=${limit}`).pipe(
+      catchError(this.handleError('getScenarioUsage', { labels: [], data: [], total: 0 }))
+    );
   }
 }
