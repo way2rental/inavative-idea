@@ -196,8 +196,8 @@ public class IntentValidationService {
         try {
             return objectMapper.readValue(json, new TypeReference<List<String>>() {});
         } catch (Exception e) {
-            log.error("Error parsing required_params for scenario {}: {}", 
-                    scenario.getScenarioCode(), e.getMessage());
+            log.error("Error parsing required_params for scenario {}, JSON: {}: {}", 
+                    scenario.getScenarioCode(), json, e.getMessage());
             return List.of();
         }
     }

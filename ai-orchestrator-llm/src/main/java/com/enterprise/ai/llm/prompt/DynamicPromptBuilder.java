@@ -20,6 +20,11 @@ import java.util.stream.Collectors;
 public class DynamicPromptBuilder {
 
     private final ConfigCacheService configCacheService;
+    
+    // Cache for intent detection prompt to avoid rebuilding on each call
+    private volatile String cachedIntentPromptContext;
+    private volatile long cacheTimestamp;
+    private static final long CACHE_TTL_MS = 300000; // 5 minutes
 
     public DynamicPromptBuilder(ConfigCacheService configCacheService) {
         this.configCacheService = configCacheService;
@@ -27,24 +32,17 @@ public class DynamicPromptBuilder {
 
     /**
      * Build intent detection prompt with all available scenarios from DB.
+     * Uses caching to avoid performance issues with 200+ scenarios.
      */
     public String buildIntentDetectionPrompt(String userInput, String sessionContext) {
         StringBuilder prompt = new StringBuilder();
         
-        // Build scenario context from database
+        // Use cached scenario context (rebuilt every 5 mins or on cache refresh)
+        String scenarioContext = getScenarioContext();
+        
         prompt.append("You are an AI assistant for a banking application.\n");
         prompt.append("Available scenarios and their descriptions:\n\n");
-        
-        for (AiScenario scenario : configCacheService.getActiveScenarios()) {
-            prompt.append("- ").append(scenario.getScenarioCode()).append(": ")
-                    .append(scenario.getDescription() != null ? scenario.getDescription() : "No description")
-                    .append("\n");
-            
-            // Add required params info
-            if (scenario.getRequiredParams() != null && !scenario.getRequiredParams().isEmpty()) {
-                prompt.append("  Required params: ").append(scenario.getRequiredParams()).append("\n");
-            }
-        }
+        prompt.append(scenarioContext);
         
         prompt.append("\nSession context: ")
                 .append(sessionContext != null ? sessionContext : "No previous context")
@@ -63,6 +61,51 @@ public class DynamicPromptBuilder {
     }
 
     /**
+     * Get cached scenario context or rebuild if expired.
+     */
+    private String getScenarioContext() {
+        long now = System.currentTimeMillis();
+        if (cachedIntentPromptContext == null || (now - cacheTimestamp) > CACHE_TTL_MS) {
+            synchronized (this) {
+                if (cachedIntentPromptContext == null || (now - cacheTimestamp) > CACHE_TTL_MS) {
+                    cachedIntentPromptContext = buildScenarioContext();
+                    cacheTimestamp = now;
+                    log.debug("Rebuilt scenario context cache with {} scenarios", 
+                            configCacheService.getActiveScenarios().size());
+                }
+            }
+        }
+        return cachedIntentPromptContext;
+    }
+
+    /**
+     * Build scenario context from active scenarios.
+     */
+    private String buildScenarioContext() {
+        StringBuilder context = new StringBuilder();
+        for (AiScenario scenario : configCacheService.getActiveScenarios()) {
+            context.append("- ").append(scenario.getScenarioCode()).append(": ")
+                    .append(scenario.getDescription() != null ? scenario.getDescription() : "No description")
+                    .append("\n");
+            
+            // Add required params info
+            if (scenario.getRequiredParams() != null && !scenario.getRequiredParams().isEmpty()) {
+                context.append("  Required params: ").append(scenario.getRequiredParams()).append("\n");
+            }
+        }
+        return context.toString();
+    }
+
+    /**
+     * Invalidate the cached scenario context.
+     * Should be called when scenarios are updated via admin panel.
+     */
+    public void invalidateCache() {
+        cachedIntentPromptContext = null;
+        log.info("Scenario context cache invalidated");
+    }
+
+    /**
      * Build clarification prompt for ambiguous queries.
      */
     public String buildClarificationPrompt(String userQuery, List<String> possibleScenarios) {
@@ -72,9 +115,7 @@ public class DynamicPromptBuilder {
         
         for (int i = 0; i < possibleScenarios.size(); i++) {
             String scenarioCode = possibleScenarios.get(i);
-            String description = configCacheService.getScenarioByCode(scenarioCode)
-                    .map(AiScenario::getDescription)
-                    .orElse(scenarioCode.toLowerCase().replace("_", " "));
+            String description = getScenarioDescription(scenarioCode);
             prompt.append(i + 1).append(". ").append(description).append("\n");
         }
         
@@ -133,11 +174,20 @@ public class DynamicPromptBuilder {
 
     /**
      * Get scenario description from database.
+     * Falls back to formatted scenario code if not found.
      */
     public String getScenarioDescription(String scenarioCode) {
         return configCacheService.getScenarioByCode(scenarioCode)
                 .map(AiScenario::getDescription)
-                .orElse(scenarioCode.toLowerCase().replace("_", " "));
+                .orElse(formatScenarioCodeAsDescription(scenarioCode));
+    }
+
+    /**
+     * Format scenario code as human-readable description.
+     * Example: "TXN_STATUS" -> "txn status"
+     */
+    private String formatScenarioCodeAsDescription(String scenarioCode) {
+        return scenarioCode.toLowerCase().replace("_", " ");
     }
 
     /**
