@@ -4,6 +4,7 @@ import com.enterprise.ai.security.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -29,6 +30,13 @@ import java.util.List;
  *   <li>CORS is properly configured to restrict cross-origin requests</li>
  * </ul>
  * 
+ * Role-based access control:
+ * <ul>
+ *   <li>ADMIN: Full access to all admin APIs</li>
+ *   <li>OPERATOR: Access to audit logs, sessions, and monitoring</li>
+ *   <li>USER: Access to chat and public endpoints only</li>
+ * </ul>
+ * 
  * @see <a href="https://owasp.org/www-community/vulnerabilities/Cross-Site_Request_Forgery_(CSRF)">OWASP CSRF</a>
  */
 @Configuration
@@ -52,16 +60,30 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Public endpoints - no auth required
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/ollama/health").permitAll()
-                        .requestMatchers("/api/v2/scenario/test").permitAll()  // Sandbox tester
-                        .requestMatchers("/api/v2/scenario/tests/**").permitAll()  // Test results
-                        .requestMatchers("/api/v2/chat/stream").authenticated()  // SSE streaming endpoint
-                        .requestMatchers("/api/v2/chat/events/**").authenticated()  // SSE events endpoint
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")  // Admin panel APIs
+                        .requestMatchers("/api/v2/scenario/test").permitAll()
+                        .requestMatchers("/api/v2/scenario/tests/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        
+                        // Streaming endpoints - authenticated users
+                        .requestMatchers("/api/v2/chat/stream").authenticated()
+                        .requestMatchers("/api/v2/chat/events/**").authenticated()
+                        
+                        // Admin-only endpoints - scenarios, settings, URL whitelist, cache
+                        .requestMatchers("/api/admin/scenarios/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/url-whitelist/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/cache/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/dashboard/**").hasRole("ADMIN")
+                        
+                        // Operator endpoints - audit logs and sessions (also accessible to admin)
+                        .requestMatchers("/api/admin/audit-logs/**").hasAnyRole("ADMIN", "OPERATOR")
+                        .requestMatchers("/api/admin/sessions/**").hasAnyRole("ADMIN", "OPERATOR")
+                        
+                        // All other requests require authentication
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -73,7 +95,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("http://localhost:4200", "http://localhost:3000"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 

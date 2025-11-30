@@ -149,9 +149,9 @@ html, body {
            hover:bg-axis-maroon transition-all duration-300 z-50;
   }
   
-  /* Chat Container */
+  /* Chat Container - Larger size for better UX */
   .chat-container {
-    @apply fixed bottom-24 right-6 w-96 h-[600px] bg-white rounded-2xl shadow-elevated 
+    @apply fixed bottom-24 right-6 w-[440px] h-[680px] bg-white rounded-2xl shadow-elevated 
            flex flex-col overflow-hidden z-40 animate-slide-up;
   }
   
