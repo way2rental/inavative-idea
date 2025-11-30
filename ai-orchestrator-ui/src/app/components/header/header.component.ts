@@ -29,4 +29,20 @@ export class HeaderComponent implements OnInit {
     this.authService.logout();
     this.router.navigate(['/login']);
   }
+
+  isAdmin(): boolean {
+    return this.currentUser?.role === 'ADMIN';
+  }
+
+  isOperator(): boolean {
+    return this.currentUser?.role === 'OPERATOR';
+  }
+
+  canAccessAdmin(): boolean {
+    return this.currentUser?.role === 'ADMIN';
+  }
+
+  canAccessAuditLogs(): boolean {
+    return this.currentUser?.role === 'ADMIN' || this.currentUser?.role === 'OPERATOR';
+  }
 }

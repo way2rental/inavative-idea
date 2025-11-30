@@ -182,6 +182,10 @@ export class ChatComponent implements AfterViewChecked {
     return this.authService.getCurrentUser()?.role || 'USER';
   }
 
+  isAdmin(): boolean {
+    return this.authService.getCurrentUser()?.role === 'ADMIN';
+  }
+
   logout(): void {
     this.authService.logout();
     window.location.href = '/login';

@@ -15,11 +15,18 @@
         </a>
       </div>
 
-      <!-- Navigation -->
+      <!-- Navigation - Role Based -->
       <nav class="hidden md:flex items-center gap-6 text-sm">
-        <a routerLink="/chat" class="hover:underline">Chat</a>
-        <a routerLink="/admin" class="hover:underline">Admin Dashboard</a>
-        <a routerLink="/admin/scenarios" class="hover:underline">Scenarios</a>
+        <a routerLink="/chat" routerLinkActive="underline" class="hover:underline">Chat</a>
+        @if (canAccessAdmin()) {
+          <a routerLink="/admin" routerLinkActive="underline" class="hover:underline">Admin Dashboard</a>
+          <a routerLink="/admin/scenarios" routerLinkActive="underline" class="hover:underline">Scenarios</a>
+          <a routerLink="/admin/settings" routerLinkActive="underline" class="hover:underline">Settings</a>
+        }
+        @if (canAccessAuditLogs()) {
+          <a routerLink="/admin/audit-logs" routerLinkActive="underline" class="hover:underline">Audit Logs</a>
+          <a routerLink="/admin/sessions" routerLinkActive="underline" class="hover:underline">Sessions</a>
+        }
       </nav>
 
       <!-- User Info -->

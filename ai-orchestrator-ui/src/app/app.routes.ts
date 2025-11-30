@@ -6,15 +6,16 @@ import { ScenariosComponent } from './components/admin/scenarios/scenarios.compo
 import { AuditLogsComponent } from './components/admin/audit-logs/audit-logs.component';
 import { SessionsComponent } from './components/admin/sessions/sessions.component';
 import { SettingsComponent } from './components/admin/settings/settings.component';
+import { authGuard, adminGuard, operatorGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
-  { path: 'chat', component: ChatComponent },
-  { path: 'admin', component: DashboardComponent },
-  { path: 'admin/scenarios', component: ScenariosComponent },
-  { path: 'admin/audit-logs', component: AuditLogsComponent },
-  { path: 'admin/sessions', component: SessionsComponent },
-  { path: 'admin/settings', component: SettingsComponent },
+  { path: 'chat', component: ChatComponent, canActivate: [authGuard] },
+  { path: 'admin', component: DashboardComponent, canActivate: [adminGuard] },
+  { path: 'admin/scenarios', component: ScenariosComponent, canActivate: [adminGuard] },
+  { path: 'admin/audit-logs', component: AuditLogsComponent, canActivate: [operatorGuard] },
+  { path: 'admin/sessions', component: SessionsComponent, canActivate: [operatorGuard] },
+  { path: 'admin/settings', component: SettingsComponent, canActivate: [adminGuard] },
   { path: '**', redirectTo: '/login' }
 ];

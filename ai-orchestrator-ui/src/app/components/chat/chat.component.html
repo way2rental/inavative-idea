@@ -37,9 +37,11 @@
             <p class="text-sm text-axis-burgundy">{{ getUserRole() }}</p>
           </div>
         </div>
-        <a routerLink="/admin" class="mt-4 block btn-axis-outline text-center text-sm">
-          Open Admin Panel
-        </a>
+        @if (isAdmin()) {
+          <a routerLink="/admin" class="mt-4 block btn-axis-outline text-center text-sm">
+            Open Admin Panel
+          </a>
+        }
       </div>
       
       <div class="card-axis p-6">
