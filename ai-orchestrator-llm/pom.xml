@@ -39,6 +39,10 @@
             <groupId>com.enterprise.ai</groupId>
             <artifactId>ai-orchestrator-common</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.enterprise.ai</groupId>
+            <artifactId>ai-orchestrator-data</artifactId>
+        </dependency>
 
         <!-- Spring AI - Ollama -->
 <!--        <dependency>-->
