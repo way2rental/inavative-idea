@@ -4,30 +4,24 @@ import com.enterprise.ai.data.entity.AiAuditLog;
 import com.enterprise.ai.data.entity.AiScenario;
 import com.enterprise.ai.data.entity.ChatSession;
 import com.enterprise.ai.data.entity.HttpUrlWhitelist;
-import com.enterprise.ai.data.repository.AiAuditLogRepository;
-import com.enterprise.ai.data.repository.AiScenarioRepository;
-import com.enterprise.ai.data.repository.ChatSessionRepository;
-import com.enterprise.ai.data.repository.ChatMessageRepository;
-import com.enterprise.ai.data.repository.HttpUrlWhitelistRepository;
 import com.enterprise.ai.data.service.ConfigCacheService;
+import com.enterprise.ai.data.service.AuditLogService;
+import com.enterprise.ai.data.service.SessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.*;
 
 /**
  * REST controller for admin panel operations.
- * Provides CRUD operations for scenarios, audit logs, sessions, and URL whitelist.
+ * All operations go through centralized services with proper caching.
+ * No direct repository access - follows SOLID principles.
  */
 @Slf4j
 @RestController
@@ -41,12 +35,9 @@ public class AdminController {
     // Session active timeout in seconds (5 minutes)
     private static final int SESSION_ACTIVE_TIMEOUT_SECONDS = 300;
 
-    private final AiScenarioRepository scenarioRepository;
-    private final AiAuditLogRepository auditLogRepository;
-    private final ChatSessionRepository sessionRepository;
-    private final ChatMessageRepository messageRepository;
-    private final HttpUrlWhitelistRepository urlWhitelistRepository;
     private final ConfigCacheService configCacheService;
+    private final AuditLogService auditLogService;
+    private final SessionService sessionService;
 
     // ===================== DASHBOARD STATS =====================
 
@@ -55,27 +46,19 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> getDashboardStats() {
         log.info("Fetching dashboard statistics");
         
-        long totalScenarios = scenarioRepository.count();
-        long activeScenarios = scenarioRepository.findByActiveTrue().size();
-        long totalSessions = sessionRepository.count();
+        // Use cached scenario data
+        List<AiScenario> allScenarios = configCacheService.getAllScenarios();
+        long totalScenarios = allScenarios.size();
+        long activeScenarios = configCacheService.getActiveScenarios().size();
         
-        // Calculate today's requests
-        Instant startOfDay = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
-        List<AiAuditLog> todayLogs = auditLogRepository.findByRequestTimeBetween(startOfDay, Instant.now());
-        long todayRequests = todayLogs.size();
+        // Use session service for session data
+        long totalSessions = sessionService.getTotalSessionCount();
         
-        // Calculate average response time
-        double avgResponseTime = todayLogs.stream()
-                .filter(log -> log.getResponseTime() != null && log.getRequestTime() != null)
-                .mapToLong(log -> log.getResponseTime().toEpochMilli() - log.getRequestTime().toEpochMilli())
-                .average()
-                .orElse(0);
-        
-        // Calculate success rate
-        long successfulRequests = todayLogs.stream()
-                .filter(log -> Boolean.TRUE.equals(log.getSuccess()))
-                .count();
-        double successRate = todayRequests > 0 ? (successfulRequests * 100.0 / todayRequests) : 100;
+        // Use audit log service for today's stats
+        Map<String, Object> todayStats = auditLogService.getTodayStats();
+        long todayRequests = (Long) todayStats.getOrDefault("todayRequests", 0L);
+        double avgResponseTime = (Double) todayStats.getOrDefault("avgResponseTime", 0.0);
+        double successRate = (Double) todayStats.getOrDefault("successRate", 100.0);
         
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalScenarios", totalScenarios);
@@ -91,10 +74,10 @@ public class AdminController {
     // ===================== SCENARIOS CRUD =====================
 
     @GetMapping("/scenarios")
-    @Operation(summary = "Get all scenarios", description = "Returns list of all AI scenarios")
+    @Operation(summary = "Get all scenarios", description = "Returns list of all AI scenarios from cache")
     public ResponseEntity<List<ScenarioDTO>> getAllScenarios() {
-        log.info("Fetching all scenarios");
-        List<AiScenario> scenarios = scenarioRepository.findAll();
+        log.info("Fetching all scenarios from cache");
+        List<AiScenario> scenarios = configCacheService.getAllScenarios();
         List<ScenarioDTO> dtos = scenarios.stream()
                 .map(this::toScenarioDTO)
                 .toList();
@@ -102,21 +85,22 @@ public class AdminController {
     }
 
     @GetMapping("/scenarios/{id}")
-    @Operation(summary = "Get scenario by ID", description = "Returns a single scenario by its ID")
+    @Operation(summary = "Get scenario by ID", description = "Returns a single scenario by its ID from cache")
     public ResponseEntity<ScenarioDTO> getScenarioById(@PathVariable Long id) {
         log.info("Fetching scenario with id: {}", id);
-        return scenarioRepository.findById(id)
+        return configCacheService.getScenarioById(id)
                 .map(this::toScenarioDTO)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping("/scenarios")
-    @Operation(summary = "Create new scenario", description = "Creates a new AI scenario")
+    @Operation(summary = "Create new scenario", description = "Creates a new AI scenario and updates cache")
     public ResponseEntity<ScenarioDTO> createScenario(@RequestBody ScenarioFormDTO form) {
         log.info("Creating new scenario: {}", form.scenarioCode);
         
-        if (scenarioRepository.existsByScenarioCode(form.scenarioCode)) {
+        // Check if exists via cache
+        if (configCacheService.getScenarioByCode(form.scenarioCode).isPresent()) {
             return ResponseEntity.badRequest().build();
         }
         
@@ -136,16 +120,17 @@ public class AdminController {
                 .promptVersion(1)
                 .build();
         
+        // Save via ConfigCacheService - automatically updates cache
         AiScenario saved = configCacheService.saveScenario(scenario);
         return ResponseEntity.ok(toScenarioDTO(saved));
     }
 
     @PutMapping("/scenarios/{id}")
-    @Operation(summary = "Update scenario", description = "Updates an existing AI scenario")
+    @Operation(summary = "Update scenario", description = "Updates an existing AI scenario and refreshes cache")
     public ResponseEntity<ScenarioDTO> updateScenario(@PathVariable Long id, @RequestBody ScenarioFormDTO form) {
         log.info("Updating scenario with id: {}", id);
         
-        return scenarioRepository.findById(id)
+        return configCacheService.getScenarioById(id)
                 .map(scenario -> {
                     scenario.setDescription(form.description);
                     scenario.setExecutionType(form.executionType);
@@ -160,6 +145,7 @@ public class AdminController {
                     scenario.setActive(form.active != null ? form.active : true);
                     scenario.setPromptVersion(scenario.getPromptVersion() + 1);
                     
+                    // Save via ConfigCacheService - automatically updates cache
                     AiScenario saved = configCacheService.saveScenario(scenario);
                     return ResponseEntity.ok(toScenarioDTO(saved));
                 })
@@ -167,12 +153,13 @@ public class AdminController {
     }
 
     @DeleteMapping("/scenarios/{id}")
-    @Operation(summary = "Delete scenario", description = "Deletes an AI scenario by ID")
+    @Operation(summary = "Delete scenario", description = "Deletes an AI scenario and removes from cache")
     public ResponseEntity<Void> deleteScenario(@PathVariable Long id) {
         log.info("Deleting scenario with id: {}", id);
         
-        return scenarioRepository.findById(id)
+        return configCacheService.getScenarioById(id)
                 .map(scenario -> {
+                    // Delete via ConfigCacheService - automatically removes from cache
                     configCacheService.deleteScenario(scenario.getScenarioCode());
                     return ResponseEntity.ok().<Void>build();
                 })
@@ -180,7 +167,7 @@ public class AdminController {
     }
 
     @PatchMapping("/scenarios/{id}/status")
-    @Operation(summary = "Toggle scenario status", description = "Enables or disables a scenario")
+    @Operation(summary = "Toggle scenario status", description = "Enables or disables a scenario and updates cache")
     public ResponseEntity<ScenarioDTO> toggleScenarioStatus(@PathVariable Long id, @RequestBody Map<String, Boolean> body) {
         log.info("Toggling scenario status for id: {}", id);
         
@@ -189,8 +176,9 @@ public class AdminController {
             return ResponseEntity.badRequest().build();
         }
         
-        return scenarioRepository.findById(id)
+        return configCacheService.getScenarioById(id)
                 .map(scenario -> {
+                    // Toggle via ConfigCacheService - automatically updates cache
                     configCacheService.toggleScenarioStatus(scenario.getScenarioCode(), active);
                     scenario.setActive(active);
                     return ResponseEntity.ok(toScenarioDTO(scenario));
@@ -210,18 +198,15 @@ public class AdminController {
         
         log.info("Fetching audit logs - page: {}, size: {}, userId: {}, scenarioCode: {}", page, size, userId, scenarioCode);
         
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "requestTime"));
-        Page<AiAuditLog> logsPage = auditLogRepository.findAll(pageRequest);
+        // Use AuditLogService for paginated results
+        Page<AiAuditLog> logsPage = auditLogService.getAuditLogs(page, size, userId, scenarioCode);
         
-        // Filter results if filters provided
-        List<AuditLogDTO> filteredLogs = logsPage.getContent().stream()
-                .filter(log -> userId == null || (log.getUserId() != null && log.getUserId().contains(userId)))
-                .filter(log -> scenarioCode == null || (log.getScenarioCode() != null && log.getScenarioCode().contains(scenarioCode)))
+        List<AuditLogDTO> logDTOs = logsPage.getContent().stream()
                 .map(this::toAuditLogDTO)
                 .toList();
         
         Map<String, Object> response = new HashMap<>();
-        response.put("content", filteredLogs);
+        response.put("content", logDTOs);
         response.put("totalElements", logsPage.getTotalElements());
         response.put("totalPages", logsPage.getTotalPages());
         response.put("currentPage", page);
@@ -239,8 +224,8 @@ public class AdminController {
         
         log.info("Fetching chat sessions - page: {}, size: {}", page, size);
         
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "lastActivityAt"));
-        Page<ChatSession> sessionsPage = sessionRepository.findAll(pageRequest);
+        // Use SessionService for paginated results
+        Page<ChatSession> sessionsPage = sessionService.getSessions(page, size);
         
         List<SessionDTO> sessionDTOs = sessionsPage.getContent().stream()
                 .map(this::toSessionDTO)
@@ -258,10 +243,10 @@ public class AdminController {
     // ===================== URL WHITELIST =====================
 
     @GetMapping("/url-whitelist")
-    @Operation(summary = "Get URL whitelist", description = "Returns all URL whitelist entries")
+    @Operation(summary = "Get URL whitelist", description = "Returns all URL whitelist entries from cache")
     public ResponseEntity<List<UrlWhitelistDTO>> getUrlWhitelist() {
-        log.info("Fetching URL whitelist");
-        List<HttpUrlWhitelist> whitelist = urlWhitelistRepository.findAll();
+        log.info("Fetching URL whitelist from cache");
+        List<HttpUrlWhitelist> whitelist = configCacheService.getAllWhitelistedUrls();
         List<UrlWhitelistDTO> dtos = whitelist.stream()
                 .map(this::toUrlWhitelistDTO)
                 .toList();
@@ -269,14 +254,16 @@ public class AdminController {
     }
 
     @PostMapping("/url-whitelist")
-    @Operation(summary = "Add URL to whitelist", description = "Adds a new URL pattern to the whitelist")
+    @Operation(summary = "Add URL to whitelist", description = "Adds a new URL pattern to the whitelist and updates cache")
     public ResponseEntity<UrlWhitelistDTO> addUrlToWhitelist(@RequestBody UrlWhitelistFormDTO form) {
         log.info("Adding URL to whitelist: {}", form.urlPattern);
         
-        if (urlWhitelistRepository.existsByUrlPattern(form.urlPattern)) {
+        // Check if exists via cache service
+        if (configCacheService.isUrlWhitelisted(form.urlPattern)) {
             return ResponseEntity.badRequest().build();
         }
         
+        // Add via ConfigCacheService - automatically updates cache
         HttpUrlWhitelist saved = configCacheService.addWhitelistedUrl(
                 form.urlPattern, 
                 form.description, 
@@ -287,12 +274,13 @@ public class AdminController {
     }
 
     @DeleteMapping("/url-whitelist/{id}")
-    @Operation(summary = "Remove URL from whitelist", description = "Removes a URL pattern from the whitelist")
+    @Operation(summary = "Remove URL from whitelist", description = "Removes a URL pattern from the whitelist and updates cache")
     public ResponseEntity<Void> removeUrlFromWhitelist(@PathVariable Long id) {
         log.info("Removing URL from whitelist with id: {}", id);
         
-        return urlWhitelistRepository.findById(id)
+        return configCacheService.getWhitelistById(id)
                 .map(whitelist -> {
+                    // Delete via ConfigCacheService - automatically removes from cache
                     configCacheService.removeWhitelistedUrl(whitelist.getUrlPattern());
                     return ResponseEntity.ok().<Void>build();
                 })
@@ -365,7 +353,7 @@ public class AdminController {
         dto.userId = session.getUserId();
         dto.startTime = session.getCreatedAt() != null ? session.getCreatedAt().toString() : null;
         dto.lastActivityTime = session.getLastActivityAt() != null ? session.getLastActivityAt().toString() : null;
-        dto.messageCount = messageRepository.findBySessionIdOrderByTimestampAsc(session.getSessionId()).size();
+        dto.messageCount = sessionService.getMessageCountForSession(session.getSessionId());
         dto.active = session.getLastActivityAt() != null && 
                 session.getLastActivityAt().isAfter(Instant.now().minusSeconds(SESSION_ACTIVE_TIMEOUT_SECONDS));
         return dto;

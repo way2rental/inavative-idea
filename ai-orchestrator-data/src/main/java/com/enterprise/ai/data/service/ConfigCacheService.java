@@ -98,11 +98,36 @@ public class ConfigCacheService {
         });
     }
 
+    /**
+     * Get scenario by ID - searches in cache first, then DB.
+     */
+    public Optional<AiScenario> getScenarioById(Long id) {
+        // First try to find in cache by iterating (since cache is keyed by code)
+        return scenarioCache.values().stream()
+                .filter(s -> id.equals(s.getId()))
+                .findFirst()
+                .or(() -> scenarioRepository.findById(id));
+    }
+
     // ===================== URL WHITELIST OPERATIONS =====================
 
     @Cacheable(value = "urlWhitelist", key = "'all'")
     public Set<String> getWhitelistedUrls() {
         return new HashSet<>(whitelistedUrls);
+    }
+
+    /**
+     * Get all whitelist entries as entities (for admin panel).
+     */
+    public List<HttpUrlWhitelist> getAllWhitelistedUrls() {
+        return urlWhitelistRepository.findAll();
+    }
+
+    /**
+     * Get whitelist entry by ID.
+     */
+    public Optional<HttpUrlWhitelist> getWhitelistById(Long id) {
+        return urlWhitelistRepository.findById(id);
     }
 
     public boolean isUrlWhitelisted(String url) {

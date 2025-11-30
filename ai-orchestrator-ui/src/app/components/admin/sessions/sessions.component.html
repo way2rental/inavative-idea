@@ -1,21 +1,26 @@
 <!-- Axis Bank Admin - Chat Sessions -->
 <div class="min-h-screen bg-bank-bg">
-  <!-- Header -->
-  <div class="bg-axis-burgundy text-white sticky top-0 z-10 shadow-md">
+  <!-- Page Title Section (simple, no redundant header) -->
+  <div class="bg-white border-b">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-          <a routerLink="/admin" class="text-white/70 hover:text-white transition-colors">
+          <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
           </a>
+          <div class="w-10 h-10 bg-axis-burgundy/10 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-axis-burgundy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
           <div>
-            <h1 class="text-xl font-bold">Chat Sessions</h1>
-            <p class="text-white/70 text-sm">Monitor active and past user sessions</p>
+            <h1 class="text-xl font-bold text-gray-900">Chat Sessions</h1>
+            <p class="text-gray-500 text-sm">Monitor active and past user sessions</p>
           </div>
         </div>
-        <div class="text-white/80 text-sm">
+        <div class="text-gray-500 text-sm">
           Total: {{ totalElements }} sessions
         </div>
       </div>
