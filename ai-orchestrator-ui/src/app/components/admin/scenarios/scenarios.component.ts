@@ -44,16 +44,19 @@ export class ScenariosComponent implements OnInit {
       scenarioCode: '',
       scenarioName: '',
       description: '',
-      intentPrompt: '',
-      responseTemplate: '',
+      llmPromptTemplate: '',
       requiredParams: '',
+      optionalParams: '',
       securityLevel: 'NORMAL',
       executionType: 'DB_QUERY',
       httpMethod: 'GET',
       httpUrl: '',
+      httpHeaders: '',
       sqlQuery: '',
       requestMapping: '',
       responseMapping: '',
+      timeoutMs: 5000,
+      executorBean: '',
       active: true
     };
   }
@@ -72,16 +75,19 @@ export class ScenariosComponent implements OnInit {
       scenarioCode: scenario.scenarioCode,
       scenarioName: scenario.scenarioName,
       description: scenario.description,
-      intentPrompt: scenario.intentPrompt || '',
-      responseTemplate: scenario.responseTemplate || '',
+      llmPromptTemplate: scenario.llmPromptTemplate || '',
       requiredParams: scenario.requiredParams.join(', '),
+      optionalParams: scenario.optionalParams?.join(', ') || '',
       securityLevel: scenario.securityLevel,
       executionType: scenario.executionType,
       httpMethod: scenario.httpMethod || 'GET',
       httpUrl: scenario.httpUrl || '',
+      httpHeaders: scenario.httpHeaders || '',
       sqlQuery: scenario.sqlQuery || '',
       requestMapping: scenario.requestMapping || '',
       responseMapping: scenario.responseMapping || '',
+      timeoutMs: scenario.timeoutMs || 5000,
+      executorBean: scenario.executorBean || '',
       active: scenario.active
     };
     this.showModal = true;

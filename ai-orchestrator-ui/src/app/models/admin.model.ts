@@ -3,36 +3,43 @@ export interface Scenario {
   scenarioCode: string;
   scenarioName: string;
   description: string;
-  intentPrompt?: string;
-  responseTemplate?: string;
-  requiredParams: string[];
-  securityLevel: string;
-  executionType: 'DB_QUERY' | 'HTTP_CALL' | 'COMPOSITE';
+  executionType: 'DB_QUERY' | 'HTTP_CALL' | 'FILE_READ' | 'KAFKA_CONSUME' | 'COMPOSITE';
   httpMethod?: string;
   httpUrl?: string;
+  httpHeaders?: string;
   sqlQuery?: string;
   requestMapping?: string;
   responseMapping?: string;
+  timeoutMs?: number;
+  executorBean?: string;
+  securityLevel: string;
+  requiredParams: string[];
+  optionalParams?: string[];
+  llmPromptTemplate?: string;
   promptVersion: number;
+  promptHistory?: string;
   active: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ScenarioFormData {
   scenarioCode: string;
   scenarioName: string;
   description: string;
-  intentPrompt?: string;
-  responseTemplate?: string;
-  requiredParams: string;
-  securityLevel: string;
-  executionType: 'DB_QUERY' | 'HTTP_CALL' | 'COMPOSITE';
+  executionType: 'DB_QUERY' | 'HTTP_CALL' | 'FILE_READ' | 'KAFKA_CONSUME' | 'COMPOSITE';
   httpMethod?: string;
   httpUrl?: string;
+  httpHeaders?: string;
   sqlQuery?: string;
   requestMapping?: string;
   responseMapping?: string;
+  timeoutMs?: number;
+  executorBean?: string;
+  securityLevel: string;
+  requiredParams: string;
+  optionalParams?: string;
+  llmPromptTemplate?: string;
   active: boolean;
 }
 
