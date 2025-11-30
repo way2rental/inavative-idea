@@ -1,0 +1,348 @@
+<!-- Axis Bank Admin Dashboard -->
+<div class="min-h-screen bg-bank-bg">
+  <!-- Header -->
+  <div class="bg-axis-burgundy text-white sticky top-0 z-10 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <svg class="h-10 w-10" viewBox="0 0 48 48" fill="currentColor">
+            <path d="M24 4 L44 44 L4 44 Z"/>
+          </svg>
+          <div>
+            <h1 class="text-xl font-bold">Admin Dashboard</h1>
+            <p class="text-white/70 text-sm">AI Orchestrator Control Center</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <button (click)="refreshCache()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh Cache
+          </button>
+          <a routerLink="/chat" class="bg-white text-axis-burgundy px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-gray-100 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Open Chat
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    @if (isLoading) {
+      <div class="flex items-center justify-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-axis-burgundy"></div>
+      </div>
+    } @else {
+      <!-- Stats Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Scenarios -->
+        <div class="card-axis p-6 hover:shadow-elevated transition-all duration-300">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-gray-500 text-sm font-medium">Total Scenarios</p>
+              <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats?.totalScenarios || 0 }}</p>
+              <p class="text-green-600 text-sm mt-1">
+                <span class="inline-flex items-center">
+                  <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                  </svg>
+                  {{ stats?.activeScenarios || 0 }} active
+                </span>
+              </p>
+            </div>
+            <div class="w-14 h-14 bg-axis-burgundy/10 rounded-xl flex items-center justify-center">
+              <svg class="w-7 h-7 text-axis-burgundy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Today's Requests -->
+        <div class="card-axis p-6 hover:shadow-elevated transition-all duration-300">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-gray-500 text-sm font-medium">Today's Requests</p>
+              <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats?.todayRequests || 0 }}</p>
+              <p class="text-blue-600 text-sm mt-1">{{ stats?.totalSessions || 0 }} total sessions</p>
+            </div>
+            <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
+              <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Avg Response Time -->
+        <div class="card-axis p-6 hover:shadow-elevated transition-all duration-300">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-gray-500 text-sm font-medium">Avg Response Time</p>
+              <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats?.avgResponseTime || 0 }}ms</p>
+              <p class="text-amber-600 text-sm mt-1">P95: {{ metrics?.p95ResponseTime || 0 }}ms</p>
+            </div>
+            <div class="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center">
+              <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Success Rate -->
+        <div class="card-axis p-6 hover:shadow-elevated transition-all duration-300">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-gray-500 text-sm font-medium">Success Rate</p>
+              <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats?.successRate || 0 }}%</p>
+              <p class="text-green-600 text-sm mt-1">
+                <span class="inline-flex items-center">
+                  <span class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                  System healthy
+                </span>
+              </p>
+            </div>
+            <div class="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center">
+              <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ollama Status & Performance -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Ollama Status -->
+        <div class="card-axis p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <div class="w-8 h-8 bg-axis-burgundy/10 rounded-lg flex items-center justify-center">
+              <span class="text-axis-burgundy font-bold text-xs">AI</span>
+            </div>
+            Ollama LLM Status
+          </h3>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <span class="text-gray-700">Connection Status</span>
+              @if (ollamaStatus?.connected) {
+                <span class="badge-success flex items-center gap-1">
+                  <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  Connected
+                </span>
+              } @else {
+                <span class="badge-danger flex items-center gap-1">
+                  <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+                  Disconnected
+                </span>
+              }
+            </div>
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <span class="text-gray-700">Base URL</span>
+              <span class="text-gray-500 font-mono text-sm">{{ ollamaStatus?.baseUrl || 'N/A' }}</span>
+            </div>
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <span class="text-gray-700">Active Model</span>
+              <span class="badge-axis">{{ ollamaStatus?.model || 'N/A' }}</span>
+            </div>
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <span class="text-gray-700">Enabled</span>
+              @if (ollamaStatus?.enabled) {
+                <span class="badge-success">Yes</span>
+              } @else {
+                <span class="badge-warning">No</span>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance Breakdown -->
+        <div class="card-axis p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Performance Breakdown
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between text-sm mb-1">
+                <span class="text-gray-700">Intent Detection</span>
+                <span class="text-gray-500">{{ metrics?.avgIntentDetectionMs || 0 }}ms</span>
+              </div>
+              <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div class="h-full bg-axis-burgundy rounded-full"
+                     [style.width.%]="((metrics?.avgIntentDetectionMs || 0) / (metrics?.avgTotalMs || 1)) * 100"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1">
+                <span class="text-gray-700">DB Execution</span>
+                <span class="text-gray-500">{{ metrics?.avgDbExecutionMs || 0 }}ms</span>
+              </div>
+              <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div class="h-full bg-green-500 rounded-full"
+                     [style.width.%]="((metrics?.avgDbExecutionMs || 0) / (metrics?.avgTotalMs || 1)) * 100"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1">
+                <span class="text-gray-700">Response Formatting</span>
+                <span class="text-gray-500">{{ metrics?.avgFormattingMs || 0 }}ms</span>
+              </div>
+              <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div class="h-full bg-amber-500 rounded-full"
+                     [style.width.%]="((metrics?.avgFormattingMs || 0) / (metrics?.avgTotalMs || 1)) * 100"></div>
+              </div>
+            </div>
+            <div class="pt-4 border-t border-gray-200">
+              <div class="flex justify-between">
+                <span class="text-gray-700 font-medium">Total Average</span>
+                <span class="text-gray-900 font-bold">{{ metrics?.avgTotalMs || 0 }}ms</span>
+              </div>
+              <div class="flex justify-between mt-2 text-sm">
+                <span class="text-gray-500">Requests/min</span>
+                <span class="text-axis-burgundy font-medium">{{ metrics?.requestsPerMinute || 0 }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions & Recent Activity -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Quick Actions -->
+        <div class="card-axis p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Quick Actions
+          </h3>
+          <div class="space-y-3">
+            <a routerLink="/admin/scenarios" class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-axis-burgundy/5 hover:border-axis-burgundy transition-all cursor-pointer group border border-transparent">
+              <div class="w-10 h-10 bg-axis-burgundy/10 rounded-lg flex items-center justify-center group-hover:bg-axis-burgundy/20 transition-all">
+                <svg class="w-5 h-5 text-axis-burgundy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </div>
+              <div>
+                <p class="text-gray-900 font-medium">Add New Scenario</p>
+                <p class="text-gray-500 text-sm">Configure new AI scenarios</p>
+              </div>
+            </a>
+            <a routerLink="/admin/audit-logs" class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-axis-burgundy/5 transition-all cursor-pointer group border border-transparent">
+              <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-all">
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <div>
+                <p class="text-gray-900 font-medium">View Audit Logs</p>
+                <p class="text-gray-500 text-sm">Monitor system activity</p>
+              </div>
+            </a>
+            <a routerLink="/admin/sessions" class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-axis-burgundy/5 transition-all cursor-pointer group border border-transparent">
+              <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-all">
+                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <div>
+                <p class="text-gray-900 font-medium">Active Sessions</p>
+                <p class="text-gray-500 text-sm">View user sessions</p>
+              </div>
+            </a>
+            <a routerLink="/admin/settings" class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-axis-burgundy/5 transition-all cursor-pointer group border border-transparent">
+              <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-200 transition-all">
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div>
+                <p class="text-gray-900 font-medium">System Settings</p>
+                <p class="text-gray-500 text-sm">Configure system options</p>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <!-- Recent Scenarios -->
+        <div class="card-axis p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <svg class="w-5 h-5 text-axis-burgundy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              Active Scenarios
+            </h3>
+            <a routerLink="/admin/scenarios" class="text-axis-burgundy hover:text-axis-maroon text-sm font-medium">View All →</a>
+          </div>
+          <div class="space-y-3">
+            @for (scenario of recentScenarios; track scenario.id) {
+              <div class="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-medium text-gray-900">{{ scenario.scenarioName }}</span>
+                  @if (scenario.active) {
+                    <span class="badge-success">Active</span>
+                  } @else {
+                    <span class="badge-danger">Inactive</span>
+                  }
+                </div>
+                <div class="flex items-center gap-2 text-sm">
+                  <span class="badge-axis">{{ scenario.executionType }}</span>
+                  <span class="text-gray-500">{{ scenario.scenarioCode }}</span>
+                </div>
+              </div>
+            }
+            @if (recentScenarios.length === 0) {
+              <div class="text-center py-8 text-gray-400">
+                <p>No scenarios configured</p>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card-axis p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Recent Activity
+            </h3>
+            <a routerLink="/admin/audit-logs" class="text-axis-burgundy hover:text-axis-maroon text-sm font-medium">View All →</a>
+          </div>
+          <div class="space-y-3">
+            @for (log of recentLogs; track log.id) {
+              <div class="p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-2 mb-2">
+                  <div class="w-8 h-8 bg-axis-burgundy/10 rounded-full flex items-center justify-center">
+                    <span class="text-xs font-medium text-axis-burgundy">{{ log.userId.charAt(0).toUpperCase() }}</span>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-gray-900 text-sm font-medium truncate">{{ log.userId }}</p>
+                    <p class="text-gray-500 text-xs">{{ log.scenarioCode }}</p>
+                  </div>
+                  <span class="text-xs text-gray-400">{{ log.executionTimeMs }}ms</span>
+                </div>
+                <p class="text-gray-600 text-sm truncate">{{ log.userQuery }}</p>
+              </div>
+            }
+            @if (recentLogs.length === 0) {
+              <div class="text-center py-8 text-gray-400">
+                <p>No recent activity</p>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

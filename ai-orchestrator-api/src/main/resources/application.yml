@@ -1,0 +1,205 @@
+# AI Orchestrator Application Configuration - Enterprise Runtime Platform
+# Dynamic Executor Architecture with Read-Only Enforcement
+
+spring:
+  application:
+    name: ai-orchestrator
+
+  # Database Configuration
+  datasource:
+    url: jdbc:mysql://localhost:3306/ai_orchestrator?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 5000       # Hard 5s connection timeout
+      validation-timeout: 3000
+      max-lifetime: 1800000
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+          batch_size: 25
+
+  # Flyway Migration (for V2 schema)
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # Redis Configuration (optional)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+
+# Server Configuration
+server:
+  port: 8080
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+    mime-types: application/json,text/event-stream
+
+# ============================================
+# OLLAMA CONFIGURATION (Enterprise Models)
+# ============================================
+ollama:
+  base-url: http://localhost:11434
+  model: mistral:7b                    # Fallback model
+  intent-model: enterprise-intent      # Custom Modelfile for intent detection
+  formatter-model: enterprise-formatter # Custom Modelfile for response formatting
+  timeout-seconds: 120                 # Hard Ollama timeout (2 minutes)
+  enabled: true
+  two-stage-detection: false           # Enable for 150+ scenarios
+  streaming-enabled: true              # Enable SSE streaming
+  connection-timeout-ms: 5000          # 5s connection timeout
+  read-timeout-ms: 120000              # 2min read timeout
+  write-timeout-ms: 60000              # 1min write timeout
+
+# ============================================
+# BUSINESS DATA SERVICE CONFIGURATION
+# ============================================
+business-data:
+  base-url: http://localhost:8081      # Business data service URL
+  timeout-ms: 5000                     # 5s API timeout
+  connection-timeout-ms: 2000          # 2s connection timeout
+  mock-mode: true                      # Set to false for real API calls
+  endpoints:
+    TXN_STATUS:
+      path: /api/transactions/${txnId}
+      method: GET
+      timeout-ms: 5000
+    FILE_STATUS:
+      path: /api/files/status
+      method: POST
+      body-template: '{"fileName": "${fileName}"}'
+      timeout-ms: 10000
+    ACCOUNT_SUMMARY:
+      path: /api/accounts/${accountId}/summary
+      method: GET
+      timeout-ms: 5000
+
+# ============================================
+# INTENT DETECTION CONFIGURATION
+# ============================================
+intent:
+  confidence:
+    threshold: 0.75                    # Minimum confidence for direct execution
+    low-threshold: 0.60                # Below this, ask for clarification
+  require-confirmation:
+    enabled: true                      # Require user confirmation for moderate confidence
+    threshold: 0.85                    # Above this, no confirmation needed
+
+# ============================================
+# RUNTIME PROTECTION LIMITS
+# ============================================
+runtime:
+  protection:
+    max-execution-time-ms: 60000       # 60s total execution limit
+    max-ollama-timeout-ms: 120000      # 120s LLM timeout
+    max-db-timeout-ms: 5000            # 5s DB query timeout
+    max-scenario-timeout-ms: 30000     # 30s per scenario
+  dry-run-mode: false                  # Global dry-run mode (for testing)
+
+# ============================================
+# RATE LIMITING CONFIGURATION
+# ============================================
+rate-limit:
+  requests-per-minute: 30              # Per-user rate limit
+  timeout-seconds: 5                   # Rate limiter timeout
+
+# ============================================
+# JWT CONFIGURATION
+# ============================================
+jwt:
+  secret: your-256-bit-secret-key-for-jwt-token-generation-change-in-production
+  expiration: 86400000                 # 24 hours in milliseconds
+
+# ============================================
+# RESILIENCE4J CONFIGURATION
+# ============================================
+resilience4j:
+  circuitbreaker:
+    instances:
+      ollama:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 3
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30000
+        permittedNumberOfCallsInHalfOpenState: 3
+        slowCallDurationThreshold: 60000
+        slowCallRateThreshold: 80
+  retry:
+    instances:
+      ollama:
+        maxAttempts: 3
+        waitDuration: 1000
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - com.enterprise.ai.common.exception.LlmException
+          - org.springframework.web.reactive.function.client.WebClientResponseException
+  ratelimiter:
+    instances:
+      ollama:
+        limitForPeriod: 10
+        limitRefreshPeriod: 1s
+        timeoutDuration: 5s
+  timelimiter:
+    instances:
+      ollama:
+        timeoutDuration: 120s
+        cancelRunningFuture: true
+
+# ============================================
+# PERFORMANCE LOGGING
+# ============================================
+logging:
+  level:
+    root: INFO
+    com.enterprise.ai: DEBUG
+    com.enterprise.ai.api.service.PerformanceLoggingService: INFO
+    com.enterprise.ai.core.security: DEBUG
+    org.springframework.security: INFO
+    io.github.resilience4j: DEBUG
+    org.springframework.web.reactive: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# ============================================
+# ACTUATOR CONFIGURATION
+# ============================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,ratelimiters
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# ============================================
+# OPENAPI CONFIGURATION
+# ============================================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
