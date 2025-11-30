@@ -160,4 +160,31 @@ export class AdminService {
   clearAllCache(): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/admin/cache/clear`, {});
   }
+
+  // RBAC Management
+  getRbacMappings(): Observable<Record<string, string[]>> {
+    return this.http.get<Record<string, string[]>>(`${this.baseUrl}/admin/rbac/mappings`).pipe(
+      catchError(this.handleError('getRbacMappings', {}))
+    );
+  }
+
+  getRbacStatus(): Observable<{ initialized: boolean; totalRoles: number; totalMappings: number }> {
+    return this.http.get<{ initialized: boolean; totalRoles: number; totalMappings: number }>(`${this.baseUrl}/admin/rbac/status`).pipe(
+      catchError(this.handleError('getRbacStatus', { initialized: false, totalRoles: 0, totalMappings: 0 }))
+    );
+  }
+
+  addRbacMapping(role: string, scenarioCode: string): Observable<string> {
+    return this.http.post<string>(`${this.baseUrl}/admin/rbac/mappings`, { role, scenarioCode });
+  }
+
+  removeRbacMapping(role: string, scenarioCode: string): Observable<string> {
+    return this.http.delete<string>(`${this.baseUrl}/admin/rbac/mappings`, { 
+      body: { role, scenarioCode } 
+    });
+  }
+
+  refreshRbacCache(): Observable<string> {
+    return this.http.post<string>(`${this.baseUrl}/admin/rbac/refresh`, {});
+  }
 }

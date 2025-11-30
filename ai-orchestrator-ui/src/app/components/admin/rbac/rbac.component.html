@@ -1,0 +1,188 @@
+<!-- Axis Bank Admin - RBAC Management -->
+<div class="min-h-screen bg-bank-bg">
+  <!-- Page Title Section -->
+  <div class="bg-white border-b">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </a>
+          <div class="w-10 h-10 bg-axis-burgundy/10 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-axis-burgundy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">Role-Based Access Control</h1>
+            <p class="text-gray-500 text-sm">Manage which roles can access which scenarios</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <button (click)="refreshCache()" class="btn-secondary text-sm flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh Cache
+          </button>
+          <button (click)="openAddModal()" class="btn-axis text-sm flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Mapping
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Status Card -->
+    @if (rbacStatus) {
+      <div class="card-axis p-6 mb-8">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center"
+              [class]="rbacStatus.initialized ? 'bg-green-100' : 'bg-red-100'">
+              @if (rbacStatus.initialized) {
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+              } @else {
+                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              }
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">RBAC Status</h3>
+              <p class="text-gray-500 text-sm">
+                {{ rbacStatus.initialized ? 'Service initialized and running' : 'Service not initialized' }}
+              </p>
+            </div>
+          </div>
+          <div class="flex gap-8">
+            <div class="text-center">
+              <div class="text-2xl font-bold text-axis-burgundy">{{ rbacStatus.totalRoles }}</div>
+              <div class="text-gray-500 text-sm">Roles Configured</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-bold text-axis-burgundy">{{ rbacStatus.totalMappings }}</div>
+              <div class="text-gray-500 text-sm">Total Mappings</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (isLoading) {
+      <div class="flex items-center justify-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-axis-burgundy"></div>
+      </div>
+    } @else {
+      <!-- Role Mappings Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        @for (mapping of roleMappings; track mapping.role) {
+          <div class="card-axis p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center"
+                  [class]="mapping.role === 'ADMIN' ? 'bg-red-100' : mapping.role === 'OPERATOR' ? 'bg-amber-100' : 'bg-blue-100'">
+                  <svg class="w-5 h-5" 
+                    [class]="mapping.role === 'ADMIN' ? 'text-red-600' : mapping.role === 'OPERATOR' ? 'text-amber-600' : 'text-blue-600'"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900">{{ mapping.role }}</h3>
+                  <p class="text-gray-500 text-sm">{{ mapping.scenarios.length }} scenarios</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-2 max-h-64 overflow-y-auto">
+              @for (scenarioCode of mapping.scenarios; track scenarioCode) {
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors">
+                  <div>
+                    <span class="text-gray-900 font-medium text-sm">{{ getScenarioName(scenarioCode) }}</span>
+                    <span class="text-gray-400 text-xs block font-mono">{{ scenarioCode }}</span>
+                  </div>
+                  <button (click)="removeMapping(mapping.role, scenarioCode)" 
+                    class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              @if (mapping.scenarios.length === 0) {
+                <div class="text-center py-4 text-gray-400 text-sm">
+                  No scenarios assigned
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @if (roleMappings.length === 0) {
+          <div class="col-span-3 card-axis p-12 text-center">
+            <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">No RBAC Mappings</h3>
+            <p class="text-gray-500 mb-6">Get started by adding role-scenario mappings.</p>
+            <button (click)="openAddModal()" class="btn-axis">Add First Mapping</button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Add Mapping Modal -->
+  @if (showAddModal) {
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="card-axis w-full max-w-md overflow-hidden">
+        <div class="p-6 border-b border-gray-200 bg-axis-burgundy text-white rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold">Add Role-Scenario Mapping</h2>
+            <button (click)="closeAddModal()" class="text-white/70 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+            <select [(ngModel)]="selectedRole" class="input-axis">
+              <option value="">Select a role...</option>
+              @for (role of availableRoles; track role) {
+                <option [value]="role">{{ role }}</option>
+              }
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Scenario</label>
+            <select [(ngModel)]="selectedScenario" class="input-axis" [disabled]="!selectedRole">
+              <option value="">Select a scenario...</option>
+              @for (scenario of getUnmappedScenarios(selectedRole); track scenario.id) {
+                <option [value]="scenario.scenarioCode">{{ scenario.scenarioName }} ({{ scenario.scenarioCode }})</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+          <button (click)="closeAddModal()" class="btn-secondary">Cancel</button>
+          <button (click)="addMapping()" class="btn-axis" [disabled]="!selectedRole || !selectedScenario">Add Mapping</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>
