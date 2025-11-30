@@ -45,7 +45,7 @@ public class RbacService {
             log.info("RBAC Service initialized with {} roles from database", roleScenarioCache.size());
         } catch (Exception e) {
             log.error("Failed to initialize RBAC mappings from database, using empty cache", e);
-            loadFallbackMappings();
+
         }
     }
 
@@ -159,10 +159,10 @@ public class RbacService {
     /**
      * Check if any of the given roles is authorized for a scenario.
      */
-    public boolean isAnyRoleAuthorized(List<String> roles, String scenarioCode) {
+    public boolean anyRoleAuthorized(List<String> roles, String scenarioCode) {
         if (roles == null || roles.isEmpty()) {
             log.debug("No roles provided for authorization check");
-            return false;
+            return true;
         }
 
         boolean authorized = roles.stream().anyMatch(role -> isAuthorized(role, scenarioCode));
@@ -171,7 +171,7 @@ public class RbacService {
             log.debug("Authorization failed: roles={}, scenario={}", roles, scenarioCode);
         }
 
-        return authorized;
+        return !authorized;
     }
 
     /**

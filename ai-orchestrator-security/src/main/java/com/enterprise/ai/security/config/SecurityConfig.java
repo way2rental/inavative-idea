@@ -50,12 +50,13 @@ public class SecurityConfig {
     /**
      * Configures the security filter chain for JWT-based stateless authentication.
      * CSRF is disabled as this is a stateless REST API using JWT tokens in headers.
+     *
+     * Special handling for async/streaming requests to prevent "response already committed" errors.
      */
     @Bean
     @SuppressWarnings("java:S4502") // CSRF disabled intentionally for stateless JWT API
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // lgtm[java/spring-disabled-csrf-protection] - CSRF disabled: stateless JWT API does not use cookies for auth
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -71,6 +72,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()  // Allow error page (prevents "response already committed")
 
                         // Streaming endpoints - authenticated users
+                        // These endpoints use SSE and async dispatch, must be handled specially
                         .requestMatchers("/api/v2/chat/stream").authenticated()
                         .requestMatchers("/api/v2/chat/events/**").authenticated()
                         
@@ -79,6 +81,20 @@ public class SecurityConfig {
 
                         // All other requests require authentication
                         .anyRequest().authenticated()
+                )
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            // Only handle if response is not committed (not in streaming mode)
+                            if (!response.isCommitted()) {
+                                response.sendError(401, "Unauthorized");
+                            }
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            // Only handle if response is not committed (not in streaming mode)
+                            if (!response.isCommitted()) {
+                                response.sendError(403, "Access Denied");
+                            }
+                        })
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

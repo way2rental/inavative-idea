@@ -9,7 +9,7 @@ import com.enterprise.ai.data.repository.AiAuditLogRepository;
 import com.enterprise.ai.data.repository.ChatMessageRepository;
 import com.enterprise.ai.data.repository.ChatSessionRepository;
 import com.enterprise.ai.llm.client.ReactiveLlmClient;
-import com.enterprise.ai.llm.config.OllamaProperties;
+// Removed: import com.enterprise.ai.llm.config.OllamaProperties; - No longer needed
 import com.enterprise.ai.security.rbac.RbacService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -45,12 +45,13 @@ public class ReactiveChatService {
     private final ChatMessageRepository messageRepository;
     private final AiAuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
-    private final OllamaProperties ollamaProperties;
+    // Removed: OllamaProperties - No longer needed with Spring AI
 
     // Configurable runtime protection limits
     private final long maxExecutionTimeMs;
     private final long maxOllamaTimeoutMs;
     private final long maxDbTimeoutMs;
+    private final boolean twoStageDetection;
 
     // Dry-run mode flag
     private final boolean dryRunMode;
@@ -65,10 +66,11 @@ public class ReactiveChatService {
             ChatMessageRepository messageRepository,
             AiAuditLogRepository auditLogRepository,
             ObjectMapper objectMapper,
-            OllamaProperties ollamaProperties,
+            // Removed: OllamaProperties parameter
             @Value("${runtime.protection.max-execution-time-ms:60000}") long maxExecutionTimeMs,
             @Value("${runtime.protection.max-ollama-timeout-ms:120000}") long maxOllamaTimeoutMs,
             @Value("${runtime.protection.max-db-timeout-ms:5000}") long maxDbTimeoutMs,
+            @Value("${llm.two-stage-detection:false}") boolean twoStageDetection,
             @Value("${runtime.dry-run-mode:false}") boolean dryRunMode) {
         this.llmClient = llmClient;
         this.scenarioRouter = scenarioRouter;
@@ -79,10 +81,11 @@ public class ReactiveChatService {
         this.messageRepository = messageRepository;
         this.auditLogRepository = auditLogRepository;
         this.objectMapper = objectMapper;
-        this.ollamaProperties = ollamaProperties;
+        // Removed: this.ollamaProperties = ollamaProperties;
         this.maxExecutionTimeMs = maxExecutionTimeMs;
         this.maxOllamaTimeoutMs = maxOllamaTimeoutMs;
         this.maxDbTimeoutMs = maxDbTimeoutMs;
+        this.twoStageDetection = twoStageDetection;
         this.dryRunMode = dryRunMode;
     }
 
@@ -121,7 +124,7 @@ public class ReactiveChatService {
             // Intent detection (non-blocking)
             tracker.startIntentDetection();
             
-            Mono<IntentResult> intentMono = ollamaProperties.isTwoStageDetection()
+            Mono<IntentResult> intentMono = twoStageDetection
                     ? llmClient.detectIntentTwoStage(request.getQuery(), sessionContext)
                     : llmClient.detectIntent(request.getQuery(), sessionContext);
             
@@ -198,7 +201,7 @@ public class ReactiveChatService {
                     }
 
                     // Authorization check (roles already validated above)
-                    if (!rbacService.isAnyRoleAuthorized(userRoles, intent.getScenario())) {
+                    if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
                         log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
                         return Flux.just(String.format("\n❌ You don't have permission to access this information.\nYour roles: %s\nRequired scenario: %s", userRoles, intent.getScenario()));
                     }
@@ -262,7 +265,7 @@ public class ReactiveChatService {
 
         // Authorization check
         List<String> userRoles = getCurrentUserRoles();
-        if (!rbacService.isAnyRoleAuthorized(userRoles, intent.getScenario())) {
+        if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
             String response = "You don't have permission to access this information.";
             saveMessageSync(sessionId, "assistant", response);
             return Mono.just(buildResponse(sessionId, response, ChatResponse.ResponseType.ERROR, 

@@ -3,149 +3,149 @@ package com.enterprise.ai.llm.client;
 import com.enterprise.ai.common.dto.IntentResult;
 import com.enterprise.ai.common.dto.ScenarioResult;
 import com.enterprise.ai.common.exception.LlmException;
-import com.enterprise.ai.llm.config.OllamaProperties;
 import com.enterprise.ai.llm.prompt.PromptTemplates;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * Ollama LLM client implementation with proper error handling and retry logic.
+ * Spring AI-based LLM Client.
+ * Provider-agnostic implementation - works with Ollama, OpenAI, Azure OpenAI, etc.
+ *
+ * To switch providers, just change spring.ai.active-provider in application.yml
  */
 @Slf4j
-@Service
+@Service("springAiLlmClient")
 @RequiredArgsConstructor
-public class OllamaLlmClient implements LlmClient {
+public class SpringAiLlmClient implements ReactiveLlmClient {
 
-    private final WebClient ollamaWebClient;
-    private final OllamaProperties properties;
+    private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
 
-    @PostConstruct
-    public void init() {
-        if (properties.isEnabled()) {
-            log.info("Ollama LLM Client initialized with base URL: {} and model: {}", 
-                    properties.getBaseUrl(), properties.getModel());
-        } else {
-            log.warn("Ollama LLM Client is DISABLED. All calls will use fallback responses.");
-        }
+    @Override
+    public Mono<IntentResult> detectIntent(String userInput, String sessionContext) {
+        return Mono.fromCallable(() -> detectIntentBlocking(userInput, sessionContext));
     }
 
     @Override
-    @CircuitBreaker(name = "ollama", fallbackMethod = "detectIntentFallback")
-    @Retry(name = "ollama")
-    public IntentResult detectIntent(String userInput, String sessionContext) {
-        if (!properties.isEnabled()) {
-            log.debug("Ollama disabled, using fallback for intent detection");
-            return detectIntentFallback(userInput, sessionContext, new LlmException("Ollama disabled"));
-        }
-        
-        String prompt = PromptTemplates.buildIntentDetectionPrompt(userInput, sessionContext);
-        String response = callOllama(prompt);
-        return parseIntentResult(response);
+    public Mono<String> generateFollowUpQuestion(String scenarioCode, List<String> missingParams) {
+        return Mono.fromCallable(() -> generateFollowUpBlocking(scenarioCode, missingParams));
     }
 
     @Override
-    @CircuitBreaker(name = "ollama", fallbackMethod = "generateFollowUpFallback")
-    @Retry(name = "ollama")
-    public String generateFollowUpQuestion(String scenarioCode, List<String> missingParams) {
-        if (!properties.isEnabled()) {
-            return generateFollowUpFallback(scenarioCode, missingParams, new LlmException("Ollama disabled"));
-        }
-        
-        String prompt = PromptTemplates.buildFollowUpPrompt(scenarioCode, missingParams);
-        return callOllama(prompt).trim();
+    public Mono<String> formatResponse(String scenarioCode, ScenarioResult result, String userQuery) {
+        return Mono.fromCallable(() -> formatResponseBlocking(scenarioCode, result, userQuery));
     }
 
     @Override
-    @CircuitBreaker(name = "ollama", fallbackMethod = "formatResponseFallback")
-    @Retry(name = "ollama")
-    public String formatResponse(String scenarioCode, ScenarioResult result, String userQuery) {
-        if (!properties.isEnabled()) {
-            return formatResponseFallback(scenarioCode, result, userQuery, new LlmException("Ollama disabled"));
-        }
-        
+    public Mono<IntentResult> detectIntentTwoStage(String userInput, String sessionContext) {
+        // Two-stage detection not needed with Spring AI
+        return detectIntent(userInput, sessionContext);
+    }
+
+    @Override
+    public Mono<Boolean> isHealthy() {
+        return Mono.just(true);  // Spring AI auto-configuration handles health
+    }
+
+    @Override
+    public Flux<String> formatResponseStreaming(String scenarioCode, ScenarioResult result, String userQuery) {
         try {
             String dataJson = objectMapper.writeValueAsString(result.getData());
             String prompt = PromptTemplates.buildResponseFormattingPrompt(scenarioCode, dataJson, userQuery);
-            return callOllama(prompt).trim();
+
+            // Stream response token by token using Spring AI
+            return chatClient.prompt()
+                    .user(prompt)
+                    .stream()
+                    .content()
+                    // Buffer tokens for smoother streaming
+                    .bufferTimeout(5, java.time.Duration.ofMillis(100))
+                    .map(tokens -> String.join("", tokens))
+                    .filter(chunk -> !chunk.isEmpty());
+
         } catch (Exception e) {
-            log.error("Error formatting response", e);
+            log.error("Error in streaming format: {}", e.getMessage(), e);
+            return Flux.just(formatResponseFallback(scenarioCode, result, userQuery, e));
+        }
+    }
+
+    @CircuitBreaker(name = "ollama", fallbackMethod = "detectIntentFallback")
+    @Retry(name = "ollama")
+    private IntentResult detectIntentBlocking(String userInput, String sessionContext) {
+        try {
+            String prompt = PromptTemplates.buildIntentDetectionPrompt(userInput, sessionContext);
+
+            // Call LLM using Spring AI (provider-agnostic)
+            String response = chatClient.prompt()
+                    .user(prompt)
+                    .call()
+                    .content();
+
+            return parseIntentResult(response);
+        } catch (Exception e) {
+            log.error("Error detecting intent: {}", e.getMessage(), e);
+            throw new LlmException("Failed to detect intent", e);
+        }
+    }
+
+    @CircuitBreaker(name = "ollama", fallbackMethod = "generateFollowUpFallback")
+    @Retry(name = "ollama")
+    private String generateFollowUpBlocking(String scenarioCode, List<String> missingParams) {
+        try {
+            String prompt = PromptTemplates.buildFollowUpPrompt(scenarioCode, missingParams);
+
+            return chatClient.prompt()
+                    .user(prompt)
+                    .call()
+                    .content()
+                    .trim();
+        } catch (Exception e) {
+            log.error("Error generating follow-up: {}", e.getMessage(), e);
+            return generateFollowUpFallback(scenarioCode, missingParams, e);
+        }
+    }
+
+    @CircuitBreaker(name = "ollama", fallbackMethod = "formatResponseFallback")
+    @Retry(name = "ollama")
+    private String formatResponseBlocking(String scenarioCode, ScenarioResult result, String userQuery) {
+        try {
+            String dataJson = objectMapper.writeValueAsString(result.getData());
+            String prompt = PromptTemplates.buildResponseFormattingPrompt(scenarioCode, dataJson, userQuery);
+
+            return chatClient.prompt()
+                    .user(prompt)
+                    .call()
+                    .content()
+                    .trim();
+        } catch (Exception e) {
+            log.error("Error formatting response: {}", e.getMessage(), e);
             return formatResponseFallback(scenarioCode, result, userQuery, e);
         }
     }
 
-    private String callOllama(String prompt) {
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", properties.getModel());
-        requestBody.put("prompt", prompt);
-        requestBody.put("stream", false);
-        requestBody.put("options", Map.of(
-                "temperature", 0.3,  // Lower temperature for more consistent outputs
-                "num_predict", 1024  // Limit response length
-        ));
-
-        try {
-            log.debug("Calling Ollama with model: {}", properties.getModel());
-            
-            String response = ollamaWebClient.post()
-                    .uri("/api/generate")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(properties.getTimeoutSeconds()))
-                    .block();
-
-            if (response == null || response.isEmpty()) {
-                throw new LlmException("Empty response from Ollama");
-            }
-
-            JsonNode node = objectMapper.readTree(response);
-            
-            // Check for error in response
-            if (node.has("error")) {
-                String error = node.get("error").asText();
-                log.error("Ollama returned error: {}", error);
-                throw new LlmException("Ollama error: " + error);
-            }
-            
-            return node.has("response") ? node.get("response").asText() : response;
-            
-        } catch (WebClientResponseException e) {
-            log.error("Ollama API error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
-            throw new LlmException("Ollama API error: " + e.getMessage(), e);
-        } catch (LlmException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Error calling Ollama API: {}", e.getMessage());
-            throw new LlmException("Failed to communicate with Ollama: " + e.getMessage(), e);
-        }
-    }
+    // ===== PARSING METHODS =====
 
     private IntentResult parseIntentResult(String response) {
         try {
-            // Extract JSON from response (LLM might add extra text)
             String jsonPart = extractJson(response);
             if (jsonPart == null || jsonPart.isEmpty()) {
-                log.warn("No JSON found in Ollama response, returning UNKNOWN intent");
+                log.warn("No JSON found in LLM response, returning UNKNOWN intent");
                 return createUnknownIntent();
             }
-            
+
+            // Fix: Remove invalid escape sequences (like \_ )
+            jsonPart = jsonPart.replaceAll("\\\\_", "_");
+
             JsonNode node = objectMapper.readTree(jsonPart);
 
             List<String> missingParams = new ArrayList<>();
@@ -158,11 +158,11 @@ public class OllamaLlmClient implements LlmClient {
             Map<String, Object> params = new HashMap<>();
             if (node.has("params") && node.get("params").isObject()) {
                 node.get("params").fields().forEachRemaining(
-                        entry -> params.put(entry.getKey(), entry.getValue().isNull() ? null : entry.getValue().asText())
+                        entry -> params.put(entry.getKey(),
+                                entry.getValue().isNull() ? null : entry.getValue().asText())
                 );
             }
 
-            // Parse possible scenarios for ambiguous intents
             List<String> possibleScenarios = new ArrayList<>();
             if (node.has("possibleScenarios") && node.get("possibleScenarios").isArray()) {
                 for (JsonNode scenario : node.get("possibleScenarios")) {
@@ -174,8 +174,8 @@ public class OllamaLlmClient implements LlmClient {
             double confidence = node.has("confidence") ? node.get("confidence").asDouble() : 0.0;
             String reasoning = node.has("reasoning") ? node.get("reasoning").asText() : null;
 
-            log.debug("Parsed intent - scenario: {}, confidence: {}, params: {}, missing: {}, reasoning: {}", 
-                    scenario, confidence, params, missingParams, reasoning);
+            log.debug("Parsed intent - scenario: {}, confidence: {}, params: {}",
+                    scenario, confidence, params);
 
             return IntentResult.builder()
                     .scenario(scenario)
@@ -212,7 +212,8 @@ public class OllamaLlmClient implements LlmClient {
                 .build();
     }
 
-    // Fallback methods for circuit breaker
+    // ===== FALLBACK METHODS =====
+
     public IntentResult detectIntentFallback(String userInput, String sessionContext, Throwable t) {
         log.warn("Fallback for detectIntent due to: {}", t.getMessage());
         return createUnknownIntent();
@@ -230,10 +231,11 @@ public class OllamaLlmClient implements LlmClient {
         log.warn("Fallback for formatResponse due to: {}", t.getMessage());
         if (result != null && result.getData() != null) {
             StringBuilder sb = new StringBuilder("Here is the result for your request:\n");
-            result.getData().forEach((key, value) -> 
+            result.getData().forEach((key, value) ->
                     sb.append("- ").append(key).append(": ").append(value).append("\n"));
             return sb.toString();
         }
         return "Your request has been processed successfully.";
     }
 }
+

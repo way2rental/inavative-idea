@@ -44,6 +44,57 @@ spring:
       port: 6379
       timeout: 2000ms
 
+  ai:
+    active-provider: openai
+    retry:
+      max-attempts: 3
+      backoff:
+        initial-interval: 1000
+        multiplier: 2
+        max-interval: 5000
+
+    # Ollama Configuration
+#    ollama:
+#      base-url: http://localhost:11434
+#      chat:
+#        enabled: true
+#        options:
+#          model: mistral:7b          # Model for general responses
+#          temperature: 0.3
+#          num-predict: 1024
+#          top-k: 40
+#          top-p: 0.9
+#      timeout:
+#        connection: 5s
+#        read: 120s
+#        write: 60s
+
+    # OpenAI Configuration (enable when needed)
+    openai:
+      api-key: ${OPENAI_API_KEY:${OPEN_API_KEY:}}
+      chat:
+        enabled: true
+        options:
+          model: gpt-4o-mini        # or gpt-4, gpt-3.5-turbo
+          temperature: 0.3
+          max-tokens: 1024
+          top-p: 1.0
+          frequency-penalty: 0.0
+          presence-penalty: 0.0
+
+    # Azure OpenAI Configuration (enable when needed)
+    azure:
+      openai:
+        api-key: ${AZURE_OPENAI_API_KEY:your-azure-key}
+        endpoint: ${AZURE_OPENAI_ENDPOINT:https://your-resource.openai.azure.com/}
+        chat:
+          enabled: false
+          options:
+            deployment-name: gpt-4
+            temperature: 0.3
+            max-tokens: 1024
+
+
 # Server Configuration
 server:
   port: 8080
@@ -54,20 +105,18 @@ server:
     mime-types: application/json,text/event-stream
 
 # ============================================
-# OLLAMA CONFIGURATION (Enterprise Models)
+# LLM OPERATION CONFIGURATION
 # ============================================
-ollama:
-  base-url: http://localhost:11434
-  model: mistral:7b                    # Fallback model
-  intent-model: enterprise-intent      # Custom Modelfile for intent detection
-  formatter-model: enterprise-formatter # Custom Modelfile for response formatting
-  timeout-seconds: 120                 # Hard Ollama timeout (2 minutes)
-  enabled: true
-  two-stage-detection: false           # Enable for 150+ scenarios
-  streaming-enabled: true              # Enable SSE streaming
-  connection-timeout-ms: 5000          # 5s connection timeout
-  read-timeout-ms: 120000              # 2min read timeout
-  write-timeout-ms: 60000              # 1min write timeout
+llm:
+  timeout:
+    detection-seconds: 30        # Intent detection timeout
+    generation-seconds: 120      # Response generation timeout
+    streaming-seconds: 150       # Streaming response timeout
+  models:
+    intent: mistral:7b          # Model for intent detection
+    formatter: mistral:7b        # Model for response formatting
+  two-stage-detection: false    # Enable for 150+ scenarios
+  streaming-enabled: true       # Enable SSE streaming
 
 # ============================================
 # BUSINESS DATA SERVICE CONFIGURATION

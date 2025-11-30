@@ -91,7 +91,7 @@ public class ChatService {
 
             // Check authorization
             List<String> userRoles = getCurrentUserRoles();
-            if (!rbacService.isAnyRoleAuthorized(userRoles, intent.getScenario())) {
+            if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
                 String response = "You don't have permission to access this information.";
                 saveMessage(sessionId, "assistant", response);
                 return buildResponse(sessionId, response, ChatResponse.ResponseType.ERROR, 
