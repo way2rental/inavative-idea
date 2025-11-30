@@ -57,6 +57,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/ollama/health").permitAll()
                         .requestMatchers("/api/v2/scenario/test").permitAll()  // Sandbox tester
                         .requestMatchers("/api/v2/scenario/tests/**").permitAll()  // Test results
+                        .requestMatchers("/api/v2/chat/stream").authenticated()  // SSE streaming endpoint
+                        .requestMatchers("/api/v2/chat/events/**").authenticated()  // SSE events endpoint
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()

@@ -54,10 +54,20 @@ public class ReactiveChatController {
     public Flux<String> processChatStreaming(@RequestBody ChatRequest request) {
         log.info("Streaming chat request received from user: {}", request.getUserId());
         
-        return reactiveChatService.processChatStreaming(request)
-                .doOnSubscribe(s -> log.debug("Streaming started"))
-                .doOnComplete(() -> log.debug("Streaming completed"))
-                .doOnError(e -> log.error("Streaming error: {}", e.getMessage()));
+        return Flux.concat(
+                // Send initial acknowledgment
+                Flux.just("Processing your request...\n"),
+
+                // Process the chat with streaming
+                reactiveChatService.processChatStreaming(request)
+                        .doOnSubscribe(s -> log.debug("Streaming started for user: {}", request.getUserId()))
+                        .doOnComplete(() -> log.debug("Streaming completed for user: {}", request.getUserId()))
+                        .doOnError(e -> log.error("Streaming error for user {}: {}", request.getUserId(), e.getMessage()))
+        )
+        .onErrorResume(e -> {
+            log.error("Fatal streaming error for user {}: {}", request.getUserId(), e.getMessage(), e);
+            return Flux.just("\n\n❌ An error occurred. Please try again.");
+        });
     }
 
     /**

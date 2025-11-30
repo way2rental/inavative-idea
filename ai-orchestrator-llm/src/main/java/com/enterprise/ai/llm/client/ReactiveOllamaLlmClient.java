@@ -283,7 +283,7 @@ public class ReactiveOllamaLlmClient implements ReactiveLlmClient {
     private Flux<String> callOllamaStreaming(String model, String prompt) {
         Map<String, Object> requestBody = buildRequestBody(model, prompt, true, STREAMING_TEMPERATURE);
 
-        log.debug("Calling Ollama [streaming] model={}", model);
+        log.debug("Calling Ollama [streaming] model={}, prompt length={}", model, prompt.length());
 
         return ollamaWebClient.post()
                 .uri("/api/generate")
@@ -291,19 +291,36 @@ public class ReactiveOllamaLlmClient implements ReactiveLlmClient {
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToFlux(String.class)
+                .doOnSubscribe(s -> log.debug("Streaming subscription started"))
+                .doOnNext(line -> log.trace("Received streaming line: {}", line))
                 .flatMap(line -> {
                     try {
                         JsonNode node = objectMapper.readTree(line);
+                        if (node.has("error")) {
+                            String error = node.get("error").asText();
+                            log.error("Ollama streaming error: {}", error);
+                            return Flux.error(new LlmException("Ollama streaming error: " + error));
+                        }
                         if (node.has("response")) {
                             String token = node.get("response").asText();
-                            return Flux.just(token);
+                            if (!token.isEmpty()) {
+                                return Flux.just(token);
+                            }
+                        }
+                        // Check if streaming is done
+                        if (node.has("done") && node.get("done").asBoolean()) {
+                            log.debug("Streaming completed (done=true)");
+                            return Flux.empty();
                         }
                         return Flux.empty();
                     } catch (Exception e) {
+                        log.error("Failed to parse streaming response: {}", line, e);
                         return Flux.error(new LlmException("Failed to parse streaming response", e));
                     }
                 })
-                .timeout(Duration.ofSeconds(properties.getTimeoutSeconds()));
+                .doOnComplete(() -> log.debug("Streaming flux completed"))
+                .doOnError(e -> log.error("Streaming flux error: {}", e.getMessage()))
+                .timeout(Duration.ofSeconds(properties.getTimeoutSeconds()), Flux.empty());
     }
 
     // ===== PROMPT BUILDERS =====

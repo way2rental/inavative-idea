@@ -24,19 +24,26 @@ public class LlmConfig {
 
     @Bean
     public WebClient ollamaWebClient(OllamaProperties properties) {
+        int connectTimeoutMs = properties.getConnectionTimeoutMs();
+        int readTimeoutMs = properties.getReadTimeoutMs();
+        int writeTimeoutMs = properties.getWriteTimeoutMs();
+
+        log.info("Configuring Ollama WebClient: connectTimeout={}ms, readTimeout={}ms, writeTimeout={}ms",
+                connectTimeoutMs, readTimeoutMs, writeTimeoutMs);
+
         HttpClient httpClient = HttpClient.create()
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, properties.getTimeoutSeconds() * 1000)
-                .responseTimeout(Duration.ofSeconds(properties.getTimeoutSeconds()))
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMs)
+                .responseTimeout(Duration.ofMillis(readTimeoutMs))
                 .doOnConnected(conn -> conn
-                        .addHandlerLast(new ReadTimeoutHandler(properties.getTimeoutSeconds(), TimeUnit.SECONDS))
-                        .addHandlerLast(new WriteTimeoutHandler(properties.getTimeoutSeconds(), TimeUnit.SECONDS)));
+                        .addHandlerLast(new ReadTimeoutHandler(readTimeoutMs, TimeUnit.MILLISECONDS))
+                        .addHandlerLast(new WriteTimeoutHandler(writeTimeoutMs, TimeUnit.MILLISECONDS)));
 
         return WebClient.builder()
                 .baseUrl(properties.getBaseUrl())
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .filter(logRequest())
                 .filter(logResponse())
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)) // 16MB buffer
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(32 * 1024 * 1024)) // 32MB buffer for streaming
                 .build();
     }
 

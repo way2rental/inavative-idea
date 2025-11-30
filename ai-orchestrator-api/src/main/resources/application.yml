@@ -108,7 +108,7 @@ intent:
 # ============================================
 runtime:
   protection:
-    max-execution-time-ms: 60000       # 60s total execution limit
+    max-execution-time-ms: 150000      # 150s total execution limit (to accommodate slow LLM responses)
     max-ollama-timeout-ms: 120000      # 120s LLM timeout
     max-db-timeout-ms: 5000            # 5s DB query timeout
     max-scenario-timeout-ms: 30000     # 30s per scenario

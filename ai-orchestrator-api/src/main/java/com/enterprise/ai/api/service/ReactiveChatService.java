@@ -154,27 +154,41 @@ public class ReactiveChatService {
     public Flux<String> processChatStreaming(ChatRequest request) {
         String executionId = UUID.randomUUID().toString();
         
-        return Mono.defer(() -> {
+        log.debug("Starting streaming chat processing for user: {}", request.getUserId());
+
+        // Send progress indicator for intent detection
+        Flux<String> progressIndicator = Flux.just("🔍 Analyzing your request... ");
+
+        // Cache the intent detection to avoid re-execution
+        Mono<IntentResult> intentMono = Mono.defer(() -> {
             String sessionId = getOrCreateSessionSync(request);
             saveMessageSync(sessionId, "user", request.getQuery());
             String sessionContext = getSessionContextSync(sessionId);
             
-            return llmClient.detectIntent(request.getQuery(), sessionContext);
+            return llmClient.detectIntent(request.getQuery(), sessionContext)
+                    .timeout(Duration.ofMillis(maxOllamaTimeoutMs));
         })
-        .flatMapMany(intent -> {
+        .doOnSuccess(intent -> log.info("Intent detected for streaming: scenario={}, confidence={}",
+                intent.getScenario(), intent.getConfidence()))
+        .doOnError(e -> log.error("Intent detection failed in streaming: {}", e.getMessage()))
+        .cache(); // Cache to avoid re-executing intent detection
+
+        Flux<String> responseFlux = intentMono.flatMapMany(intent -> {
             // Validate intent
             IntentValidationService.ValidationResult validation = 
                     validationService.validate(intent, request.getQuery());
             
             if (!validation.isValid()) {
                 String message = validation.validationMessage();
-                return Flux.just(message);
+                log.debug("Validation failed, returning error message");
+                return Flux.just("\n\n" + message);
             }
             
             // Check authorization
             List<String> userRoles = getCurrentUserRoles();
             if (!rbacService.isAnyRoleAuthorized(userRoles, intent.getScenario())) {
-                return Flux.just("You don't have permission to access this information.");
+                log.warn("User not authorized for scenario: {}", intent.getScenario());
+                return Flux.just("\n\n❌ You don't have permission to access this information.");
             }
             
             // Execute scenario
@@ -184,15 +198,34 @@ public class ReactiveChatService {
                     .userId(request.getUserId())
                     .build();
             
-            return scenarioRouter.routeReactive(scenarioRequest)
-                    .flatMapMany(result -> 
-                            llmClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery()));
+            log.debug("Executing scenario reactively: {}", intent.getScenario());
+
+            return Flux.concat(
+                    Flux.just("\n\n📊 Fetching data... "),
+                    scenarioRouter.routeReactive(scenarioRequest)
+                            .timeout(Duration.ofMillis(maxDbTimeoutMs))
+                            .doOnSuccess(result -> log.debug("Scenario executed, starting streaming response"))
+                            .doOnError(e -> log.error("Scenario execution failed: {}", e.getMessage()))
+                            .flatMapMany(result -> {
+                                log.debug("Formatting response as stream");
+                                return Flux.concat(
+                                        Flux.just("\n\n"),
+                                        llmClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery())
+                                                .doOnComplete(() -> log.debug("Response streaming completed"))
+                                                .doOnError(e -> log.error("Response streaming error: {}", e.getMessage()))
+                                );
+                            })
+            );
         })
-        .timeout(Duration.ofMillis(maxExecutionTimeMs))
+        .timeout(Duration.ofMillis(maxExecutionTimeMs),
+                Flux.just("\n\n⏱️ Request timeout. The operation is taking longer than expected. Please try again."))
         .onErrorResume(e -> {
-            log.error("Streaming error: {}", e.getMessage());
-            return Flux.just("An error occurred. Please try again.");
+            log.error("Streaming error: {}", e.getMessage(), e);
+            return Flux.just("\n\n❌ An error occurred: " + e.getMessage() + "\n\nPlease try again.");
         });
+
+        // Combine progress indicator with response
+        return Flux.concat(progressIndicator, responseFlux);
     }
 
     private Mono<ChatResponse> processIntent(
