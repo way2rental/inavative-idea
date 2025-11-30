@@ -36,6 +36,11 @@ import java.util.*;
 @Tag(name = "Admin", description = "Admin Panel API for configuration management")
 public class AdminController {
 
+    // Default confidence when not stored in audit log
+    private static final double DEFAULT_CONFIDENCE = 0.85;
+    // Session active timeout in seconds (5 minutes)
+    private static final int SESSION_ACTIVE_TIMEOUT_SECONDS = 300;
+
     private final AiScenarioRepository scenarioRepository;
     private final AiAuditLogRepository auditLogRepository;
     private final ChatSessionRepository sessionRepository;
@@ -342,7 +347,7 @@ public class AdminController {
         dto.scenarioCode = log.getScenarioCode() != null ? log.getScenarioCode() : "N/A";
         dto.userQuery = extractQueryFromJson(log.getRawIntentJson());
         dto.detectedIntent = log.getScenarioCode();
-        dto.confidence = 0.85; // Default confidence since not stored in current schema
+        dto.confidence = DEFAULT_CONFIDENCE;
         dto.paramsExtracted = log.getRawIntentJson();
         dto.responseGenerated = extractResponseFromJson(log.getRawResultJson());
         dto.executionTimeMs = log.getResponseTime() != null && log.getRequestTime() != null
@@ -362,7 +367,7 @@ public class AdminController {
         dto.lastActivityTime = session.getLastActivityAt() != null ? session.getLastActivityAt().toString() : null;
         dto.messageCount = messageRepository.findBySessionIdOrderByTimestampAsc(session.getSessionId()).size();
         dto.active = session.getLastActivityAt() != null && 
-                session.getLastActivityAt().isAfter(Instant.now().minusSeconds(300)); // Active if activity within last 5 minutes
+                session.getLastActivityAt().isAfter(Instant.now().minusSeconds(SESSION_ACTIVE_TIMEOUT_SECONDS));
         return dto;
     }
 
