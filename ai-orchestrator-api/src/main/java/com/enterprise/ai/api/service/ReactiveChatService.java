@@ -186,11 +186,20 @@ public class ReactiveChatService {
             
             // Check authorization
             List<String> userRoles = getCurrentUserRoles();
-            if (!rbacService.isAnyRoleAuthorized(userRoles, intent.getScenario())) {
-                log.warn("User not authorized for scenario: {}", intent.getScenario());
-                return Flux.just("\n\n❌ You don't have permission to access this information.");
+            log.debug("User roles for authorization check: {} for scenario: {}", userRoles, intent.getScenario());
+
+            if (userRoles.isEmpty()) {
+                log.error("No user roles found! Authentication may have failed.");
+                return Flux.just("\n\n❌ Authentication required. Please log in again.");
             }
-            
+
+            if (!rbacService.isAnyRoleAuthorized(userRoles, intent.getScenario())) {
+                log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
+                return Flux.just(String.format("\n\n❌ You don't have permission to access this information.\nYour roles: %s\nRequired scenario: %s", userRoles, intent.getScenario()));
+            }
+
+            log.debug("Authorization successful for user with roles: {}", userRoles);
+
             // Execute scenario
             ScenarioRequest scenarioRequest = ScenarioRequest.builder()
                     .scenario(intent.getScenario())
@@ -569,12 +578,20 @@ public class ReactiveChatService {
 
     private List<String> getCurrentUserRoles() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getAuthorities() == null) {
+        if (auth == null) {
+            log.error("No authentication found in SecurityContext");
             return List.of();
         }
-        return auth.getAuthorities().stream()
+        if (auth.getAuthorities() == null || auth.getAuthorities().isEmpty()) {
+            log.warn("Authentication found but no authorities: principal={}, authenticated={}",
+                    auth.getPrincipal(), auth.isAuthenticated());
+            return List.of();
+        }
+        List<String> roles = auth.getAuthorities().stream()
                 .map(a -> a.getAuthority().replace("ROLE_", ""))
                 .toList();
+        log.debug("Extracted roles from authentication: {}", roles);
+        return roles;
     }
 
     private void logAuditAsync(String executionId, String userId, String scenarioCode,

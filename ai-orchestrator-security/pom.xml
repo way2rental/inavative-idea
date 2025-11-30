@@ -50,5 +50,9 @@
             <artifactId>jjwt-jackson</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>com.enterprise.ai</groupId>
+            <artifactId>ai-orchestrator-data</artifactId>
+        </dependency>
     </dependencies>
 </project>

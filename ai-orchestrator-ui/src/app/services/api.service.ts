@@ -22,18 +22,42 @@ export class ApiService {
 
   chatStream(request: ChatRequest): Observable<string> {
     const subject = new Subject<string>();
-    
+
+    // Get token from localStorage
+    let token = '';
+    const storedUser = localStorage.getItem('currentUser');
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        token = user.token || '';
+      } catch (e) {
+        console.error('Failed to parse currentUser from localStorage:', e);
+      }
+    }
+
+    if (!token) {
+      subject.error(new Error('No authentication token available'));
+      return subject.asObservable();
+    }
+
     // Try streaming endpoint first, fall back to regular if not available
     fetch(`${this.baseUrl}/v2/chat/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('currentUser') ? JSON.parse(localStorage.getItem('currentUser')!).token : ''}`
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(request)
     }).then(async response => {
-      if (!response.ok || !response.body) {
-        subject.error(new Error('Streaming not available'));
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Streaming request failed:', response.status, errorText);
+        subject.error(new Error(`Streaming failed: ${response.status} - ${response.statusText}`));
+        return;
+      }
+
+      if (!response.body) {
+        subject.error(new Error('Streaming not available - no response body'));
         return;
       }
 
@@ -43,13 +67,14 @@ export class ApiService {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         const chunk = decoder.decode(value, { stream: true });
         subject.next(chunk);
       }
-      
+
       subject.complete();
     }).catch(err => {
+      console.error('Streaming error:', err);
       subject.error(err);
     });
 

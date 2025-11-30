@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v2/scenario/tests/**").permitAll()  // Test results
                         .requestMatchers("/api/v2/chat/stream").authenticated()  // SSE streaming endpoint
                         .requestMatchers("/api/v2/chat/events/**").authenticated()  // SSE events endpoint
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")  // Admin panel APIs
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
