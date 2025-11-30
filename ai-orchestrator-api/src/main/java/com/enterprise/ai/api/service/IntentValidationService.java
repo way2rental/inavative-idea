@@ -249,6 +249,19 @@ public class IntentValidationService {
     }
 
     /**
+     * Get common scenarios for clarification options (loaded from DB).
+     * Returns up to 5 most relevant scenarios based on user role access.
+     */
+    public List<String> getCommonScenarios() {
+        return configCacheService.getActiveScenarios().stream()
+                .filter(s -> !"AMBIGUOUS".equals(s.getScenarioCode()))
+                .filter(s -> !"UNKNOWN".equals(s.getScenarioCode()))
+                .map(AiScenario::getScenarioCode)
+                .limit(5)
+                .toList();
+    }
+
+    /**
      * Get human-readable description of scenario from database.
      */
     public String getScenarioDescription(String scenario) {

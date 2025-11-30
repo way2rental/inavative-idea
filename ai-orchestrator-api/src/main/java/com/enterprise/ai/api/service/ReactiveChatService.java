@@ -409,10 +409,17 @@ public class ReactiveChatService {
                     });
         }
         
-        String response = "I didn't understand your selection. Please reply with a number (1, 2, or 3).";
-        saveMessageSync(sessionId, "assistant", response);
-        return Mono.just(buildResponse(sessionId, response, ChatResponse.ResponseType.CLARIFICATION, 
-                null, null, List.of("TXN_STATUS", "FILE_STATUS", "ACCOUNT_SUMMARY"), null, executionId));
+        // Couldn't understand the selection - show dynamic options
+        List<String> commonScenarios = validationService.getCommonScenarios();
+        StringBuilder response = new StringBuilder();
+        response.append("I didn't understand your selection. Please reply with a number or describe what you're looking for:\n");
+        for (int i = 0; i < commonScenarios.size(); i++) {
+            response.append(String.format("%d. %s\n", i + 1, 
+                    validationService.getScenarioDescription(commonScenarios.get(i))));
+        }
+        saveMessageSync(sessionId, "assistant", response.toString());
+        return Mono.just(buildResponse(sessionId, response.toString(), ChatResponse.ResponseType.CLARIFICATION, 
+                null, null, commonScenarios, null, executionId));
     }
 
     private Mono<ChatResponse> handleValidationFailure(
@@ -423,16 +430,19 @@ public class ReactiveChatService {
             String executionId) {
         
         if (validation.hasLowConfidence()) {
-            String response = "I'm not fully sure what you're asking for. Could you please:\n" +
-                    "• Be more specific about what you want to check\n" +
-                    "• Include relevant IDs or names\n" +
-                    "• Or tell me if you want to check:\n" +
-                    "  1. Transaction status\n" +
-                    "  2. File processing status\n" +
-                    "  3. Account balance";
-            saveMessageSync(sessionId, "assistant", response);
-            return Mono.just(buildResponse(sessionId, response, ChatResponse.ResponseType.CLARIFICATION,
-                    null, null, List.of("TXN_STATUS", "FILE_STATUS", "ACCOUNT_SUMMARY"), 
+            List<String> commonScenarios = validationService.getCommonScenarios();
+            StringBuilder response = new StringBuilder();
+            response.append("I'm not fully sure what you're asking for. Could you please:\n");
+            response.append("• Be more specific about what you want to check\n");
+            response.append("• Include relevant IDs or names\n");
+            response.append("• Or tell me if you want to check:\n");
+            for (int i = 0; i < commonScenarios.size(); i++) {
+                response.append(String.format("  %d. %s\n", i + 1, 
+                        validationService.getScenarioDescription(commonScenarios.get(i))));
+            }
+            saveMessageSync(sessionId, "assistant", response.toString());
+            return Mono.just(buildResponse(sessionId, response.toString(), ChatResponse.ResponseType.CLARIFICATION,
+                    null, null, commonScenarios, 
                     intent.getConfidence(), executionId));
         }
 
@@ -520,26 +530,49 @@ public class ReactiveChatService {
         return response.toLowerCase().trim().matches(AFFIRMATIVE_PATTERN);
     }
 
+    /**
+     * Extract selected scenario from clarification response.
+     * Uses dynamic scenarios from database instead of hardcoded values.
+     */
     private String extractSelectedScenario(ChatRequest request) {
+        List<String> commonScenarios = validationService.getCommonScenarios();
+        
+        // Check explicit selection (1-based index)
         if (request.getSelectedOption() != null) {
-            return switch (request.getSelectedOption()) {
-                case 1 -> "TXN_STATUS";
-                case 2 -> "FILE_STATUS";
-                case 3 -> "ACCOUNT_SUMMARY";
-                default -> null;
-            };
+            int index = request.getSelectedOption() - 1;
+            if (index >= 0 && index < commonScenarios.size()) {
+                return commonScenarios.get(index);
+            }
+            return null;
         }
         
+        // Try to extract from query text - match against scenario codes and descriptions
         String query = request.getQuery().toLowerCase();
-        if (query.contains("1") || query.contains("transaction") || query.contains("payment")) {
-            return "TXN_STATUS";
+        
+        // Check for number selection
+        for (int i = 0; i < commonScenarios.size(); i++) {
+            if (query.contains(String.valueOf(i + 1))) {
+                return commonScenarios.get(i);
+            }
         }
-        if (query.contains("2") || query.contains("file") || query.contains("batch")) {
-            return "FILE_STATUS";
+        
+        // Check for keyword matches from scenario descriptions
+        for (String scenarioCode : commonScenarios) {
+            String description = validationService.getScenarioDescription(scenarioCode).toLowerCase();
+            // Check if query contains keywords from description
+            String[] keywords = description.split("\\s+");
+            for (String keyword : keywords) {
+                if (keyword.length() > 3 && query.contains(keyword)) {
+                    return scenarioCode;
+                }
+            }
+            // Also check scenario code words
+            String codeWords = scenarioCode.toLowerCase().replace("_", " ");
+            if (query.contains(codeWords) || query.contains(scenarioCode.toLowerCase())) {
+                return scenarioCode;
+            }
         }
-        if (query.contains("3") || query.contains("balance") || query.contains("account")) {
-            return "ACCOUNT_SUMMARY";
-        }
+        
         return null;
     }
 
