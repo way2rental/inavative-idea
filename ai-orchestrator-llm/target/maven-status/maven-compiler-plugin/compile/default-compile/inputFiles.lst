@@ -1,9 +1,0 @@
-/home/runner/work/inavative-idea/inavative-idea/ai-orchestrator-llm/src/main/java/com/enterprise/ai/llm/prompt/PromptTemplates.java
-/home/runner/work/inavative-idea/inavative-idea/ai-orchestrator-llm/src/main/java/com/enterprise/ai/llm/config/LlmConfig.java
-/home/runner/work/inavative-idea/inavative-idea/ai-orchestrator-llm/src/main/java/com/enterprise/ai/llm/validation/IntentSchemaValidator.java
-/home/runner/work/inavative-idea/inavative-idea/ai-orchestrator-llm/src/main/java/com/enterprise/ai/llm/client/ReactiveOllamaLlmClient.java
-/home/runner/work/inavative-idea/inavative-idea/ai-orchestrator-llm/src/main/java/com/enterprise/ai/llm/client/OllamaLlmClient.java
-/home/runner/work/inavative-idea/inavative-idea/ai-orchestrator-llm/src/main/java/com/enterprise/ai/llm/client/OllamaHealthService.java
-/home/runner/work/inavative-idea/inavative-idea/ai-orchestrator-llm/src/main/java/com/enterprise/ai/llm/client/ReactiveLlmClient.java
-/home/runner/work/inavative-idea/inavative-idea/ai-orchestrator-llm/src/main/java/com/enterprise/ai/llm/client/LlmClient.java
-/home/runner/work/inavative-idea/inavative-idea/ai-orchestrator-llm/src/main/java/com/enterprise/ai/llm/config/OllamaProperties.java

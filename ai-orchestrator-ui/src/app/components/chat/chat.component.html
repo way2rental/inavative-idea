@@ -1,38 +1,5 @@
 <!-- Axis Bank AHA Style Chat Interface -->
 <div class="min-h-screen bg-bank-bg">
-  <!-- Axis Bank Header -->
-  <header class="axis-header shadow-md">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-      <!-- Logo -->
-      <div class="flex items-center gap-4">
-        <div class="flex items-center gap-2">
-          <svg class="w-10 h-10 text-white" viewBox="0 0 40 40" fill="currentColor">
-            <path d="M20 5 L35 35 L5 35 Z" fill="currentColor"/>
-          </svg>
-          <div>
-            <span class="text-xl font-bold tracking-wide">AXIS BANK</span>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Navigation -->
-      <nav class="hidden md:flex items-center gap-6 text-sm">
-        <a href="#" class="hover:underline">Personal</a>
-        <a href="#" class="hover:underline">Business</a>
-        <a href="#" class="hover:underline">Priority</a>
-        <a href="#" class="hover:underline">NRI</a>
-        <a href="#" class="hover:underline">About Us</a>
-        <a href="#" class="hover:underline">Support</a>
-      </nav>
-      
-      <!-- User Actions -->
-      <div class="flex items-center gap-4">
-        <span class="text-sm">Welcome, {{ getCurrentUser() }}</span>
-        <button (click)="logout()" class="text-sm hover:underline">Logout</button>
-      </div>
-    </div>
-  </header>
-
   <!-- Main Content Area -->
   <main class="max-w-7xl mx-auto px-4 py-8">
     <!-- Page Header -->
