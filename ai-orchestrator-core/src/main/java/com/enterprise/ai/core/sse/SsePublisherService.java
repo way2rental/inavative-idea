@@ -274,6 +274,10 @@ public class SsePublisherService {
      * Frontend must parse this and render by type.
      */
     public ServerSentEvent<String> createStructuredResponseEvent(StructuredChatResponse response) {
+        if (response == null) {
+            log.warn("Null response passed to createStructuredResponseEvent, returning error event");
+            return createErrorEvent("Empty response received");
+        }
         try {
             return ServerSentEvent.<String>builder()
                     .event("response")
