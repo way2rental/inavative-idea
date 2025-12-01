@@ -101,8 +101,9 @@ public class QueryExecutor implements DynamicExecutor {
                 log.info("Using JsonPathResponseMapper for scenario: {}", scenarioCode);
                 aiReadyData = responseMappingService.mapDbResultToAiRequest(scenarioCode, rawResults);
             } else {
-                log.warn("No response mappings found for scenario: {}, using legacy mapping", scenarioCode);
-                aiReadyData = applyResponseMapping(rawResults, scenario);
+                log.info("Using mandatory masking with response_mapping for scenario: {}", scenarioCode);
+                // MANDATORY: Use applyMandatoryMasking instead of legacy applyResponseMapping
+                aiReadyData = applyMandatoryMasking(rawResults, scenario);
             }
 
             long executionTime = System.currentTimeMillis() - startTime;
@@ -348,73 +349,6 @@ public class QueryExecutor implements DynamicExecutor {
             }
             result.put("data", maskedRows);
             result.put("count", maskedRows.size());
-        }
-
-        return result;
-    }
-
-    /**
-     * Apply response_mapping to shape query results.
-     * response_mapping format: {"outputField": "$.column_name"}
-     */
-    private Map<String, Object> applyResponseMapping(List<Map<String, Object>> rawResults, AiScenario scenario) {
-        log.info("Applying response mapping for {}: {} rows",scenario.getScenarioCode(), rawResults.size());
-        Map<String, Object> result = new LinkedHashMap<>();
-        
-        if (rawResults.isEmpty()) {
-            result.put("data", List.of());
-            result.put("count", 0);
-            return result;
-        }
-
-        if (scenario.getResponseMapping() == null || scenario.getResponseMapping().isBlank()) {
-            // No mapping, return raw results
-            if (rawResults.size() == 1) {
-                result.putAll(rawResults.get(0));
-            } else {
-                result.put("data", rawResults);
-                result.put("count", rawResults.size());
-            }
-            return result;
-        }
-
-        try {
-            Map<String, String> mappings = objectMapper.readValue(
-                    scenario.getResponseMapping(), 
-                    new TypeReference<Map<String, String>>() {}
-            );
-
-            if (rawResults.size() == 1) {
-                // Single row - map fields directly
-                Map<String, Object> row = rawResults.get(0);
-                for (Map.Entry<String, String> entry : mappings.entrySet()) {
-                    String outputField = entry.getKey();
-                    String sourceField = extractFieldName(entry.getValue());
-                    result.put(outputField, row.get(sourceField));
-                }
-            } else {
-                // Multiple rows - map each row
-                List<Map<String, Object>> mappedRows = new ArrayList<>();
-                for (Map<String, Object> row : rawResults) {
-                    Map<String, Object> mappedRow = new LinkedHashMap<>();
-                    for (Map.Entry<String, String> entry : mappings.entrySet()) {
-                        String outputField = entry.getKey();
-                        String sourceField = extractFieldName(entry.getValue());
-                        mappedRow.put(outputField, row.get(sourceField));
-                    }
-                    mappedRows.add(mappedRow);
-                }
-                result.put("data", mappedRows);
-                result.put("count", mappedRows.size());
-            }
-        } catch (Exception e) {
-            log.warn("Failed to apply response_mapping, returning raw: {}", e.getMessage());
-            if (rawResults.size() == 1) {
-                result.putAll(rawResults.get(0));
-            } else {
-                result.put("data", rawResults);
-                result.put("count", rawResults.size());
-            }
         }
 
         return result;
