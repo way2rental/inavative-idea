@@ -1,5 +1,6 @@
 package com.enterprise.ai.core.sse;
 
+import com.enterprise.ai.common.dto.StructuredChatResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Builder;
 import lombok.Data;
@@ -257,6 +258,122 @@ public class SsePublisherService {
      */
     public String getDefaultUnknownMessage() {
         return "I didn't understand this yet. Here are some things I can help with:";
+    }
+
+    // ============================================
+    // STRUCTURED RESPONSE SUPPORT (per STRUCTURED_CHAT_RESPONSE_UPGRADE.md)
+    // ============================================
+
+    /**
+     * Create a 'response' event with structured JSON payload.
+     * Per STRUCTURED_CHAT_RESPONSE_UPGRADE.md Section 5.5:
+     * - Phase 1: Status messages only (start, progress)
+     * - Phase 2: ONE SINGLE JSON chunk as final response
+     * 
+     * This emits the final structured response as a single JSON object.
+     * Frontend must parse this and render by type.
+     */
+    public ServerSentEvent<String> createStructuredResponseEvent(StructuredChatResponse response) {
+        try {
+            return ServerSentEvent.<String>builder()
+                    .event("response")
+                    .data(objectMapper.writeValueAsString(response))
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to create structured response event: {}", e.getMessage());
+            return createErrorEvent("Failed to format response");
+        }
+    }
+
+    /**
+     * Stream with TWO PHASE MODEL per STRUCTURED_CHAT_RESPONSE_UPGRADE.md Section 5.5:
+     * - Phase 1: Status messages (start, progress events)
+     * - Phase 2: ONE final structured JSON response
+     * 
+     * @param statusMessages Progress/status messages to stream first
+     * @param finalResponse The final structured response
+     * @param sessionId Session identifier
+     * @return Stable SSE stream with proper event lifecycle
+     */
+    public Flux<ServerSentEvent<String>> streamStructuredResponse(
+            List<String> statusMessages,
+            StructuredChatResponse finalResponse,
+            String sessionId) {
+        
+        // Phase 1: Start event
+        Flux<ServerSentEvent<String>> startFlux = Flux.just(createStartEvent("Processing your request..."));
+        
+        // Phase 1: Status/progress messages
+        Flux<ServerSentEvent<String>> statusFlux = Flux.fromIterable(statusMessages)
+                .delayElements(Duration.ofMillis(300))
+                .map(this::createProgressEvent);
+        
+        // Phase 2: Single final structured response
+        Flux<ServerSentEvent<String>> responseFlux = Flux.just(createStructuredResponseEvent(finalResponse));
+        
+        // Done event
+        Flux<ServerSentEvent<String>> doneFlux = Flux.just(createDoneEvent());
+        
+        return Flux.concat(startFlux, statusFlux, responseFlux, doneFlux)
+                .timeout(MAX_STREAM_DURATION)
+                .onErrorResume(e -> {
+                    log.error("SSE structured response error for session {}: {}", sessionId, e.getMessage());
+                    return Flux.concat(
+                            Flux.just(createStructuredResponseEvent(
+                                    StructuredChatResponse.error(getUserSafeErrorMessage(e), sessionId)
+                            )),
+                            Flux.just(createDoneEvent())
+                    );
+                });
+    }
+
+    /**
+     * Stream with reactive status and structured final response.
+     * 
+     * @param statusFlux Reactive flux of status messages
+     * @param finalResponseMono Reactive mono of the final structured response
+     * @param sessionId Session identifier
+     * @return Stable SSE stream
+     */
+    public Flux<ServerSentEvent<String>> streamStructuredResponseReactive(
+            Flux<String> statusFlux,
+            Mono<StructuredChatResponse> finalResponseMono,
+            String sessionId) {
+        
+        AtomicBoolean hasCompleted = new AtomicBoolean(false);
+        
+        return Flux.concat(
+                // Start event
+                Flux.just(createStartEvent("Processing your request...")),
+                
+                // Status/progress messages
+                statusFlux
+                        .map(this::createProgressEvent)
+                        .onErrorResume(e -> {
+                            log.warn("Status stream error for session {}: {}", sessionId, e.getMessage());
+                            return Flux.empty();
+                        }),
+                
+                // Final structured response
+                finalResponseMono
+                        .timeout(MAX_STREAM_DURATION)
+                        .map(this::createStructuredResponseEvent)
+                        .flux()
+                        .doOnComplete(() -> hasCompleted.set(true))
+                        .onErrorResume(e -> {
+                            log.error("Final response error for session {}: {}", sessionId, e.getMessage());
+                            hasCompleted.set(true);
+                            return Flux.just(createStructuredResponseEvent(
+                                    StructuredChatResponse.error(getUserSafeErrorMessage(e), sessionId)
+                            ));
+                        }),
+                
+                // Done event
+                Flux.defer(() -> {
+                    hasCompleted.set(true);
+                    return Flux.just(createDoneEvent());
+                })
+        );
     }
 
     /**

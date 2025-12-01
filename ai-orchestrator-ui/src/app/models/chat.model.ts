@@ -19,27 +19,113 @@ export interface ResponseMeta {
   additionalInfo?: { [key: string]: any };
 }
 
+// ============================================
+// STRUCTURED CHAT RESPONSE (per STRUCTURED_CHAT_RESPONSE_UPGRADE.md)
+// ============================================
+
+/**
+ * Response types per spec Section 4.
+ * Each type determines UI rendering behavior.
+ */
+export type StructuredResponseType = 'TEXT' | 'BULLET' | 'TABLE' | 'KV' | 'MIXED' | 'FOLLOW_UP' | 'ERROR';
+
+/**
+ * Structured response contract per STRUCTURED_CHAT_RESPONSE_UPGRADE.md Section 3.
+ * All final AI responses MUST follow this structure.
+ */
+export interface StructuredResponse {
+  type: StructuredResponseType;
+  title?: string;
+  confidence?: number;
+  payload: any;
+  footer?: string;
+  sessionId?: string;
+  scenario?: string;
+}
+
+/**
+ * TEXT payload: Simple paragraph message
+ */
+export interface TextPayload {
+  message: string;
+}
+
+/**
+ * BULLET payload: List of items
+ */
+export interface BulletPayload {
+  items: string[];
+}
+
+/**
+ * KV payload: Key-value pairs
+ */
+export interface KvPayload {
+  [key: string]: string | number;
+}
+
+/**
+ * TABLE payload: Columns and rows
+ */
+export interface TablePayload {
+  columns: string[];
+  rows: string[][];
+}
+
+/**
+ * MIXED payload: Text + table combination
+ */
+export interface MixedPayload {
+  text: string;
+  table: TablePayload;
+}
+
+/**
+ * FOLLOW_UP payload: Missing parameters and question
+ */
+export interface FollowUpPayload {
+  missingParams: string[];
+  question: string;
+}
+
+/**
+ * ERROR payload: Error message and suggestions
+ */
+export interface ErrorPayload {
+  message: string;
+  suggestions: string[];
+}
+
+/**
+ * Chat message model per STRUCTURED_CHAT_RESPONSE_UPGRADE.md Section 6.1.
+ * 
+ * Key changes:
+ * - content: used ONLY for streaming status messages
+ * - structured: final response (rendered by type)
+ * - isStreaming: indicates status phase
+ */
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content?: string;              // Only for streaming status messages
+  structured?: StructuredResponse; // Final structured response
   timestamp: Date;
   isLoading?: boolean;
   isStreaming?: boolean;
   statusMessages?: string[];
-  isError?: boolean;         // CHUNK 3: Flag for error messages
-  followUp?: FollowUpData;   // CHUNK 3: Follow-up question data
-  suggestions?: string[];    // CHUNK 3: Suggestions for unknown scenarios
+  isError?: boolean;
+  followUp?: FollowUpData;
+  suggestions?: string[];
 }
 
-// CHUNK 3: Follow-up event payload
+// Legacy support: Follow-up event payload
 export interface FollowUpData {
   scenario: string;
   missingParams: string[];
   question: string;
 }
 
-// CHUNK 3: SSE Event structure
+// SSE Event structure
 export interface SSEEvent {
-  event: 'start' | 'message' | 'done' | 'error' | 'followup' | 'unknown';
+  event: 'start' | 'message' | 'progress' | 'response' | 'done' | 'error' | 'followup' | 'unknown';
   data: string;
 }

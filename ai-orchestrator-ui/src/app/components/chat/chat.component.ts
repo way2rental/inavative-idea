@@ -4,7 +4,16 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
-import { ChatMessage, ChatRequest, ChatResponse } from '../../models/chat.model';
+import { ChatMessage, ChatRequest, ChatResponse, StructuredResponse } from '../../models/chat.model';
+import {
+  ChatTextComponent,
+  ChatBulletComponent,
+  ChatKvComponent,
+  ChatTableComponent,
+  ChatFollowUpComponent,
+  ChatErrorComponent,
+  ChatMixedComponent
+} from './renderers';
 
 // CHUNK 3: Status message emoji patterns for intermediate status detection
 const STATUS_EMOJI_PATTERNS = ['🔍', '📊', '📈', '💾', '✅', '❌', '⚠️', '🔐'];
@@ -12,7 +21,19 @@ const STATUS_EMOJI_PATTERNS = ['🔍', '📊', '📈', '💾', '✅', '❌', '�
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    // Structured response renderers per STRUCTURED_CHAT_RESPONSE_UPGRADE.md
+    ChatTextComponent,
+    ChatBulletComponent,
+    ChatKvComponent,
+    ChatTableComponent,
+    ChatFollowUpComponent,
+    ChatErrorComponent,
+    ChatMixedComponent
+  ],
   templateUrl: './chat.component.html'
 })
 export class ChatComponent implements AfterViewChecked {
@@ -117,12 +138,12 @@ export class ChatComponent implements AfterViewChecked {
     let hasReceivedStart = false;
     let hasReceivedDone = false;
 
-    // CHUNK 3 SSE STABILITY: Handle proper event types
+    // STRUCTURED_CHAT_RESPONSE_UPGRADE: Handle proper event types including 'response' and 'progress'
     this.apiService.chatStream(request).subscribe({
       next: (event: { event: string; data: string }) => {
         const { event: eventType, data: chunk } = event;
 
-        // Handle different SSE event types per CHUNK 3 spec
+        // Handle different SSE event types per STRUCTURED_CHAT_RESPONSE_UPGRADE.md
         switch (eventType) {
           case 'start':
             // Stream initialization - show processing indicator
@@ -131,8 +152,34 @@ export class ChatComponent implements AfterViewChecked {
             assistantMessage.isLoading = true;
             break;
 
+          case 'progress':
+            // Progress/status message (Phase 1 per spec)
+            const progressMessage = chunk.trim();
+            if (progressMessage) {
+              assistantMessage.statusMessages = [progressMessage];
+            }
+            break;
+
+          case 'response':
+            // STRUCTURED_CHAT_RESPONSE_UPGRADE: Final structured JSON response (Phase 2)
+            // This is the single JSON chunk containing the complete structured response
+            try {
+              const structuredResponse: StructuredResponse = JSON.parse(chunk);
+              assistantMessage.structured = structuredResponse;
+              assistantMessage.content = undefined; // Clear content, use structured
+              assistantMessage.statusMessages = [];
+              assistantMessage.isLoading = false;
+              isCollectingFinalResponse = true;
+            } catch (e) {
+              console.error('Failed to parse structured response:', e);
+              // Fallback to text content
+              assistantMessage.content = chunk;
+              assistantMessage.isLoading = false;
+            }
+            break;
+
           case 'message':
-            // Regular message token - accumulate for final response
+            // Regular message token - accumulate for final response (legacy support)
             // Check if this is a status message (starts with emoji) - use constant
             const isStatusMessage = STATUS_EMOJI_PATTERNS.some(emoji => chunk.trim().startsWith(emoji));
 
@@ -144,7 +191,7 @@ export class ChatComponent implements AfterViewChecked {
                 assistantMessage.content = '';
               }
             } else {
-              // This is part of the final response
+              // This is part of the final response (legacy unstructured)
               isCollectingFinalResponse = true;
               assistantMessage.statusMessages = [];
               finalResponseBuffer += chunk;
@@ -164,8 +211,27 @@ export class ChatComponent implements AfterViewChecked {
             break;
 
           case 'error':
-            // Error occurred - show user-safe message
-            assistantMessage.content = chunk || 'An error occurred. Please try again.';
+            // Error occurred - convert to structured ERROR response
+            try {
+              const errorData = JSON.parse(chunk);
+              assistantMessage.structured = {
+                type: 'ERROR',
+                payload: {
+                  message: errorData.message || chunk,
+                  suggestions: errorData.suggestions || ['Check Transaction Status', 'Account Summary']
+                }
+              };
+              assistantMessage.content = undefined;
+            } catch {
+              assistantMessage.structured = {
+                type: 'ERROR',
+                payload: {
+                  message: chunk || 'An error occurred. Please try again.',
+                  suggestions: ['Check Transaction Status', 'Account Summary']
+                }
+              };
+              assistantMessage.content = undefined;
+            }
             assistantMessage.isLoading = false;
             assistantMessage.isStreaming = false;
             assistantMessage.statusMessages = [];
@@ -173,10 +239,18 @@ export class ChatComponent implements AfterViewChecked {
             break;
 
           case 'followup':
-            // Follow-up question from AI
+            // Follow-up question - convert to structured FOLLOW_UP response
             try {
               const followupData = JSON.parse(chunk);
-              assistantMessage.content = followupData.question || chunk;
+              assistantMessage.structured = {
+                type: 'FOLLOW_UP',
+                payload: {
+                  missingParams: followupData.missingParams || [],
+                  question: followupData.question || chunk
+                },
+                scenario: followupData.scenario
+              };
+              assistantMessage.content = undefined;
               assistantMessage.followUp = followupData;
             } catch {
               assistantMessage.content = chunk;
@@ -185,10 +259,17 @@ export class ChatComponent implements AfterViewChecked {
             break;
 
           case 'unknown':
-            // Unknown scenario - show suggestions
+            // Unknown scenario - convert to structured ERROR with suggestions
             try {
               const unknownData = JSON.parse(chunk);
-              assistantMessage.content = unknownData.message || 'I didn\'t understand that.';
+              assistantMessage.structured = {
+                type: 'ERROR',
+                payload: {
+                  message: unknownData.message || 'I didn\'t understand that.',
+                  suggestions: unknownData.options || ['Transaction Status', 'Account Summary']
+                }
+              };
+              assistantMessage.content = undefined;
               assistantMessage.suggestions = unknownData.options || [];
             } catch {
               assistantMessage.content = chunk;
@@ -211,7 +292,7 @@ export class ChatComponent implements AfterViewChecked {
         this.regularChat(request);
       },
       complete: () => {
-        // CHUNK 3: Ensure UI is never left in loading state
+        // Ensure UI is never left in loading state
         this.isLoading = false;
         this.isStreaming = false;
         assistantMessage.isLoading = false;

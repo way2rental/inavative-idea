@@ -243,7 +243,7 @@
                     <div class="flex-1">
                       <div class="bg-white rounded-2xl rounded-tl-sm p-4 shadow-md border border-gray-100">
                         @if (message.isStreaming && message.statusMessages && message.statusMessages.length > 0) {
-                          <!-- Show intermediate status messages with animation -->
+                          <!-- Show intermediate status messages with animation (Phase 1) -->
                           <div class="flex items-center gap-3 animate-pulse">
                             <div class="flex gap-1.5">
                               <span class="w-2.5 h-2.5 bg-axis-burgundy rounded-full animate-bounce"></span>
@@ -262,10 +262,27 @@
                             </div>
                             <span class="text-gray-500 text-sm font-medium">Connecting...</span>
                           </div>
+                        } @else if (message.structured) {
+                          <!-- STRUCTURED_CHAT_RESPONSE_UPGRADE: Type-based rendering per Section 6.3 -->
+                          <div [ngSwitch]="message.structured.type">
+                            <app-chat-text *ngSwitchCase="'TEXT'" [response]="message.structured"></app-chat-text>
+                            <app-chat-bullet *ngSwitchCase="'BULLET'" [response]="message.structured"></app-chat-bullet>
+                            <app-chat-kv *ngSwitchCase="'KV'" [response]="message.structured"></app-chat-kv>
+                            <app-chat-table *ngSwitchCase="'TABLE'" [response]="message.structured"></app-chat-table>
+                            <app-chat-mixed *ngSwitchCase="'MIXED'" [response]="message.structured"></app-chat-mixed>
+                            <app-chat-follow-up *ngSwitchCase="'FOLLOW_UP'" [response]="message.structured"></app-chat-follow-up>
+                            <app-chat-error *ngSwitchCase="'ERROR'" 
+                              [response]="message.structured"
+                              (suggestionClicked)="insertQuery($event)"></app-chat-error>
+                            <!-- Default fallback for unknown types -->
+                            <div *ngSwitchDefault class="text-sm text-gray-700">
+                              {{ message.structured.payload?.message || 'Unknown response type' }}
+                            </div>
+                          </div>
                         } @else {
-                          <!-- Final formatted response -->
+                          <!-- Legacy: Unstructured text response with formatResponse -->
                           <div class="prose prose-sm max-w-none">
-                            <div class="formatted-response" [innerHTML]="formatResponse(message.content)"></div>
+                            <div class="formatted-response" [innerHTML]="formatResponse(message.content || '')"></div>
                           </div>
                         }
                       </div>
