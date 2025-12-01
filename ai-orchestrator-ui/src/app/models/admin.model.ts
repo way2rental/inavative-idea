@@ -114,3 +114,135 @@ export interface OllamaStatus {
   enabled: boolean;
   lastCheckTime: string;
 }
+
+// ===================== PROMPT TEMPLATES =====================
+
+export interface PromptTemplate {
+  id: number;
+  promptKey: string;
+  category: string;
+  systemPrompt: string;
+  userTemplate: string;
+  responseFormat: string;
+  temperature: number;
+  maxTokens: number;
+  version: number;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+  historyCount: number;
+}
+
+export interface PromptFormData {
+  promptKey: string;
+  category: string;
+  systemPrompt: string;
+  userTemplate: string;
+  responseFormat: string;
+  temperature: number;
+  maxTokens: number;
+  enabled: boolean;
+  createdBy?: string;
+  updatedBy?: string;
+}
+
+// ===================== INTENT CONFIGURATIONS =====================
+
+export interface IntentConfig {
+  id: number;
+  intentKey: string;
+  intentName: string;
+  description: string;
+  trainingPhrases: string[];
+  confidenceThreshold: number;
+  followupGroup: string;
+  scenarioCode: string;
+  category: string;
+  priority: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IntentFormData {
+  intentKey: string;
+  intentName: string;
+  description: string;
+  trainingPhrases: string[];
+  confidenceThreshold: number;
+  followupGroup: string;
+  scenarioCode: string;
+  category: string;
+  priority: number;
+  active: boolean;
+}
+
+// ===================== FOLLOW-UP GROUPS =====================
+
+export interface FollowUpQuestion {
+  key: string;
+  question: string;
+  type: 'string' | 'date' | 'number' | 'boolean';
+  required: boolean;
+  validationPattern?: string;
+  placeholder?: string;
+  defaultValue?: string;
+}
+
+export interface FollowUpGroup {
+  id: number;
+  groupKey: string;
+  description: string;
+  scenarioCodes: string[];
+  questions: FollowUpQuestion[];
+  questionOrder: string[];
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export interface FollowUpGroupFormData {
+  groupKey: string;
+  description: string;
+  scenarioCodes: string[];
+  questions: FollowUpQuestion[];
+  questionOrder: string[];
+  active: boolean;
+  createdBy?: string;
+}
+
+// ===================== POLICY RULES =====================
+
+export interface PolicyRule {
+  id: number;
+  policyKey: string;
+  policyName: string;
+  description: string;
+  ruleExpression: string;
+  onFail: 'BLOCK' | 'WARN' | 'LOG';
+  failureMessage: string;
+  applicableScenarios: string[];
+  applicableRoles: string[];
+  priority: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export interface PolicyFormData {
+  policyKey: string;
+  policyName: string;
+  description: string;
+  ruleExpression: string;
+  onFail: 'BLOCK' | 'WARN' | 'LOG';
+  failureMessage: string;
+  applicableScenarios: string[];
+  applicableRoles: string[];
+  priority: number;
+  active: boolean;
+  createdBy?: string;
+}

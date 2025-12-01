@@ -12,7 +12,16 @@ import {
   ScenarioTestResult,
   DashboardStats,
   PerformanceMetrics,
-  OllamaStatus
+  OllamaStatus,
+  PromptTemplate,
+  PromptFormData,
+  IntentConfig,
+  IntentFormData,
+  FollowUpGroup,
+  FollowUpGroupFormData,
+  FollowUpQuestion,
+  PolicyRule,
+  PolicyFormData
 } from '../models/admin.model';
 import { environment } from '../../environments/environment';
 
@@ -159,5 +168,209 @@ export class AdminService {
 
   clearAllCache(): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/admin/cache/clear`, {});
+  }
+
+  // ===================== PROMPT TEMPLATES =====================
+
+  getPrompts(): Observable<PromptTemplate[]> {
+    return this.http.get<PromptTemplate[]>(`${this.baseUrl}/admin/prompts`).pipe(
+      catchError(this.handleError('getPrompts', []))
+    );
+  }
+
+  getPromptsByCategory(category: string): Observable<PromptTemplate[]> {
+    return this.http.get<PromptTemplate[]>(`${this.baseUrl}/admin/prompts/category/${category}`).pipe(
+      catchError(this.handleError('getPromptsByCategory', []))
+    );
+  }
+
+  getPromptById(id: number): Observable<PromptTemplate> {
+    return this.http.get<PromptTemplate>(`${this.baseUrl}/admin/prompts/${id}`);
+  }
+
+  getPromptByKey(promptKey: string): Observable<PromptTemplate> {
+    return this.http.get<PromptTemplate>(`${this.baseUrl}/admin/prompts/key/${promptKey}`);
+  }
+
+  createPrompt(prompt: PromptFormData): Observable<PromptTemplate> {
+    return this.http.post<PromptTemplate>(`${this.baseUrl}/admin/prompts`, prompt);
+  }
+
+  updatePrompt(id: number, prompt: PromptFormData): Observable<PromptTemplate> {
+    return this.http.put<PromptTemplate>(`${this.baseUrl}/admin/prompts/${id}`, prompt);
+  }
+
+  deletePrompt(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/prompts/${id}`);
+  }
+
+  togglePromptStatus(id: number, enabled: boolean): Observable<PromptTemplate> {
+    return this.http.patch<PromptTemplate>(`${this.baseUrl}/admin/prompts/${id}/toggle`, { enabled });
+  }
+
+  rollbackPrompt(id: number, version: number): Observable<PromptTemplate> {
+    return this.http.post<PromptTemplate>(`${this.baseUrl}/admin/prompts/${id}/rollback/${version}`, {});
+  }
+
+  getPromptHistory(id: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/admin/prompts/${id}/history`).pipe(
+      catchError(this.handleError('getPromptHistory', []))
+    );
+  }
+
+  testPrompt(id: number, testData: Record<string, any>): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/admin/prompts/${id}/test`, testData);
+  }
+
+  // ===================== INTENT CONFIGURATIONS =====================
+
+  getIntents(): Observable<IntentConfig[]> {
+    return this.http.get<IntentConfig[]>(`${this.baseUrl}/admin/intents`).pipe(
+      catchError(this.handleError('getIntents', []))
+    );
+  }
+
+  getActiveIntents(): Observable<IntentConfig[]> {
+    return this.http.get<IntentConfig[]>(`${this.baseUrl}/admin/intents/active`).pipe(
+      catchError(this.handleError('getActiveIntents', []))
+    );
+  }
+
+  getIntentsByCategory(category: string): Observable<IntentConfig[]> {
+    return this.http.get<IntentConfig[]>(`${this.baseUrl}/admin/intents/category/${category}`).pipe(
+      catchError(this.handleError('getIntentsByCategory', []))
+    );
+  }
+
+  getIntentById(id: number): Observable<IntentConfig> {
+    return this.http.get<IntentConfig>(`${this.baseUrl}/admin/intents/${id}`);
+  }
+
+  createIntent(intent: IntentFormData): Observable<IntentConfig> {
+    return this.http.post<IntentConfig>(`${this.baseUrl}/admin/intents`, intent);
+  }
+
+  updateIntent(id: number, intent: IntentFormData): Observable<IntentConfig> {
+    return this.http.put<IntentConfig>(`${this.baseUrl}/admin/intents/${id}`, intent);
+  }
+
+  deleteIntent(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/intents/${id}`);
+  }
+
+  toggleIntentStatus(id: number, active: boolean): Observable<IntentConfig> {
+    return this.http.patch<IntentConfig>(`${this.baseUrl}/admin/intents/${id}/toggle`, { active });
+  }
+
+  addTrainingPhrases(id: number, phrases: string[]): Observable<IntentConfig> {
+    return this.http.post<IntentConfig>(`${this.baseUrl}/admin/intents/${id}/training-phrases`, phrases);
+  }
+
+  removeTrainingPhrases(id: number, phrases: string[]): Observable<IntentConfig> {
+    return this.http.request<IntentConfig>('DELETE', `${this.baseUrl}/admin/intents/${id}/training-phrases`, { body: phrases });
+  }
+
+  getIntentCategories(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.baseUrl}/admin/intents/categories`).pipe(
+      catchError(this.handleError('getIntentCategories', []))
+    );
+  }
+
+  // ===================== FOLLOW-UP GROUPS =====================
+
+  getFollowUpGroups(): Observable<FollowUpGroup[]> {
+    return this.http.get<FollowUpGroup[]>(`${this.baseUrl}/admin/followups`).pipe(
+      catchError(this.handleError('getFollowUpGroups', []))
+    );
+  }
+
+  getActiveFollowUpGroups(): Observable<FollowUpGroup[]> {
+    return this.http.get<FollowUpGroup[]>(`${this.baseUrl}/admin/followups/active`).pipe(
+      catchError(this.handleError('getActiveFollowUpGroups', []))
+    );
+  }
+
+  getFollowUpGroupById(id: number): Observable<FollowUpGroup> {
+    return this.http.get<FollowUpGroup>(`${this.baseUrl}/admin/followups/${id}`);
+  }
+
+  getFollowUpGroupByKey(groupKey: string): Observable<FollowUpGroup> {
+    return this.http.get<FollowUpGroup>(`${this.baseUrl}/admin/followups/key/${groupKey}`);
+  }
+
+  createFollowUpGroup(group: FollowUpGroupFormData): Observable<FollowUpGroup> {
+    return this.http.post<FollowUpGroup>(`${this.baseUrl}/admin/followups`, group);
+  }
+
+  updateFollowUpGroup(id: number, group: FollowUpGroupFormData): Observable<FollowUpGroup> {
+    return this.http.put<FollowUpGroup>(`${this.baseUrl}/admin/followups/${id}`, group);
+  }
+
+  deleteFollowUpGroup(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/followups/${id}`);
+  }
+
+  toggleFollowUpGroupStatus(id: number, active: boolean): Observable<FollowUpGroup> {
+    return this.http.patch<FollowUpGroup>(`${this.baseUrl}/admin/followups/${id}/toggle`, { active });
+  }
+
+  addQuestionToGroup(id: number, question: FollowUpQuestion): Observable<FollowUpGroup> {
+    return this.http.post<FollowUpGroup>(`${this.baseUrl}/admin/followups/${id}/questions`, question);
+  }
+
+  updateQuestionInGroup(id: number, questionKey: string, question: FollowUpQuestion): Observable<FollowUpGroup> {
+    return this.http.put<FollowUpGroup>(`${this.baseUrl}/admin/followups/${id}/questions/${questionKey}`, question);
+  }
+
+  removeQuestionFromGroup(id: number, questionKey: string): Observable<FollowUpGroup> {
+    return this.http.delete<FollowUpGroup>(`${this.baseUrl}/admin/followups/${id}/questions/${questionKey}`);
+  }
+
+  updateQuestionOrder(id: number, order: string[]): Observable<FollowUpGroup> {
+    return this.http.put<FollowUpGroup>(`${this.baseUrl}/admin/followups/${id}/order`, order);
+  }
+
+  // ===================== POLICY RULES =====================
+
+  getPolicies(): Observable<PolicyRule[]> {
+    return this.http.get<PolicyRule[]>(`${this.baseUrl}/admin/policies`).pipe(
+      catchError(this.handleError('getPolicies', []))
+    );
+  }
+
+  getActivePolicies(): Observable<PolicyRule[]> {
+    return this.http.get<PolicyRule[]>(`${this.baseUrl}/admin/policies/active`).pipe(
+      catchError(this.handleError('getActivePolicies', []))
+    );
+  }
+
+  getOrderedPolicies(): Observable<PolicyRule[]> {
+    return this.http.get<PolicyRule[]>(`${this.baseUrl}/admin/policies/ordered`).pipe(
+      catchError(this.handleError('getOrderedPolicies', []))
+    );
+  }
+
+  getPolicyById(id: number): Observable<PolicyRule> {
+    return this.http.get<PolicyRule>(`${this.baseUrl}/admin/policies/${id}`);
+  }
+
+  createPolicy(policy: PolicyFormData): Observable<PolicyRule> {
+    return this.http.post<PolicyRule>(`${this.baseUrl}/admin/policies`, policy);
+  }
+
+  updatePolicy(id: number, policy: PolicyFormData): Observable<PolicyRule> {
+    return this.http.put<PolicyRule>(`${this.baseUrl}/admin/policies/${id}`, policy);
+  }
+
+  deletePolicy(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/policies/${id}`);
+  }
+
+  togglePolicyStatus(id: number, active: boolean): Observable<PolicyRule> {
+    return this.http.patch<PolicyRule>(`${this.baseUrl}/admin/policies/${id}/toggle`, { active });
+  }
+
+  testPolicy(id: number, testContext: Record<string, any>): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/admin/policies/${id}/test`, testContext);
   }
 }

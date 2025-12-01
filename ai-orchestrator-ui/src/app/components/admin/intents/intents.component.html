@@ -1,0 +1,238 @@
+<!-- Axis Bank Admin - Intent Management -->
+<div class="min-h-screen bg-bank-bg">
+  <!-- Page Title Section -->
+  <div class="bg-white border-b">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </a>
+          <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">Intent Trainer</h1>
+            <p class="text-gray-500 text-sm">Configure intent detection without redeploy</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <select [(ngModel)]="selectedCategory" (change)="filterByCategory(selectedCategory)" class="input-axis text-sm py-2">
+            <option value="">All Categories</option>
+            @for (cat of categories; track cat) {
+              <option [value]="cat">{{ cat }}</option>
+            }
+          </select>
+          <button (click)="openCreateModal()" class="btn-axis text-sm flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Intent
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    @if (isLoading) {
+      <div class="flex items-center justify-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-axis-burgundy"></div>
+      </div>
+    } @else {
+      <!-- Intents Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        @for (intent of filteredIntents; track intent.id) {
+          <div class="card-axis p-6 hover:shadow-elevated transition-all duration-300">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">{{ intent.intentName }}</h3>
+                <p class="text-gray-500 text-sm font-mono">{{ intent.intentKey }}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                @if (intent.active) {
+                  <span class="badge-success">Active</span>
+                } @else {
+                  <span class="badge-danger">Inactive</span>
+                }
+              </div>
+            </div>
+
+            <p class="text-gray-600 text-sm mb-4">{{ intent.description }}</p>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+              @if (intent.category) {
+                <span class="badge-info">{{ intent.category }}</span>
+              }
+              <span class="badge bg-purple-100 text-purple-700">Scenario: {{ intent.scenarioCode }}</span>
+              <span class="badge bg-amber-100 text-amber-700">Threshold: {{ intent.confidenceThreshold }}</span>
+              @if (intent.priority > 0) {
+                <span class="badge bg-green-100 text-green-700">Priority: {{ intent.priority }}</span>
+              }
+            </div>
+
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+              <p class="text-gray-500 text-xs mb-2">Training Phrases ({{ intent.trainingPhrases.length }}):</p>
+              <div class="flex flex-wrap gap-1">
+                @for (phrase of intent.trainingPhrases.slice(0, 5); track phrase) {
+                  <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{{ phrase }}</span>
+                }
+                @if (intent.trainingPhrases.length > 5) {
+                  <span class="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-xs">+{{ intent.trainingPhrases.length - 5 }} more</span>
+                }
+              </div>
+            </div>
+
+            @if (intent.followupGroup) {
+              <div class="mb-4 p-3 bg-green-50 rounded-lg">
+                <p class="text-green-500 text-xs mb-1">Follow-up Group:</p>
+                <span class="text-green-700 text-sm font-mono">{{ intent.followupGroup }}</span>
+              </div>
+            }
+
+            <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+              <div class="text-gray-400 text-xs">
+                @if (intent.updatedAt) {
+                  Updated: {{ intent.updatedAt | date:'short' }}
+                } @else {
+                  Created: {{ intent.createdAt | date:'short' }}
+                }
+              </div>
+              <div class="flex items-center gap-2">
+                <button (click)="openEditModal(intent)" class="btn-secondary text-sm py-1.5 px-3">Edit</button>
+                <button (click)="toggleStatus(intent)" class="text-sm py-1.5 px-3 rounded-lg transition-all"
+                  [class]="intent.active ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-green-100 text-green-700 hover:bg-green-200'">
+                  {{ intent.active ? 'Disable' : 'Enable' }}
+                </button>
+                <button (click)="deleteIntent(intent)" class="btn-danger text-sm py-1.5 px-3">Delete</button>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (intents.length === 0) {
+        <div class="card-axis p-12 text-center">
+          <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">No Intents Configured</h3>
+          <p class="text-gray-500 mb-6">Start training your AI by adding intents.</p>
+          <button (click)="openCreateModal()" class="btn-axis">Add First Intent</button>
+        </div>
+      }
+    }
+  </div>
+
+  <!-- Create/Edit Modal -->
+  @if (showModal) {
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="card-axis w-full max-w-3xl max-h-[90vh] overflow-hidden">
+        <div class="p-6 border-b border-gray-200 bg-blue-600 text-white rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold">{{ isEditing ? 'Edit Intent' : 'Create New Intent' }}</h2>
+            <button (click)="closeModal()" class="text-white/70 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6 overflow-y-auto max-h-[60vh]">
+          <form class="space-y-6">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Intent Key</label>
+                <input type="text" [(ngModel)]="formData.intentKey" name="intentKey"
+                  class="input-axis" placeholder="e.g., TXN_STATUS" [disabled]="isEditing">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Intent Name</label>
+                <input type="text" [(ngModel)]="formData.intentName" name="intentName"
+                  class="input-axis" placeholder="e.g., Transaction Status">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <textarea [(ngModel)]="formData.description" name="description" rows="2"
+                class="input-axis" placeholder="Describe what this intent detects..."></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Scenario Code</label>
+                <input type="text" [(ngModel)]="formData.scenarioCode" name="scenarioCode"
+                  class="input-axis" placeholder="e.g., TXN_STATUS">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <input type="text" [(ngModel)]="formData.category" name="category"
+                  class="input-axis" placeholder="e.g., TRANSACTIONS">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Confidence Threshold</label>
+                <input type="number" [(ngModel)]="formData.confidenceThreshold" name="confidenceThreshold"
+                  class="input-axis" min="0" max="1" step="0.01">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                <input type="number" [(ngModel)]="formData.priority" name="priority"
+                  class="input-axis" min="0">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Follow-up Group</label>
+                <input type="text" [(ngModel)]="formData.followupGroup" name="followupGroup"
+                  class="input-axis" placeholder="e.g., TXN_FOLLOWUPS">
+              </div>
+            </div>
+
+            <!-- Training Phrases -->
+            <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <label class="block text-sm font-medium text-blue-700 mb-3">Training Phrases</label>
+              <div class="flex gap-2 mb-3">
+                <input type="text" [(ngModel)]="newPhrase" name="newPhrase"
+                  class="input-axis flex-1" placeholder="Add a training phrase..."
+                  (keyup.enter)="addPhrase()">
+                <button type="button" (click)="addPhrase()" class="btn-axis">Add</button>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                @for (phrase of formData.trainingPhrases; track phrase; let i = $index) {
+                  <span class="inline-flex items-center gap-1 px-3 py-1 bg-white border border-blue-200 rounded-full text-sm">
+                    {{ phrase }}
+                    <button type="button" (click)="removePhrase(i)" class="text-red-500 hover:text-red-700">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                }
+              </div>
+              @if (formData.trainingPhrases.length === 0) {
+                <p class="text-blue-500 text-sm mt-2">No training phrases added yet</p>
+              }
+            </div>
+
+            <div class="flex items-center gap-2">
+              <input type="checkbox" [(ngModel)]="formData.active" name="active" id="active" class="rounded border-gray-300 text-axis-burgundy focus:ring-axis-burgundy">
+              <label for="active" class="text-sm text-gray-700">Active</label>
+            </div>
+          </form>
+        </div>
+
+        <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+          <button (click)="closeModal()" class="btn-secondary">Cancel</button>
+          <button (click)="saveIntent()" class="btn-axis">{{ isEditing ? 'Update' : 'Create' }} Intent</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>
