@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../services/admin.service';
+import { AlertService } from '../../../services/alert.service';
 import { PromptTemplate, PromptFormData } from '../../../models/admin.model';
 
 @Component({
@@ -27,7 +28,10 @@ export class PromptsComponent implements OnInit {
   categories = ['SYSTEM', 'USER', 'INTENT', 'FORMAT', 'FOLLOWUP'];
   responseFormats = ['TEXT', 'JSON', 'MARKDOWN'];
 
-  constructor(private adminService: AdminService) {}
+  constructor(
+    private adminService: AdminService,
+    private alertService: AlertService
+  ) {}
 
   ngOnInit(): void {
     this.loadPrompts();
@@ -93,16 +97,18 @@ export class PromptsComponent implements OnInit {
         next: () => {
           this.closeModal();
           this.loadPrompts();
+          this.alertService.success('Success', 'Prompt updated successfully');
         },
-        error: (err) => alert('Failed to update prompt: ' + err.message)
+        error: (err) => this.alertService.error('Error', 'Failed to update prompt: ' + err.message)
       });
     } else {
       this.adminService.createPrompt(this.formData).subscribe({
         next: () => {
           this.closeModal();
           this.loadPrompts();
+          this.alertService.success('Success', 'Prompt created successfully');
         },
-        error: (err) => alert('Failed to create prompt: ' + err.message)
+        error: (err) => this.alertService.error('Error', 'Failed to create prompt: ' + err.message)
       });
     }
   }
@@ -110,7 +116,7 @@ export class PromptsComponent implements OnInit {
   toggleStatus(prompt: PromptTemplate): void {
     this.adminService.togglePromptStatus(prompt.id, !prompt.enabled).subscribe({
       next: () => this.loadPrompts(),
-      error: () => alert('Failed to toggle status')
+      error: () => this.alertService.error('Error', 'Failed to toggle status')
     });
   }
 
@@ -118,7 +124,7 @@ export class PromptsComponent implements OnInit {
     if (confirm(`Are you sure you want to delete "${prompt.promptKey}"?`)) {
       this.adminService.deletePrompt(prompt.id).subscribe({
         next: () => this.loadPrompts(),
-        error: () => alert('Failed to delete prompt')
+        error: () => this.alertService.error('Error', 'Failed to delete prompt')
       });
     }
   }
@@ -130,7 +136,7 @@ export class PromptsComponent implements OnInit {
         this.promptHistory = history;
         this.showHistoryModal = true;
       },
-      error: () => alert('Failed to load history')
+      error: () => this.alertService.error('Error', 'Failed to load history')
     });
   }
 
@@ -145,9 +151,9 @@ export class PromptsComponent implements OnInit {
         next: () => {
           this.closeHistoryModal();
           this.loadPrompts();
-          alert('Rolled back successfully!');
+          this.alertService.success('Success', 'Rolled back successfully!');
         },
-        error: () => alert('Failed to rollback')
+        error: () => this.alertService.error('Error', 'Failed to rollback')
       });
     }
   }
@@ -177,7 +183,7 @@ export class PromptsComponent implements OnInit {
         next: (result) => {
           this.testResult = result;
         },
-        error: () => alert('Test failed')
+        error: () => this.alertService.error('Error', 'Test failed')
       });
     }
   }

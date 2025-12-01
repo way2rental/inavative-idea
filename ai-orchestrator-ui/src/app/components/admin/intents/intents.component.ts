@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../services/admin.service';
+import { AlertService } from '../../../services/alert.service';
 import { IntentConfig, IntentFormData } from '../../../models/admin.model';
 
 @Component({
@@ -23,7 +24,10 @@ export class IntentsComponent implements OnInit {
 
   formData: IntentFormData = this.getEmptyFormData();
 
-  constructor(private adminService: AdminService) {}
+  constructor(
+    private adminService: AdminService,
+    private alertService: AlertService
+  ) {}
 
   ngOnInit(): void {
     this.loadIntents();
@@ -115,8 +119,9 @@ export class IntentsComponent implements OnInit {
           this.closeModal();
           this.loadIntents();
           this.loadCategories();
+          this.alertService.success('Success', 'Intent updated successfully');
         },
-        error: (err) => alert('Failed to update intent: ' + err.message)
+        error: (err) => this.alertService.error('Error', 'Failed to update intent: ' + err.message)
       });
     } else {
       this.adminService.createIntent(this.formData).subscribe({
@@ -124,8 +129,9 @@ export class IntentsComponent implements OnInit {
           this.closeModal();
           this.loadIntents();
           this.loadCategories();
+          this.alertService.success('Success', 'Intent created successfully');
         },
-        error: (err) => alert('Failed to create intent: ' + err.message)
+        error: (err) => this.alertService.error('Error', 'Failed to create intent: ' + err.message)
       });
     }
   }
@@ -133,7 +139,7 @@ export class IntentsComponent implements OnInit {
   toggleStatus(intent: IntentConfig): void {
     this.adminService.toggleIntentStatus(intent.id, !intent.active).subscribe({
       next: () => this.loadIntents(),
-      error: () => alert('Failed to toggle status')
+      error: () => this.alertService.error('Error', 'Failed to toggle status')
     });
   }
 
@@ -141,7 +147,7 @@ export class IntentsComponent implements OnInit {
     if (confirm(`Are you sure you want to delete "${intent.intentName}"?`)) {
       this.adminService.deleteIntent(intent.id).subscribe({
         next: () => this.loadIntents(),
-        error: () => alert('Failed to delete intent')
+        error: () => this.alertService.error('Error', 'Failed to delete intent')
       });
     }
   }

@@ -201,18 +201,6 @@ html, body {
   animation: pulse-glow 2s infinite;
 }
 
-.badge-warning {
-  @apply badge bg-amber-100 text-amber-700;
-}
-
-  .badge-danger {
-    @apply badge bg-red-100 text-red-700;
-  }
-
-  .badge-info {
-    @apply badge bg-blue-100 text-blue-700;
-  }
-
   .badge-axis {
     @apply badge bg-axis-burgundy/10 text-axis-burgundy;
   }
