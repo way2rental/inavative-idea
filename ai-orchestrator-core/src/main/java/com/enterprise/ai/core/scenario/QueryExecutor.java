@@ -6,6 +6,7 @@ import com.enterprise.ai.common.dto.ScenarioRequest;
 import com.enterprise.ai.common.dto.ScenarioResult;
 import com.enterprise.ai.common.enums.ExecutionType;
 import com.enterprise.ai.common.exception.SecurityViolationException;
+import com.enterprise.ai.core.datasource.DataSourceRegistryService;
 import com.enterprise.ai.core.mapper.JsonPathResponseMapper;
 import com.enterprise.ai.core.mapper.MaskingService;
 import com.enterprise.ai.core.security.ReadOnlyEnforcementService;
@@ -32,10 +33,16 @@ import java.util.*;
  * Features:
  * - SELECT-only validation
  * - MANDATORY row-level security (owner_user_id + org_id)
+ * - Dynamic multi-datasource routing via dbKey
  * - Named parameter binding from request_mapping
  * - Response shaping via response_mapping with MANDATORY masking
  * - Configurable timeout
  * - MAX_ROWS = 1000 enforcement
+ * 
+ * SECURITY CRITICAL:
+ * - User context ONLY from RequestContextHolder
+ * - Never accept userId as method parameter
+ * - Never trust frontend userId
  */
 @Slf4j
 @Component
@@ -45,7 +52,7 @@ public class QueryExecutor implements DynamicExecutor {
     private static final long DEFAULT_TIMEOUT_MS = 5000;
     private static final int MAX_RESULT_SIZE = 1000; // Hard limit to prevent memory exhaustion
 
-    private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final DataSourceRegistryService dataSourceRegistry;
     private final ReadOnlyEnforcementService readOnlyEnforcement;
     private final RowLevelSecurityService rowLevelSecurityService;
     private final JsonPathResponseMapper responseMapper;
@@ -64,8 +71,9 @@ public class QueryExecutor implements DynamicExecutor {
         String scenarioCode = scenario.getScenarioCode();
 
         try {
-            // Get user context for row-level security
-            RequestContext userContext = RequestContextHolder.getContext();
+            // SECURITY: Get user context ONLY from RequestContextHolder
+            // NEVER accept userId as method parameter or from request
+            RequestContext userContext = RequestContextHolder.get();
             if (userContext == null) {
                 log.error("Security context missing for scenario {}", scenarioCode);
                 throw new SecurityViolationException(
@@ -74,6 +82,19 @@ public class QueryExecutor implements DynamicExecutor {
                         null
                 );
             }
+
+            // MANDATORY: Resolve database via dbKey
+            String dbKey = scenario.getDbKey();
+            if (dbKey == null || dbKey.isBlank()) {
+                log.error("Database routing not configured for scenario {}", scenarioCode);
+                throw new SecurityViolationException(
+                        "Database routing not configured for this scenario",
+                        "MISSING_DB_KEY",
+                        scenarioCode
+                );
+            }
+            NamedParameterJdbcTemplate jdbcTemplate = dataSourceRegistry.resolveByDbKey(dbKey);
+            log.debug("Resolved dbKey '{}' for scenario {}", dbKey, scenarioCode);
 
             // Validate SQL is SELECT only (first check)
             String rawSql = scenario.getSqlQuery();
@@ -86,15 +107,23 @@ public class QueryExecutor implements DynamicExecutor {
             // Build parameters from request_mapping
             Map<String, Object> sqlParams = buildSqlParameters(request, scenario);
             
-            // Add security context parameters
+            // Add security context parameters from RequestContextHolder
             sqlParams.put("userId", userContext.getUserId());
-            String orgId = userContext.getOrgId() != null ? userContext.getOrgId() : 
-                          (userContext.getTenantId() != null ? userContext.getTenantId() : "DEFAULT");
+            String orgId = userContext.getEffectiveOrgId();
+            if (orgId == null || orgId.isBlank()) {
+                log.error("org_id not present in context for user {}. Access denied.", userContext.getUserId());
+                throw new SecurityViolationException(
+                        "Security context missing. Access denied.",
+                        "MISSING_ORG_ID",
+                        null
+                );
+            }
             sqlParams.put("orgId", orgId);
 
-            log.info("Executing DB_QUERY for scenario {} with params: {}", scenarioCode, sqlParams.keySet());
+            log.info("Executing DB_QUERY for scenario {} with dbKey={}, params: {}", 
+                    scenarioCode, dbKey, sqlParams.keySet());
 
-            // Execute query with timeout
+            // Execute query with resolved JdbcTemplate
             List<Map<String, Object>> rawResults = jdbcTemplate.queryForList(securedSql, sqlParams);
             
             // Enforce MAX_ROWS limit

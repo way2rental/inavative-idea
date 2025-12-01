@@ -626,7 +626,7 @@ List major packages and what they contain:
 - Hardcoded scenario configs: NONE – All from `ai_scenarios` table
 - Hardcoded follow-up texts: YES – Fallback in `SpringAiLlmClient.generateFollowUpFallback()`
 - Hardcoded mapping instead of JsonPath: NO – Uses JsonPath
-- Hardcoded DataSource routing: YES – Single datasource only
+- Hardcoded DataSource routing: NO – Dynamic routing via `DataSourceRegistryService` and `dbKey`
 
 **Fallback mappings in RbacService**:
 ```java
@@ -659,13 +659,22 @@ AMBIGUITY_PATTERNS = Map.of(
 
 ## 18. FINAL SELF-REPORTED GAPS (BY CODEBASE)
 
-### NEWLY IMPLEMENTED (Production Closure Chunk 1):
+### NEWLY IMPLEMENTED (Production Closure Chunk 1 + Chunk 2):
 
+**Chunk 1:**
 1. **RowLevelSecurityService** - Central row-level security with automatic injection of `owner_user_id = :userId` and `org_id = :orgId`
 2. **QueryExecutor now @Component** - Auto-wired with all security dependencies, enforces RLS
 3. **HttpCallExecutor now @Component** - Auto-wired with security validation
 4. **Mandatory Masking** - All DB results go through `MaskingService` before reaching AI formatter
 5. **JWT Secret Externalization** - Loaded from `JWT_SECRET` environment variable, fails fast if missing or insecure
+
+**Chunk 2:**
+6. **Global User Context Propagation** - `RequestContext` populated from JWT in `JwtAuthenticationFilter`
+7. **RequestContextHolder** - ThreadLocal-based with `set()`, `get()`, `clear()` methods
+8. **Dynamic Multi-Datasource Routing** - `DataSourceRegistryService` with `resolveByDbKey()` method
+9. **dbKey field in AiScenario** - Each scenario specifies which database to use
+10. **HTTP Security Headers** - `HttpCallExecutor` injects `X-User-Id`, `X-Org-Id`, `X-Roles` from context
+11. **Context Cleanup** - `RequestContextHolder.clear()` called in finally block to prevent thread-leak
 
 ### Still partially implemented:
 

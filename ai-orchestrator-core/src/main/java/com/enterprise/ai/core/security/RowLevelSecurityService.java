@@ -91,9 +91,13 @@ public class RowLevelSecurityService {
         // Validate orgId is present
         String orgId = userContext.getTenantId(); // tenantId is used as orgId
         if (orgId == null || orgId.isBlank()) {
-            // For backward compatibility, use a default if not set
-            log.warn("org_id not present in context for user {}, using default 'DEFAULT'", userId);
-            orgId = "DEFAULT";
+            // STRICT: orgId must be present for row-level security
+            log.error("org_id not present in context for user {}. Access denied.", userId);
+            throw new SecurityViolationException(
+                    "Security context missing. Access denied.",
+                    "MISSING_ORG_ID",
+                    null
+            );
         }
 
         String normalizedSql = rawSql.trim();

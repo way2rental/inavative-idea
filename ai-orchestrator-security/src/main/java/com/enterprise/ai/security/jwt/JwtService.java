@@ -84,9 +84,9 @@ public class JwtService {
             return true;
         }
 
-        // Check minimum length (256 bits = 32 bytes)
+        // Check minimum length (256 bits = 32 bytes) - STRICT enforcement
         if (secret.length() < 32) {
-            log.warn("JWT secret is shorter than recommended 32 characters");
+            log.error("JWT secret is shorter than required 32 characters (256 bits)");
             return true;
         }
 
@@ -119,6 +119,20 @@ public class JwtService {
     public List<String> extractRoles(String token) {
         Claims claims = extractAllClaims(token);
         return claims.get("roles", List.class);
+    }
+
+    /**
+     * Extract orgId from token.
+     * Returns null if not present.
+     */
+    public String extractOrgId(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            return claims.get("orgId", String.class);
+        } catch (Exception e) {
+            log.debug("No orgId claim in token");
+            return null;
+        }
     }
 
     /**

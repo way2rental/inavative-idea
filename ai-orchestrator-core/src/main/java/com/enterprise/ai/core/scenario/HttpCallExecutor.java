@@ -1,8 +1,11 @@
 package com.enterprise.ai.core.scenario;
 
+import com.enterprise.ai.common.context.RequestContext;
+import com.enterprise.ai.common.context.RequestContextHolder;
 import com.enterprise.ai.common.dto.ScenarioRequest;
 import com.enterprise.ai.common.dto.ScenarioResult;
 import com.enterprise.ai.common.enums.ExecutionType;
+import com.enterprise.ai.common.exception.SecurityViolationException;
 import com.enterprise.ai.core.security.ReadOnlyEnforcementService;
 import com.enterprise.ai.data.entity.AiScenario;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -26,6 +29,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Dynamic executor for HTTP_CALL execution type.
@@ -40,6 +44,11 @@ import java.util.regex.Pattern;
  * - Circuit breaker for fault tolerance
  * - Configurable timeout
  * - Response size limit (1MB)
+ * 
+ * SECURITY CRITICAL:
+ * - User context ONLY from RequestContextHolder
+ * - NEVER accept userId from request body or frontend
+ * - Always inject X-User-Id, X-Org-Id, X-Roles headers
  */
 @Slf4j
 @Component
@@ -48,6 +57,11 @@ public class HttpCallExecutor implements DynamicExecutor {
     private static final long DEFAULT_TIMEOUT_MS = 5000;
     private static final int MAX_RESPONSE_SIZE_BYTES = 1024 * 1024; // 1MB limit
     private static final Pattern URL_VARIABLE_PATTERN = Pattern.compile("\\{(\\w+)}");
+
+    // Security headers injected from RequestContext
+    private static final String HEADER_USER_ID = "X-User-Id";
+    private static final String HEADER_ORG_ID = "X-Org-Id";
+    private static final String HEADER_ROLES = "X-Roles";
 
     private final WebClient webClient;
     private final ReadOnlyEnforcementService readOnlyEnforcement;
@@ -100,6 +114,19 @@ public class HttpCallExecutor implements DynamicExecutor {
         long timeoutMs = scenario.getTimeoutMs() != null ? scenario.getTimeoutMs() : DEFAULT_TIMEOUT_MS;
 
         try {
+            // SECURITY: Get user context ONLY from RequestContextHolder
+            // NEVER accept userId from request body or frontend
+            RequestContext userContext = RequestContextHolder.get();
+            if (userContext == null) {
+                log.error("Security context not initialized for HTTP_CALL scenario {}", scenarioCode);
+                return Mono.just(ScenarioResult.builder()
+                        .scenario(scenarioCode)
+                        .success(false)
+                        .errorMessage("Security context not initialized. HTTP call blocked.")
+                        .data(Map.of("error", "Access denied"))
+                        .build());
+            }
+
             // Get and validate HTTP method
             String httpMethod = scenario.getHttpMethod();
             if (httpMethod == null) httpMethod = "GET";
@@ -111,7 +138,8 @@ public class HttpCallExecutor implements DynamicExecutor {
             // Validate URL is whitelisted
             readOnlyEnforcement.validateUrl(url);
 
-            log.info("Executing HTTP_CALL {} {} for scenario {}", httpMethod, url, scenarioCode);
+            log.info("Executing HTTP_CALL {} {} for scenario {} (user: {})", 
+                    httpMethod, url, scenarioCode, userContext.getUserId());
 
             // Get circuit breaker for this scenario
             CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(scenarioCode);
@@ -126,6 +154,9 @@ public class HttpCallExecutor implements DynamicExecutor {
             } else {
                 requestSpec = webClient.get().uri(url);
             }
+
+            // MANDATORY: Inject security headers from RequestContext
+            requestSpec = injectSecurityHeaders(requestSpec, userContext);
 
             // Add custom headers if specified
             if (scenario.getHttpHeaders() != null && !scenario.getHttpHeaders().isBlank()) {
@@ -375,5 +406,47 @@ public class HttpCallExecutor implements DynamicExecutor {
             }
         }
         return node.toString();
+    }
+
+    /**
+     * Inject security headers from RequestContext.
+     * These headers identify the user to downstream services.
+     * 
+     * MANDATORY: Headers are ALWAYS injected from RequestContextHolder,
+     * NEVER from request body or frontend parameters.
+     */
+    private WebClient.RequestHeadersSpec<?> injectSecurityHeaders(
+            WebClient.RequestHeadersSpec<?> requestSpec, 
+            RequestContext context) {
+        
+        if (context == null) {
+            log.warn("Cannot inject security headers - context is null");
+            return requestSpec;
+        }
+
+        // Inject X-User-Id
+        if (context.getUserId() != null) {
+            requestSpec = requestSpec.header(HEADER_USER_ID, context.getUserId());
+        }
+
+        // Inject X-Org-Id
+        String orgId = context.getEffectiveOrgId();
+        if (orgId != null) {
+            requestSpec = requestSpec.header(HEADER_ORG_ID, orgId);
+        }
+
+        // Inject X-Roles (comma-separated list)
+        List<String> roles = context.getRoles();
+        if (roles != null && !roles.isEmpty()) {
+            String rolesHeader = String.join(",", roles);
+            requestSpec = requestSpec.header(HEADER_ROLES, rolesHeader);
+        } else if (context.getRole() != null) {
+            requestSpec = requestSpec.header(HEADER_ROLES, context.getRole());
+        }
+
+        log.debug("Injected security headers: userId={}, orgId={}, roles={}", 
+                context.getUserId(), orgId, roles);
+
+        return requestSpec;
     }
 }

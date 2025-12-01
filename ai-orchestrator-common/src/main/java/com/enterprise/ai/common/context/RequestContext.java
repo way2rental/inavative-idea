@@ -3,6 +3,7 @@ package com.enterprise.ai.common.context;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -14,13 +15,19 @@ import java.util.Map;
  * - Policy evaluation
  * - Ownership verification
  * - Tenant isolation
+ * - Row-level security
+ * 
+ * SECURITY CRITICAL:
+ * - Set ONLY from JWT at request ingress layer
+ * - NEVER accepted from frontend
+ * - NEVER passed as method parameter
  */
 @Data
 @Builder
 public class RequestContext {
 
     /**
-     * User ID from authentication
+     * User ID from authentication (from JWT subject)
      */
     private String userId;
 
@@ -41,9 +48,14 @@ public class RequestContext {
     private String orgId;
 
     /**
-     * User role (ADMIN, USER, AUDITOR, OPERATOR)
+     * Primary user role (ADMIN, USER, AUDITOR, OPERATOR)
      */
     private String role;
+
+    /**
+     * List of all user roles (for multiple role support)
+     */
+    private List<String> roles;
 
     /**
      * IP address of the request
@@ -74,15 +86,26 @@ public class RequestContext {
      * Check if user has a specific role
      */
     public boolean hasRole(String requiredRole) {
+        if (roles != null && !roles.isEmpty()) {
+            return roles.stream().anyMatch(r -> r.equalsIgnoreCase(requiredRole));
+        }
         return role != null && role.equalsIgnoreCase(requiredRole);
     }
 
     /**
      * Check if user has any of the specified roles
      */
-    public boolean hasAnyRole(String... roles) {
+    public boolean hasAnyRole(String... requiredRoles) {
+        if (roles != null && !roles.isEmpty()) {
+            for (String required : requiredRoles) {
+                if (roles.stream().anyMatch(r -> r.equalsIgnoreCase(required))) {
+                    return true;
+                }
+            }
+            return false;
+        }
         if (role == null) return false;
-        for (String r : roles) {
+        for (String r : requiredRoles) {
             if (role.equalsIgnoreCase(r)) return true;
         }
         return false;
@@ -100,5 +123,12 @@ public class RequestContext {
      */
     public boolean isSameUser(String otherUserId) {
         return userId != null && userId.equals(otherUserId);
+    }
+
+    /**
+     * Get effective orgId (prefers orgId, falls back to tenantId)
+     */
+    public String getEffectiveOrgId() {
+        return orgId != null ? orgId : tenantId;
     }
 }
