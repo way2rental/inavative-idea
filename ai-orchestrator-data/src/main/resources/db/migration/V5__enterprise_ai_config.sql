@@ -1,5 +1,22 @@
--- V4: Enterprise AI Dynamic Configuration
--- Adds tables for fully dynamic AI orchestration: prompts, intents, follow-ups, and policies
+-- V5: Enterprise AI Dynamic Configuration
+-- Adds tables for fully dynamic AI orchestration: prompts, intents, follow-ups, policies, and response mappings
+-- Per ENTERPRISE_AI_RESPONSE_MAPPING_AND_SSE_SPEC.md and ADMIN_PANEL_UI_UX_SPEC.md
+
+-- ===================== RESPONSE MAPPINGS =====================
+-- JSON Path-based response mapping per SPEC Section 4.1
+CREATE TABLE IF NOT EXISTS ai_response_mappings (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    scenario_code VARCHAR(100) NOT NULL,
+    source_type VARCHAR(50) DEFAULT 'DB_QUERY',
+    source_field VARCHAR(255),
+    target_field VARCHAR(255) NOT NULL,
+    json_path VARCHAR(255) NOT NULL,
+    masking_type VARCHAR(50) DEFAULT 'NONE',
+    display_order INT DEFAULT 0,
+    active BOOLEAN DEFAULT TRUE,
+    INDEX idx_mapping_scenario (scenario_code),
+    INDEX idx_mapping_active (active)
+);
 
 -- ===================== PROMPT TEMPLATES =====================
 -- Dynamic prompt management with versioning
@@ -177,3 +194,32 @@ INSERT INTO ai_policies (policy_key, policy_name, rule_expression, on_fail, fail
  'request.requestCount < 100',
  'BLOCK', 'Rate limit exceeded. Please try again later.')
 ON DUPLICATE KEY UPDATE policy_name = VALUES(policy_name);
+
+-- ===================== INSERT DEFAULT RESPONSE MAPPINGS =====================
+-- Per ENTERPRISE_AI_RESPONSE_MAPPING_AND_SSE_SPEC.md Section 5 Example
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+-- TXN_STATUS mappings
+('TXN_STATUS', 'DB_QUERY', 'txn_id', 'txnId', '$.txn_id', 'NONE', 1),
+('TXN_STATUS', 'DB_QUERY', 'status_code', 'status', '$.status_code', 'NONE', 2),
+('TXN_STATUS', 'DB_QUERY', 'amount', 'amount', '$.amount', 'NONE', 3),
+('TXN_STATUS', 'DB_QUERY', 'account_number', 'accountNumber', '$.account_number', 'ACCOUNT', 4),
+('TXN_STATUS', 'DB_QUERY', 'created_at', 'timestamp', '$.created_at', 'NONE', 5),
+
+-- FILE_STATUS mappings
+('FILE_STATUS', 'HTTP_CALL', 'file_name', 'fileName', '$.file_name', 'NONE', 1),
+('FILE_STATUS', 'HTTP_CALL', 'status', 'status', '$.status', 'NONE', 2),
+('FILE_STATUS', 'HTTP_CALL', 'processed_at', 'processedAt', '$.processed_at', 'NONE', 3),
+('FILE_STATUS', 'HTTP_CALL', 'record_count', 'recordCount', '$.record_count', 'NONE', 4),
+
+-- ACCOUNT_SUMMARY mappings
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 1),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_holder', 'accountHolder', '$.account_holder', 'NONE', 2),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'balance', 'balance', '$.balance', 'NONE', 3),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 4),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'last_updated', 'lastUpdated', '$.last_updated', 'NONE', 5),
+
+-- BALANCE_CHECK mappings
+('BALANCE_CHECK', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 1),
+('BALANCE_CHECK', 'DB_QUERY', 'balance', 'availableBalance', '$.balance', 'NONE', 2),
+('BALANCE_CHECK', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 3)
+ON DUPLICATE KEY UPDATE target_field = VALUES(target_field);

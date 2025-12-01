@@ -78,18 +78,18 @@ export class AdminService {
     );
   }
 
-  // Ollama Status - fetches from backend health check
-  getOllamaStatus(): Observable<OllamaStatus> {
-    return this.http.get<OllamaStatus>(`${this.baseUrl}/ollama/health`).pipe(
-      catchError(this.handleError('getOllamaStatus', {
-        connected: false,
-        baseUrl: '',
-        model: '',
-        enabled: false,
-        lastCheckTime: new Date().toISOString()
-      }))
-    );
-  }
+//   // Ollama Status - fetches from backend health check
+//   getOllamaStatus(): Observable<OllamaStatus> {
+//     return this.http.get<OllamaStatus>(`${this.baseUrl}/ollama/health`).pipe(
+//       catchError(this.handleError('getOllamaStatus', {
+//         connected: false,
+//         baseUrl: '',
+//         model: '',
+//         enabled: false,
+//         lastCheckTime: new Date().toISOString()
+//       }))
+//     );
+//   }
 
   // Scenarios CRUD - all data from DB
   getScenarios(): Observable<Scenario[]> {
@@ -132,15 +132,25 @@ export class AdminService {
     let params = new HttpParams().set('page', page.toString()).set('size', size.toString());
     if (filters?.userId) params = params.set('userId', filters.userId);
     if (filters?.scenarioCode) params = params.set('scenarioCode', filters.scenarioCode);
-    
+
     return this.http.get<{ content: AuditLog[]; totalElements: number }>(`${this.baseUrl}/admin/audit-logs`, { params }).pipe(
       catchError(this.handleError('getAuditLogs', { content: [], totalElements: 0 }))
     );
   }
 
-  // Chat Sessions - all data from DB
-  getChatSessions(page = 0, size = 20): Observable<{ content: ChatSession[]; totalElements: number }> {
-    const params = new HttpParams().set('page', page.toString()).set('size', size.toString());
+  // Chat Sessions - all data from DB with filters
+  getChatSessions(page = 0, size = 20, userId?: string, sessionId?: string): Observable<{ content: ChatSession[]; totalElements: number }> {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('size', size.toString());
+
+    if (userId && userId.trim()) {
+      params = params.set('userId', userId.trim());
+    }
+    if (sessionId && sessionId.trim()) {
+      params = params.set('sessionId', sessionId.trim());
+    }
+
     return this.http.get<{ content: ChatSession[]; totalElements: number }>(`${this.baseUrl}/admin/sessions`, { params }).pipe(
       catchError(this.handleError('getChatSessions', { content: [], totalElements: 0 }))
     );
@@ -372,5 +382,57 @@ export class AdminService {
 
   testPolicy(id: number, testContext: Record<string, any>): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/admin/policies/${id}/test`, testContext);
+  }
+
+  // RBAC Management
+  getRbacMappings(): Observable<Record<string, string[]>> {
+    return this.http.get<Record<string, string[]>>(`${this.baseUrl}/admin/rbac/mappings`).pipe(
+      catchError(this.handleError('getRbacMappings', {}))
+    );
+  }
+
+  getRbacStatus(): Observable<{ initialized: boolean; totalRoles: number; totalMappings: number }> {
+    return this.http.get<{ initialized: boolean; totalRoles: number; totalMappings: number }>(`${this.baseUrl}/admin/rbac/status`).pipe(
+      catchError(this.handleError('getRbacStatus', { initialized: false, totalRoles: 0, totalMappings: 0 }))
+    );
+  }
+
+  addRbacMapping(role: string, scenarioCode: string): Observable<string> {
+    return this.http.post<string>(`${this.baseUrl}/admin/rbac/mappings`, { role, scenarioCode });
+  }
+
+  removeRbacMapping(role: string, scenarioCode: string): Observable<string> {
+    return this.http.delete<string>(`${this.baseUrl}/admin/rbac/mappings`, {
+      body: { role, scenarioCode }
+    });
+  }
+
+  refreshRbacCache(): Observable<string> {
+    return this.http.post<string>(`${this.baseUrl}/admin/rbac/refresh`, {});
+  }
+
+  // Analytics APIs
+  getRequestsOverTime(hours: number = 24, interval: number = 4): Observable<any> {
+    return this.http.get(`${this.baseUrl}/admin/analytics/requests-over-time?hours=${hours}&interval=${interval}`).pipe(
+      catchError(this.handleError('getRequestsOverTime', { labels: [], data: [], period: '' }))
+    );
+  }
+
+  getResponseDistribution(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/admin/analytics/response-distribution`).pipe(
+      catchError(this.handleError('getResponseDistribution', { labels: [], data: [], average: 0 }))
+    );
+  }
+
+  getSuccessRateTrend(weeks: number = 4): Observable<any> {
+    return this.http.get(`${this.baseUrl}/admin/analytics/success-rate-trend?weeks=${weeks}`).pipe(
+      catchError(this.handleError('getSuccessRateTrend', { labels: [], data: [], overall: 0 }))
+    );
+  }
+
+  getScenarioUsage(limit: number = 5): Observable<any> {
+    return this.http.get(`${this.baseUrl}/admin/analytics/scenario-usage?limit=${limit}`).pipe(
+      catchError(this.handleError('getScenarioUsage', { labels: [], data: [], total: 0 }))
+    );
   }
 }

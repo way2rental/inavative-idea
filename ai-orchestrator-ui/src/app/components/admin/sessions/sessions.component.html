@@ -1,8 +1,8 @@
 <!-- Axis Bank Admin - Chat Sessions -->
 <div class="min-h-screen bg-bank-bg">
-  <!-- Page Title Section (simple, no redundant header) -->
+  <!-- Page Title Section -->
   <div class="bg-white border-b">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div class="px-6 lg:px-8 py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
@@ -12,115 +12,194 @@
           </a>
           <div class="w-10 h-10 bg-axis-burgundy/10 rounded-lg flex items-center justify-center">
             <svg class="w-6 h-6 text-axis-burgundy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
           </div>
           <div>
             <h1 class="text-xl font-bold text-gray-900">Chat Sessions</h1>
-            <p class="text-gray-500 text-sm">Monitor active and past user sessions</p>
+            <p class="text-gray-500 text-sm">View and manage user chat sessions</p>
           </div>
         </div>
-        <div class="text-gray-500 text-sm">
-          Total: {{ totalElements }} sessions
+        <div class="flex items-center gap-3">
+          <span class="text-gray-500 text-sm">Total: {{ totalElements }} sessions</span>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="px-6 lg:px-8 py-8">
+    <!-- Filters -->
+    <div class="card-axis p-4 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <input type="text" [(ngModel)]="filterUserId" (input)="applyFilters()"
+            placeholder="Filter by User ID..." class="input-axis text-sm">
+        </div>
+        <div>
+          <input type="text" [(ngModel)]="filterSessionId" (input)="applyFilters()"
+            placeholder="Filter by Session ID..." class="input-axis text-sm">
+        </div>
+      </div>
+      <div class="flex items-center gap-3 mt-3">
+        <button (click)="clearFilters()" class="btn-secondary text-sm">Clear Filters</button>
+        <span class="text-gray-500 text-sm">Showing {{ sessions.length }} of {{ totalElements }} sessions</span>
+      </div>
+    </div>
+
     @if (isLoading) {
       <div class="flex items-center justify-center h-64">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-axis-burgundy"></div>
       </div>
     } @else {
-      <!-- Sessions Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        @for (session of sessions; track session.id) {
-          <div class="card-axis p-6 hover:shadow-elevated transition-all duration-300">
-            <div class="flex items-start justify-between mb-4">
-              <div class="flex items-center gap-3">
-                <div class="w-12 h-12 bg-axis-burgundy rounded-full flex items-center justify-center">
-                  <span class="text-white font-bold text-lg">{{ session.userId.charAt(0).toUpperCase() }}</span>
-                </div>
-                <div>
-                  <p class="text-gray-900 font-medium">{{ session.userId }}</p>
-                  <p class="text-gray-400 text-xs font-mono">{{ session.sessionId }}</p>
-                </div>
-              </div>
-              @if (session.active) {
-                <span class="badge-success flex items-center gap-1">
-                  <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                  Active
-                </span>
-              } @else {
-                <span class="badge bg-gray-100 text-gray-500">Ended</span>
+      <!-- Sessions Table -->
+      <div class="card-axis overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session ID</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User ID</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Messages</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Started</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Activity</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              @for (session of sessions; track session.id) {
+                <tr class="hover:bg-gray-50 transition-colors">
+                  <td class="px-6 py-4">
+                    <span class="text-gray-900 font-mono text-sm">{{ session.sessionId }}</span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span class="text-gray-900 font-medium">{{ session.userId }}</span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span class="badge bg-blue-100 text-blue-700">{{ session.messageCount || 0 }} messages</span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span class="text-gray-600 text-sm">{{ formatDate(session.startTime) }}</span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span class="text-gray-600 text-sm">{{ formatDate(session.lastActivityTime) }}</span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <button (click)="viewDetails(session)"
+                      class="text-axis-burgundy hover:text-axis-maroon text-sm font-medium">
+                      View Details
+                    </button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="px-6 py-12 text-center">
+                    <div class="flex flex-col items-center justify-center">
+                      <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                      </svg>
+                      <p class="text-gray-500 font-medium">No sessions found</p>
+                      <p class="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
+                    </div>
+                  </td>
+                </tr>
               }
-            </div>
+            </tbody>
+          </table>
+        </div>
 
-            <div class="space-y-3">
-              <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span class="text-gray-500 text-sm">Messages</span>
-                <span class="text-gray-900 font-bold text-lg">{{ session.messageCount }}</span>
+        <!-- Pagination -->
+        @if (totalElements > pageSize) {
+          <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
+            <div class="flex items-center justify-between">
+              <div class="text-sm text-gray-700">
+                Showing <span class="font-medium">{{ currentPage * pageSize + 1 }}</span> to
+                <span class="font-medium">{{ Math.min((currentPage + 1) * pageSize, totalElements) }}</span> of
+                <span class="font-medium">{{ totalElements }}</span> sessions
               </div>
-
-              <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span class="text-gray-500 text-sm">Started</span>
-                <span class="text-gray-700 text-sm">{{ getTimeSince(session.startTime) }}</span>
-              </div>
-
-              <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span class="text-gray-500 text-sm">Last Activity</span>
-                <span class="text-gray-700 text-sm">{{ getTimeSince(session.lastActivityTime) }}</span>
-              </div>
-            </div>
-
-            <div class="mt-4 pt-4 border-t border-gray-200">
               <div class="flex items-center gap-2">
-                @if (session.active) {
-                  <div class="flex items-center gap-1 text-green-600 text-xs">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                    </svg>
-                    User is currently chatting
-                  </div>
-                } @else {
-                  <div class="text-gray-400 text-xs">
-                    Session ended at {{ session.lastActivityTime | date:'short' }}
-                  </div>
-                }
+                <button (click)="prevPage()" [disabled]="currentPage === 0"
+                  class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                  Previous
+                </button>
+                <span class="text-sm text-gray-700">
+                  Page {{ currentPage + 1 }} of {{ getTotalPages() }}
+                </span>
+                <button (click)="nextPage()" [disabled]="(currentPage + 1) * pageSize >= totalElements"
+                  class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                  Next
+                </button>
               </div>
             </div>
           </div>
         }
       </div>
-
-      @if (sessions.length === 0) {
-        <div class="card-axis p-12 text-center">
-          <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">No Sessions Yet</h3>
-          <p class="text-gray-500">Chat sessions will appear here once users start interacting.</p>
-        </div>
-      }
-
-      <!-- Pagination -->
-      @if (sessions.length > 0) {
-        <div class="mt-8 flex items-center justify-between">
-          <div class="text-gray-500 text-sm">
-            Page {{ currentPage + 1 }} of {{ Math.ceil(totalElements / pageSize) }}
-          </div>
-          <div class="flex gap-2">
-            <button (click)="prevPage()" [disabled]="currentPage === 0" class="btn-secondary" [class.opacity-50]="currentPage === 0">
-              Previous
-            </button>
-            <button (click)="nextPage()" [disabled]="(currentPage + 1) * pageSize >= totalElements" class="btn-secondary"
-              [class.opacity-50]="(currentPage + 1) * pageSize >= totalElements">
-              Next
-            </button>
-          </div>
-        </div>
-      }
     }
   </div>
 </div>
+
+<!-- Details Modal -->
+@if (selectedSession) {
+  <div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" (click)="closeDetails()">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden" (click)="$event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-axis-burgundy to-axis-maroon px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-white">Session Details</h2>
+            <p class="text-white/80 text-sm font-mono">{{ selectedSession.sessionId }}</p>
+          </div>
+        </div>
+        <button (click)="closeDetails()" class="text-white/80 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+        <!-- Session Information -->
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-3">Session Information</h3>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-gray-500 text-sm">Session ID</label>
+              <p class="text-gray-900 font-mono text-sm">{{ selectedSession.sessionId }}</p>
+            </div>
+            <div>
+              <label class="text-gray-500 text-sm">User ID</label>
+              <p class="text-gray-900 font-medium">{{ selectedSession.userId }}</p>
+            </div>
+            <div>
+              <label class="text-gray-500 text-sm">Message Count</label>
+              <p class="text-gray-900">{{ selectedSession.messageCount || 0 }}</p>
+            </div>
+            <div>
+              <label class="text-gray-500 text-sm">Started At</label>
+              <p class="text-gray-900 text-sm">{{ formatDate(selectedSession.startTime) }}</p>
+            </div>
+            <div>
+              <label class="text-gray-500 text-sm">Last Activity</label>
+              <p class="text-gray-900 text-sm">{{ formatDate(selectedSession.lastActivityTime) }}</p>
+            </div>
+            <div>
+              <label class="text-gray-500 text-sm">Duration</label>
+              <p class="text-gray-900 text-sm">{{ formatDuration(selectedSession.startTime, selectedSession.lastActivityTime) }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end gap-3 pt-4 border-t">
+          <button (click)="closeDetails()" class="btn-secondary">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+

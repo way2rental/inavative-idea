@@ -1,6 +1,7 @@
 package com.enterprise.ai.security.config;
 
 import com.enterprise.ai.security.jwt.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -52,6 +53,7 @@ public class SecurityConfig {
      * CSRF is disabled as this is a stateless REST API using JWT tokens in headers.
      *
      * Special handling for async/streaming requests to prevent "response already committed" errors.
+     * ASYNC dispatches are permitted to avoid AccessDeniedException after streaming completes.
      */
     @Bean
     @SuppressWarnings("java:S4502") // CSRF disabled intentionally for stateless JWT API
@@ -61,6 +63,15 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // CRITICAL: Allow ASYNC dispatches to prevent "response already committed" errors
+                        // When SSE/streaming responses complete, Spring triggers an async dispatch
+                        // which must be permitted to avoid AccessDeniedException.
+                        // Security note: This is safe because:
+                        // 1. Authentication is validated on the initial REQUEST dispatch
+                        // 2. @PreAuthorize annotations on controller methods enforce auth before streaming starts
+                        // 3. ASYNC dispatch only completes the already-authenticated response
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
+                        
                         // Public endpoints - no auth required
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()

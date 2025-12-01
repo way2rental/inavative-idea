@@ -170,79 +170,199 @@ public class ReactiveChatService {
         }
         log.debug("Pre-flight auth check passed: user has roles {}", userRoles);
 
-        // Cache the intent detection to avoid re-execution
-        Mono<IntentResult> intentMono = Mono.defer(() -> {
-            String sessionId = getOrCreateSessionSync(request);
-            saveMessageSync(sessionId, "user", request.getQuery());
-            String sessionContext = getSessionContextSync(sessionId);
-            
-            return llmClient.detectIntent(request.getQuery(), sessionContext)
-                    .timeout(Duration.ofMillis(maxOllamaTimeoutMs));
-        })
-        .doOnSuccess(intent -> log.info("Intent detected for streaming: scenario={}, confidence={}",
-                intent.getScenario(), intent.getConfidence()))
-        .doOnError(e -> log.error("Intent detection failed in streaming: {}", e.getMessage()))
-        .cache(); // Cache to avoid re-executing intent detection
+        // Get or create session BEFORE the reactive chain
+        String sessionId = getOrCreateSessionSync(request);
+        saveMessageSync(sessionId, "user", request.getQuery());
+        String sessionContext = getSessionContextSync(sessionId);
 
-        // Now build the response flux with progress indicators
+        // Cache the intent detection to avoid re-execution
+        Mono<IntentResult> intentMono = llmClient.detectIntent(request.getQuery(), sessionContext)
+                .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
+                .doOnSuccess(intent -> log.info("Intent detected for streaming: scenario={}, confidence={}",
+                        intent.getScenario(), intent.getConfidence()))
+                .doOnError(e -> log.error("Intent detection failed in streaming: {}", e.getMessage()))
+                .cache(); // Cache to avoid re-executing intent detection
+
+        // Now build the response flux with detailed progress indicators
         return Flux.concat(
-                // Send initial progress AFTER auth check
+                // Stage 1: Initial analysis
                 Flux.just("🔍 Analyzing your request...\n"),
 
                 intentMono.flatMapMany(intent -> {
-                    // Validate intent
-                    IntentValidationService.ValidationResult validation =
-                            validationService.validate(intent, request.getQuery());
-
-                    if (!validation.isValid()) {
-                        String message = validation.validationMessage();
-                        log.debug("Validation failed, returning error message");
-                        return Flux.just("\n" + message);
-                    }
-
-                    // Authorization check (roles already validated above)
-                    if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
-                        log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
-                        return Flux.just(String.format("\n❌ You don't have permission to access this information.\nYour roles: %s\nRequired scenario: %s", userRoles, intent.getScenario()));
-                    }
-
-                    log.debug("Authorization successful for user with roles: {}", userRoles);
-
-                    // Execute scenario
-                    ScenarioRequest scenarioRequest = ScenarioRequest.builder()
-                            .scenario(intent.getScenario())
-                            .params(intent.getParams())
-                            .userId(request.getUserId())
-                            .build();
-
-                    log.debug("Executing scenario reactively: {}", intent.getScenario());
-
+                    // Stage 2: Understanding complete
                     return Flux.concat(
-                            Flux.just("\n📊 Fetching data...\n"),
-                            scenarioRouter.routeReactive(scenarioRequest)
-                                    .timeout(Duration.ofMillis(maxDbTimeoutMs))
-                                    .doOnSuccess(result -> log.debug("Scenario executed, starting streaming response"))
-                                    .doOnError(e -> log.error("Scenario execution failed: {}", e.getMessage()))
-                                    .flatMapMany(result -> {
-                                        log.debug("Formatting response as stream");
-                                        return Flux.concat(
-                                                Flux.just("\n"),
-                                                llmClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery())
-                                                        .doOnComplete(() -> log.debug("Response streaming completed"))
-                                                        .doOnError(e -> log.error("Response streaming error: {}", e.getMessage()))
-                                        );
-                                    })
+                            Flux.just("✅ Request understood - " + intent.getScenario().replace("_", " ").toLowerCase() + "\n"),
+
+                            Flux.defer(() -> {
+                                // Validate intent
+                                IntentValidationService.ValidationResult validation =
+                                        validationService.validate(intent, request.getQuery());
+
+                                if (!validation.isValid()) {
+                                    String message = validation.validationMessage();
+                                    log.debug("Validation failed, returning error message");
+
+                                    // Log validation failure to audit
+                                    Instant requestTime = Instant.now();
+                                    logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                            requestTime, Instant.now(), false,
+                                            "Validation failed: " + message, intent, null);
+
+                                    // Generate user-friendly missing parameter message using AI
+                                    if (!validation.missingRequiredParams().isEmpty()) {
+                                        return generateMissingParamMessage(intent.getScenario(),
+                                                validation.missingRequiredParams(), request.getQuery());
+                                    }
+
+                                    return Flux.just("\n" + message);
+                                }
+
+                                // Stage 3: Checking permissions
+                                return Flux.concat(
+                                        Flux.just("🔐 Verifying permissions...\n"),
+
+                                        Flux.defer(() -> {
+                                            // Authorization check (roles already validated above)
+                                            if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
+                                                log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
+
+                                                // Log authorization failure to audit
+                                                Instant requestTime = Instant.now();
+                                                logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                                        requestTime, Instant.now(), false,
+                                                        "Authorization denied for roles: " + userRoles, intent, null);
+
+                                                return Flux.just(String.format("\n❌ You don't have permission to access this information.\n\n**Your roles:** %s\n**Required scenario:** %s",
+                                                        userRoles, intent.getScenario()));
+                                            }
+
+                                            log.debug("Authorization successful for user with roles: {}", userRoles);
+
+                                            // Stage 4: Execute scenario
+                                            ScenarioRequest scenarioRequest = ScenarioRequest.builder()
+                                                    .scenario(intent.getScenario())
+                                                    .params(intent.getParams())
+                                                    .userId(request.getUserId())
+                                                    .build();
+
+                                            log.debug("Executing scenario reactively: {}", intent.getScenario());
+
+                                            return Flux.concat(
+                                                    Flux.just("✅ Access granted\n"),
+                                                    Flux.just("📊 Fetching your data...\n"),
+                                                    scenarioRouter.routeReactive(scenarioRequest)
+                                                            .timeout(Duration.ofMillis(maxDbTimeoutMs))
+                                                            .doOnSuccess(result -> {
+                                                                log.debug("Scenario executed, starting streaming response");
+                                                                // Log successful execution to audit
+                                                                Instant requestTime = Instant.now();
+                                                                logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                                                        requestTime, Instant.now(), true, null, intent, result);
+                                                            })
+                                                            .doOnError(e -> {
+                                                                log.error("Scenario execution failed: {}", e.getMessage());
+                                                                // Log execution failure to audit
+                                                                Instant requestTime = Instant.now();
+                                                                logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                                                        requestTime, Instant.now(), false,
+                                                                        "Scenario execution failed: " + e.getMessage(), intent, null);
+                                                            })
+                                                            .flatMapMany(result -> {
+                                                                log.debug("Formatting response as stream");
+
+                                                                // Collect the response to save it later
+                                                                final StringBuilder responseCollector = new StringBuilder();
+
+                                                                return Flux.concat(
+                                                                        Flux.just("✅ Data retrieved\n"),
+                                                                        Flux.just("📝 Preparing your response...\n"),
+                                                                        Flux.just("\n"),
+                                                                        llmClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery())
+                                                                                .doOnNext(chunk -> responseCollector.append(chunk))
+                                                                                .doOnComplete(() -> {
+                                                                                    log.debug("Response streaming completed");
+                                                                                    // Save the complete assistant response
+                                                                                    String completeResponse = responseCollector.toString().trim();
+                                                                                    if (!completeResponse.isEmpty()) {
+                                                                                        saveMessageSync(sessionId, "assistant", completeResponse);
+                                                                                    }
+                                                                                })
+                                                                                .doOnError(e -> log.error("Response streaming error: {}", e.getMessage()))
+                                                                );
+                                                            })
+                                            );
+                                        })
+                                );
+                            })
                     );
                 })
         )
         .timeout(Duration.ofMillis(maxExecutionTimeMs),
-                Flux.just("\n⏱️ Request timeout. The operation is taking longer than expected. Please try again."))
+                Flux.just("\n⏱️ **Request timeout.** The operation is taking longer than expected. Please try again."))
         .onErrorResume(e -> {
             log.error("Streaming error: {}", e.getMessage(), e);
-            return Flux.just("\n❌ An error occurred: " + e.getMessage() + "\nPlease try again.");
+            return Flux.just("\n❌ **An error occurred:** " + e.getMessage() + "\n\nPlease try again or contact support if the issue persists.");
         });
     }
 
+    /**
+     * Generate user-friendly missing parameter message using AI.
+     */
+    private Flux<String> generateMissingParamMessage(String scenarioCode, List<String> missingParams, String userQuery) {
+        return Flux.concat(
+                Flux.just("\n🔍 **Missing Information**\n\n"),
+                llmClient.generateFollowUpQuestion(scenarioCode, missingParams)
+                        .map(question -> {
+                            // Enhance the AI-generated question with helpful formatting
+                            StringBuilder message = new StringBuilder();
+                            message.append(question).append("\n\n");
+                            message.append("**Missing parameters:** ");
+                            message.append(String.join(", ", missingParams.stream()
+                                    .map(param -> param.replace("_", " "))
+                                    .map(this::capitalize)
+                                    .toList()));
+                            message.append("\n\n***Below is the Description of User asking to provide:**\n");
+                            message.append(scenarioRouter.getScenario(scenarioCode).getDescription());
+                            message.append("\n\n");
+                            message.append("*Please provide this information and try again.*");
+                            return message.toString();
+                        })
+                        .onErrorResume(e -> {
+                            // Fallback to simple message if AI fails
+                            log.error("Failed to generate follow-up question: {}", e.getMessage());
+                            return Mono.just(generateSimpleMissingParamMessage(scenarioCode, missingParams));
+                        })
+        );
+    }
+
+    /**
+     * Generate simple missing parameter message as fallback.
+     */
+    private String generateSimpleMissingParamMessage(String scenarioCode, List<String> missingParams) {
+        String scenarioName = scenarioCode.replace("_", " ").toLowerCase();
+        String params = String.join(", ", missingParams.stream()
+                .map(param -> "**" + capitalize(param.replace("_", " ")) + "**")
+                .toList());
+
+        return String.format("""
+                
+                To help you with %s, I need some additional information:
+                
+                Missing: %s
+                
+                Please provide this information and ask again.
+                """, scenarioName, params);
+    }
+
+    /**
+     * Capitalize first letter of a string.
+     */
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
+    }
 
     private Mono<ChatResponse> processIntent(
             IntentResult intent, 
@@ -409,10 +529,17 @@ public class ReactiveChatService {
                     });
         }
         
-        String response = "I didn't understand your selection. Please reply with a number (1, 2, or 3).";
-        saveMessageSync(sessionId, "assistant", response);
-        return Mono.just(buildResponse(sessionId, response, ChatResponse.ResponseType.CLARIFICATION, 
-                null, null, List.of("TXN_STATUS", "FILE_STATUS", "ACCOUNT_SUMMARY"), null, executionId));
+        // Couldn't understand the selection - show dynamic options
+        List<String> commonScenarios = validationService.getCommonScenarios();
+        StringBuilder response = new StringBuilder();
+        response.append("I didn't understand your selection. Please reply with a number or describe what you're looking for:\n");
+        for (int i = 0; i < commonScenarios.size(); i++) {
+            response.append(String.format("%d. %s\n", i + 1, 
+                    validationService.getScenarioDescription(commonScenarios.get(i))));
+        }
+        saveMessageSync(sessionId, "assistant", response.toString());
+        return Mono.just(buildResponse(sessionId, response.toString(), ChatResponse.ResponseType.CLARIFICATION, 
+                null, null, commonScenarios, null, executionId));
     }
 
     private Mono<ChatResponse> handleValidationFailure(
@@ -423,16 +550,19 @@ public class ReactiveChatService {
             String executionId) {
         
         if (validation.hasLowConfidence()) {
-            String response = "I'm not fully sure what you're asking for. Could you please:\n" +
-                    "• Be more specific about what you want to check\n" +
-                    "• Include relevant IDs or names\n" +
-                    "• Or tell me if you want to check:\n" +
-                    "  1. Transaction status\n" +
-                    "  2. File processing status\n" +
-                    "  3. Account balance";
-            saveMessageSync(sessionId, "assistant", response);
-            return Mono.just(buildResponse(sessionId, response, ChatResponse.ResponseType.CLARIFICATION,
-                    null, null, List.of("TXN_STATUS", "FILE_STATUS", "ACCOUNT_SUMMARY"), 
+            List<String> commonScenarios = validationService.getCommonScenarios();
+            StringBuilder response = new StringBuilder();
+            response.append("I'm not fully sure what you're asking for. Could you please:\n");
+            response.append("• Be more specific about what you want to check\n");
+            response.append("• Include relevant IDs or names\n");
+            response.append("• Or tell me if you want to check:\n");
+            for (int i = 0; i < commonScenarios.size(); i++) {
+                response.append(String.format("  %d. %s\n", i + 1, 
+                        validationService.getScenarioDescription(commonScenarios.get(i))));
+            }
+            saveMessageSync(sessionId, "assistant", response.toString());
+            return Mono.just(buildResponse(sessionId, response.toString(), ChatResponse.ResponseType.CLARIFICATION,
+                    null, null, commonScenarios, 
                     intent.getConfidence(), executionId));
         }
 
@@ -520,26 +650,49 @@ public class ReactiveChatService {
         return response.toLowerCase().trim().matches(AFFIRMATIVE_PATTERN);
     }
 
+    /**
+     * Extract selected scenario from clarification response.
+     * Uses dynamic scenarios from database instead of hardcoded values.
+     */
     private String extractSelectedScenario(ChatRequest request) {
+        List<String> commonScenarios = validationService.getCommonScenarios();
+        
+        // Check explicit selection (1-based index)
         if (request.getSelectedOption() != null) {
-            return switch (request.getSelectedOption()) {
-                case 1 -> "TXN_STATUS";
-                case 2 -> "FILE_STATUS";
-                case 3 -> "ACCOUNT_SUMMARY";
-                default -> null;
-            };
+            int index = request.getSelectedOption() - 1;
+            if (index >= 0 && index < commonScenarios.size()) {
+                return commonScenarios.get(index);
+            }
+            return null;
         }
         
+        // Try to extract from query text - match against scenario codes and descriptions
         String query = request.getQuery().toLowerCase();
-        if (query.contains("1") || query.contains("transaction") || query.contains("payment")) {
-            return "TXN_STATUS";
+        
+        // Check for number selection
+        for (int i = 0; i < commonScenarios.size(); i++) {
+            if (query.contains(String.valueOf(i + 1))) {
+                return commonScenarios.get(i);
+            }
         }
-        if (query.contains("2") || query.contains("file") || query.contains("batch")) {
-            return "FILE_STATUS";
+        
+        // Check for keyword matches from scenario descriptions
+        for (String scenarioCode : commonScenarios) {
+            String description = validationService.getScenarioDescription(scenarioCode).toLowerCase();
+            // Check if query contains keywords from description
+            String[] keywords = description.split("\\s+");
+            for (String keyword : keywords) {
+                if (keyword.length() > 3 && query.contains(keyword)) {
+                    return scenarioCode;
+                }
+            }
+            // Also check scenario code words
+            String codeWords = scenarioCode.toLowerCase().replace("_", " ");
+            if (query.contains(codeWords) || query.contains(scenarioCode.toLowerCase())) {
+                return scenarioCode;
+            }
         }
-        if (query.contains("3") || query.contains("balance") || query.contains("account")) {
-            return "ACCOUNT_SUMMARY";
-        }
+        
         return null;
     }
 
@@ -547,6 +700,10 @@ public class ReactiveChatService {
         if (request.getSessionId() != null) {
             Optional<ChatSession> existing = sessionRepository.findBySessionId(request.getSessionId());
             if (existing.isPresent()) {
+                // Update lastActivityAt to track session activity
+                ChatSession session = existing.get();
+                session.setLastActivityAt(Instant.now());
+                sessionRepository.save(session);
                 return request.getSessionId();
             }
         }

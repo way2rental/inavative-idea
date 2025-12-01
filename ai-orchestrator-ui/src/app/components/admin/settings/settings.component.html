@@ -1,222 +1,431 @@
-<!-- Axis Bank Admin - System Settings -->
+<!-- Axis Bank Admin - System Settings & Monitoring -->
 <div class="min-h-screen bg-bank-bg">
-  <!-- Page Title Section (simple, no redundant header) -->
+  <!-- Page Title Section -->
   <div class="bg-white border-b">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-      <div class="flex items-center gap-4">
-        <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
+    <div class="px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </a>
+          <div class="w-10 h-10 bg-axis-burgundy/10 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-axis-burgundy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">System Settings</h1>
+            <p class="text-gray-500 text-sm">Monitor system health and configuration via Spring Boot Actuator</p>
+          </div>
+        </div>
+        <button (click)="refreshAll()" class="btn-axis text-sm flex items-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-        </a>
-        <div class="w-10 h-10 bg-axis-burgundy/10 rounded-lg flex items-center justify-center">
-          <svg class="w-6 h-6 text-axis-burgundy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-xl font-bold text-gray-900">System Settings</h1>
-          <p class="text-gray-500 text-sm">Configure system options and manage caches</p>
-        </div>
+          Refresh All
+        </button>
       </div>
     </div>
   </div>
 
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="px-6 lg:px-8 py-8">
     @if (isLoading) {
       <div class="flex items-center justify-center h-64">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-axis-burgundy"></div>
       </div>
     } @else {
-      <div class="space-y-8">
-        <!-- Ollama Configuration -->
-        <div class="card-axis p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <div class="w-8 h-8 bg-axis-burgundy/10 rounded-lg flex items-center justify-center">
-              <span class="text-axis-burgundy font-bold text-xs">AI</span>
-            </div>
-            Ollama LLM Configuration
-          </h2>
-          <div class="grid grid-cols-2 gap-4">
-            <div class="p-4 bg-gray-50 rounded-lg">
-              <p class="text-gray-500 text-sm mb-1">Status</p>
-              @if (ollamaStatus?.connected) {
-                <div class="flex items-center gap-2">
-                  <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-                  <span class="text-green-600 font-medium">Connected</span>
-                </div>
-              } @else {
-                <div class="flex items-center gap-2">
-                  <span class="w-3 h-3 bg-red-500 rounded-full"></span>
-                  <span class="text-red-600 font-medium">Disconnected</span>
-                </div>
-              }
-            </div>
-            <div class="p-4 bg-gray-50 rounded-lg">
-              <p class="text-gray-500 text-sm mb-1">Enabled</p>
-              @if (ollamaStatus?.enabled) {
-                <span class="badge-success">Yes</span>
-              } @else {
-                <span class="badge-danger">No</span>
-              }
-            </div>
-            <div class="p-4 bg-gray-50 rounded-lg">
-              <p class="text-gray-500 text-sm mb-1">Base URL</p>
-              <p class="text-gray-900 font-mono text-sm">{{ ollamaStatus?.baseUrl }}</p>
-            </div>
-            <div class="p-4 bg-gray-50 rounded-lg">
-              <p class="text-gray-500 text-sm mb-1">Model</p>
-              <span class="badge-axis">{{ ollamaStatus?.model }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Cache Management -->
-        <div class="card-axis p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-            </svg>
-            Cache Management
-          </h2>
-          <p class="text-gray-500 text-sm mb-4">
-            The system uses Caffeine cache for scenarios and other frequently accessed data.
-            Refresh caches to pick up database changes immediately.
-          </p>
-          <div class="flex gap-4">
-            <button (click)="refreshScenarioCache()" class="btn-axis flex items-center gap-2">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh Scenario Cache
-            </button>
-            <button (click)="clearAllCache()" class="btn-danger flex items-center gap-2">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Clear All Caches
-            </button>
-          </div>
-        </div>
-
-        <!-- URL Whitelist -->
-        <div class="card-axis p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-              URL Whitelist
-            </h2>
-            <button (click)="openAddUrlModal()" class="btn-axis text-sm">Add URL</button>
-          </div>
-          <p class="text-gray-500 text-sm mb-4">
-            HTTP Call scenarios can only access URLs matching these patterns.
-            This is a security feature to prevent unauthorized external calls.
-          </p>
-          <div class="space-y-3">
-            @for (url of urlWhitelist; track url.id) {
-              <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <p class="text-gray-900 font-mono text-sm">{{ url.urlPattern }}</p>
-                  <p class="text-gray-500 text-xs mt-1">{{ url.description }}</p>
-                </div>
-                <div class="flex items-center gap-3">
-                  <span class="badge-info">{{ url.allowedMethods }}</span>
-                  @if (url.active) {
-                    <span class="badge-success">Active</span>
-                  } @else {
-                    <span class="badge-danger">Inactive</span>
-                  }
-                  <button (click)="removeUrl(url)" class="text-red-500 hover:text-red-600 transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
+      <!-- Tabs -->
+      <div class="card-axis mb-6">
+        <div class="border-b border-gray-200">
+          <nav class="flex -mb-px">
+            <button (click)="setActiveTab('health')"
+              [class]="activeTab === 'health' ? 'border-axis-burgundy text-axis-burgundy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+              class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Health
               </div>
-            }
-            @if (urlWhitelist.length === 0) {
-              <div class="p-8 text-center text-gray-400">
-                <p>No URLs in whitelist. Add URLs to allow HTTP Call scenarios.</p>
+            </button>
+            <button (click)="setActiveTab('info')"
+              [class]="activeTab === 'info' ? 'border-axis-burgundy text-axis-burgundy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+              class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Application Info
               </div>
-            }
-          </div>
-        </div>
-
-        <!-- System Info -->
-        <div class="card-axis p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            System Information
-          </h2>
-          <div class="grid grid-cols-2 gap-4">
-            <div class="p-4 bg-gray-50 rounded-lg">
-              <p class="text-gray-500 text-sm mb-1">Version</p>
-              <p class="text-gray-900 font-medium">1.0.0</p>
-            </div>
-            <div class="p-4 bg-gray-50 rounded-lg">
-              <p class="text-gray-500 text-sm mb-1">Environment</p>
-              <span class="badge-warning">Development</span>
-            </div>
-            <div class="p-4 bg-gray-50 rounded-lg">
-              <p class="text-gray-500 text-sm mb-1">API Endpoint</p>
-              <p class="text-gray-900 font-mono text-sm">http://localhost:8080/api</p>
-            </div>
-            <div class="p-4 bg-gray-50 rounded-lg">
-              <p class="text-gray-500 text-sm mb-1">Build</p>
-              <p class="text-gray-900">Angular 18 + Spring Boot 3</p>
-            </div>
-          </div>
+            </button>
+            <button (click)="setActiveTab('metrics')"
+              [class]="activeTab === 'metrics' ? 'border-axis-burgundy text-axis-burgundy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+              class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Metrics
+              </div>
+            </button>
+            <button (click)="setActiveTab('config')"
+              [class]="activeTab === 'config' ? 'border-axis-burgundy text-axis-burgundy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+              class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                Configuration
+              </div>
+            </button>
+          </nav>
         </div>
       </div>
+
+      <!-- Tab Content -->
+
+      <!-- Health Tab -->
+      @if (activeTab === 'health' && health) {
+        <div class="space-y-6">
+          <!-- Overall Health Status -->
+          <div class="card-axis p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">System Health Status</h3>
+                <p class="text-gray-500 text-sm">Overall system health and component status</p>
+              </div>
+              <div [class]="getHealthStatusColor(health.status)" class="px-6 py-3 rounded-lg flex items-center gap-3">
+                <span class="text-3xl">{{ getHealthIcon(health.status) }}</span>
+                <span class="text-xl font-bold">{{ health.status }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Component Health -->
+          @if (health.components) {
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              @for (component of health.components | keyvalue; track component.key) {
+                <div class="card-axis p-6">
+                  <div class="flex items-center justify-between mb-4">
+                    <h4 class="font-semibold text-gray-900">{{ component.key }}</h4>
+                    <span [class]="getHealthStatusColor(component.value.status)"
+                      class="px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                      <span>{{ getHealthIcon(component.value.status) }}</span>
+                      <span>{{ component.value.status }}</span>
+                    </span>
+                  </div>
+                  @if (component.value.details) {
+                    <div class="bg-gray-50 rounded-lg p-3">
+                      <pre class="text-xs text-gray-600 overflow-auto max-h-32">{{ component.value.details | json }}</pre>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Info Tab -->
+      @if (activeTab === 'info' && info) {
+        <div class="space-y-6">
+          <!-- Application Info -->
+          @if (info.app) {
+            <div class="card-axis p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Application Information</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="text-gray-500 text-sm">Name</label>
+                  <p class="text-gray-900 font-medium">{{ info.app.name || 'N/A' }}</p>
+                </div>
+                <div>
+                  <label class="text-gray-500 text-sm">Version</label>
+                  <p class="text-gray-900 font-medium">{{ info.app.version || 'N/A' }}</p>
+                </div>
+                <div class="col-span-2">
+                  <label class="text-gray-500 text-sm">Description</label>
+                  <p class="text-gray-900">{{ info.app.description || 'N/A' }}</p>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Java Info -->
+          @if (info.java) {
+            <div class="card-axis p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Java Runtime</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="text-gray-500 text-sm">Version</label>
+                  <p class="text-gray-900 font-medium">{{ info.java.version || 'N/A' }}</p>
+                </div>
+                <div>
+                  <label class="text-gray-500 text-sm">Vendor</label>
+                  <p class="text-gray-900 font-medium">{{ info.java.vendor || 'N/A' }}</p>
+                </div>
+                <div class="col-span-2">
+                  <label class="text-gray-500 text-sm">Runtime</label>
+                  <p class="text-gray-900 font-mono text-sm">{{ info.java.runtime || 'N/A' }}</p>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- OS Info -->
+          @if (info.os) {
+            <div class="card-axis p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">Operating System</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="text-gray-500 text-sm">Name</label>
+                  <p class="text-gray-900 font-medium">{{ info.os.name || 'N/A' }}</p>
+                </div>
+                <div>
+                  <label class="text-gray-500 text-sm">Version</label>
+                  <p class="text-gray-900 font-medium">{{ info.os.version || 'N/A' }}</p>
+                </div>
+                <div>
+                  <label class="text-gray-500 text-sm">Architecture</label>
+                  <p class="text-gray-900 font-medium">{{ info.os.arch || 'N/A' }}</p>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Metrics Tab -->
+      @if (activeTab === 'metrics') {
+        <div class="space-y-6">
+          <!-- Key Metrics Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            @for (metric of commonMetrics; track metric.key) {
+              <div class="card-axis p-6">
+                <div class="flex items-start justify-between mb-3">
+                  <div class="flex-1">
+                    <h4 class="text-sm text-gray-500 mb-1">{{ metric.label }}</h4>
+                    <p class="text-2xl font-bold text-gray-900">
+                      @if (metric.unit === 'bytes') {
+                        {{ formatBytes(getMetricValue(metric.key)) }}
+                      } @else if (metric.unit === 'percentage') {
+                        {{ formatPercentage(getMetricValue(metric.key)) }}
+                      } @else if (metric.unit === 'seconds') {
+                        {{ formatUptime(getMetricValue(metric.key)) }}
+                      } @else {
+                        {{ getMetricValue(metric.key) }}
+                      }
+                    </p>
+                  </div>
+                  <button (click)="loadMetricDetail(metric.key)"
+                    class="text-axis-burgundy hover:text-axis-maroon text-sm">
+                    Details
+                  </button>
+                </div>
+                <div class="text-xs text-gray-400 font-mono">{{ metric.key }}</div>
+              </div>
+            }
+          </div>
+
+          <!-- All Metrics List -->
+          @if (metrics) {
+            <div class="card-axis p-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">All Available Metrics</h3>
+              <div class="max-h-96 overflow-auto">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                  @for (metricName of metrics.names; track metricName) {
+                    <button (click)="loadMetricDetail(metricName)"
+                      class="text-left px-3 py-2 rounded border border-gray-200 hover:border-axis-burgundy hover:bg-axis-burgundy/5 transition-colors">
+                      <span class="text-xs font-mono text-gray-600">{{ metricName }}</span>
+                    </button>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Configuration Tab -->
+      @if (activeTab === 'config') {
+        <div class="space-y-6">
+          <div class="card-axis p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Actuator Endpoints</h3>
+            <p class="text-gray-600 mb-6">Available Spring Boot Actuator endpoints for monitoring and management</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="border border-gray-200 rounded-lg p-4 hover:border-axis-burgundy transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-semibold text-gray-900">/actuator/health</h4>
+                  <span class="badge-success">Active</span>
+                </div>
+                <p class="text-sm text-gray-600">Application health information</p>
+              </div>
+
+              <div class="border border-gray-200 rounded-lg p-4 hover:border-axis-burgundy transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-semibold text-gray-900">/actuator/info</h4>
+                  <span class="badge-success">Active</span>
+                </div>
+                <p class="text-sm text-gray-600">Application information</p>
+              </div>
+
+              <div class="border border-gray-200 rounded-lg p-4 hover:border-axis-burgundy transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-semibold text-gray-900">/actuator/metrics</h4>
+                  <span class="badge-success">Active</span>
+                </div>
+                <p class="text-sm text-gray-600">Application metrics</p>
+              </div>
+
+              <div class="border border-gray-200 rounded-lg p-4 hover:border-axis-burgundy transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-semibold text-gray-900">/actuator/env</h4>
+                  <span class="badge-success">Active</span>
+                </div>
+                <p class="text-sm text-gray-600">Environment properties</p>
+              </div>
+
+              <div class="border border-gray-200 rounded-lg p-4 hover:border-axis-burgundy transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-semibold text-gray-900">/actuator/loggers</h4>
+                  <span class="badge-success">Active</span>
+                </div>
+                <p class="text-sm text-gray-600">Logger configuration</p>
+              </div>
+
+              <div class="border border-gray-200 rounded-lg p-4 hover:border-axis-burgundy transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-semibold text-gray-900">/actuator/caches</h4>
+                  <span class="badge-success">Active</span>
+                </div>
+                <p class="text-sm text-gray-600">Cache statistics</p>
+              </div>
+
+              <div class="border border-gray-200 rounded-lg p-4 hover:border-axis-burgundy transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-semibold text-gray-900">/actuator/circuitbreakers</h4>
+                  <span class="badge-success">Active</span>
+                </div>
+                <p class="text-sm text-gray-600">Circuit breaker status</p>
+              </div>
+
+              <div class="border border-gray-200 rounded-lg p-4 hover:border-axis-burgundy transition-colors">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-semibold text-gray-900">/actuator/threaddump</h4>
+                  <span class="badge-success">Active</span>
+                </div>
+                <p class="text-sm text-gray-600">Thread dump</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- LLM Configuration -->
+          <div class="card-axis p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">LLM Configuration</h3>
+            <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-4">
+              <div class="flex items-center gap-3">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p class="text-green-800 font-semibold">OpenAI GPT Active</p>
+                  <p class="text-green-700 text-sm">System is using OpenAI GPT-4 for AI processing</p>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-gray-500 text-sm">Active Provider</label>
+                <p class="text-gray-900 font-medium">OpenAI</p>
+              </div>
+              <div>
+                <label class="text-gray-500 text-sm">Model</label>
+                <p class="text-gray-900 font-medium">gpt-4o-mini</p>
+              </div>
+              <div>
+                <label class="text-gray-500 text-sm">Status</label>
+                <span class="badge-success">Connected</span>
+              </div>
+              <div>
+                <label class="text-gray-500 text-sm">Temperature</label>
+                <p class="text-gray-900 font-medium">0.3</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
     }
   </div>
+</div>
 
-  <!-- Add URL Modal -->
-  @if (showAddUrlModal) {
-    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="card-axis w-full max-w-md">
-        <div class="p-6 border-b border-gray-200 bg-axis-burgundy text-white rounded-t-2xl">
-          <div class="flex items-center justify-between">
-            <h2 class="text-xl font-bold">Add URL to Whitelist</h2>
-            <button (click)="closeAddUrlModal()" class="text-white/70 hover:text-white transition-colors">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+<!-- Metric Detail Modal -->
+@if (selectedMetric && metricValue) {
+  <div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" (click)="closeMetricDetail()">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden" (click)="$event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-axis-burgundy to-axis-maroon px-6 py-4 flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-bold text-white">Metric Details</h2>
+          <p class="text-white/80 text-sm font-mono">{{ selectedMetric }}</p>
+        </div>
+        <button (click)="closeMetricDetail()" class="text-white/80 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+        <div class="space-y-6">
+          <!-- Measurements -->
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">Measurements</h3>
+            <div class="grid grid-cols-2 gap-4">
+              @for (measurement of metricValue.measurements; track measurement.statistic) {
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <label class="text-gray-500 text-sm">{{ measurement.statistic }}</label>
+                  <p class="text-2xl font-bold text-gray-900">{{ measurement.value }}</p>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Available Tags -->
+          @if (metricValue.availableTags && metricValue.availableTags.length > 0) {
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900 mb-3">Available Tags</h3>
+              @for (tag of metricValue.availableTags; track tag.tag) {
+                <div class="mb-4">
+                  <label class="text-gray-500 text-sm font-medium">{{ tag.tag }}</label>
+                  <div class="flex flex-wrap gap-2 mt-2">
+                    @for (value of tag.values; track value) {
+                      <span class="badge bg-gray-100 text-gray-700">{{ value }}</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Raw JSON -->
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">Raw Data</h3>
+            <div class="bg-gray-900 rounded-lg p-4">
+              <pre class="text-sm text-green-400 font-mono overflow-auto">{{ metricValue | json }}</pre>
+            </div>
           </div>
         </div>
 
-        <div class="p-6 space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">URL Pattern</label>
-            <input type="text" [(ngModel)]="newUrl.urlPattern" class="input-axis font-mono text-sm"
-              placeholder="/api/endpoint/*">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
-            <input type="text" [(ngModel)]="newUrl.description" class="input-axis"
-              placeholder="What this endpoint is for...">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Allowed Methods</label>
-            <select [(ngModel)]="newUrl.allowedMethods" class="input-axis">
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="GET,POST">GET, POST</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
-          <button (click)="closeAddUrlModal()" class="btn-secondary">Cancel</button>
-          <button (click)="addUrlToWhitelist()" class="btn-axis">Add URL</button>
+        <!-- Close Button -->
+        <div class="flex justify-end pt-4 border-t mt-6">
+          <button (click)="closeMetricDetail()" class="btn-secondary">Close</button>
         </div>
       </div>
     </div>
-  }
-</div>
+  </div>
+}
+

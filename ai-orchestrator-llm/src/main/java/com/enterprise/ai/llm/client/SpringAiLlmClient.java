@@ -3,12 +3,11 @@ package com.enterprise.ai.llm.client;
 import com.enterprise.ai.common.dto.IntentResult;
 import com.enterprise.ai.common.dto.ScenarioResult;
 import com.enterprise.ai.common.exception.LlmException;
-import com.enterprise.ai.llm.prompt.PromptTemplates;
+import com.enterprise.ai.llm.prompt.DynamicPromptBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
@@ -20,16 +19,23 @@ import java.util.*;
 /**
  * Spring AI-based LLM Client.
  * Provider-agnostic implementation - works with Ollama, OpenAI, Azure OpenAI, etc.
- *
+ * 
+ * Uses DynamicPromptBuilder to load prompts from database - NO HARDCODED prompts.
  * To switch providers, just change spring.ai.active-provider in application.yml
  */
 @Slf4j
 @Service("springAiLlmClient")
-@RequiredArgsConstructor
 public class SpringAiLlmClient implements ReactiveLlmClient {
 
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
+    private final DynamicPromptBuilder promptBuilder;
+
+    public SpringAiLlmClient(ChatClient chatClient, ObjectMapper objectMapper, DynamicPromptBuilder promptBuilder) {
+        this.chatClient = chatClient;
+        this.objectMapper = objectMapper;
+        this.promptBuilder = promptBuilder;
+    }
 
     @Override
     public Mono<IntentResult> detectIntent(String userInput, String sessionContext) {
@@ -61,7 +67,7 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
     public Flux<String> formatResponseStreaming(String scenarioCode, ScenarioResult result, String userQuery) {
         try {
             String dataJson = objectMapper.writeValueAsString(result.getData());
-            String prompt = PromptTemplates.buildResponseFormattingPrompt(scenarioCode, dataJson, userQuery);
+            String prompt = promptBuilder.buildResponseFormattingPrompt(scenarioCode, dataJson, userQuery);
 
             // Stream response token by token using Spring AI
             return chatClient.prompt()
@@ -83,7 +89,7 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
     @Retry(name = "ollama")
     private IntentResult detectIntentBlocking(String userInput, String sessionContext) {
         try {
-            String prompt = PromptTemplates.buildIntentDetectionPrompt(userInput, sessionContext);
+            String prompt = promptBuilder.buildIntentDetectionPrompt(userInput, sessionContext);
 
             // Call LLM using Spring AI (provider-agnostic)
             String response = chatClient.prompt()
@@ -102,7 +108,7 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
     @Retry(name = "ollama")
     private String generateFollowUpBlocking(String scenarioCode, List<String> missingParams) {
         try {
-            String prompt = PromptTemplates.buildFollowUpPrompt(scenarioCode, missingParams);
+            String prompt = promptBuilder.buildFollowUpPrompt(scenarioCode, missingParams);
 
             return chatClient.prompt()
                     .user(prompt)
@@ -120,7 +126,7 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
     private String formatResponseBlocking(String scenarioCode, ScenarioResult result, String userQuery) {
         try {
             String dataJson = objectMapper.writeValueAsString(result.getData());
-            String prompt = PromptTemplates.buildResponseFormattingPrompt(scenarioCode, dataJson, userQuery);
+            String prompt = promptBuilder.buildResponseFormattingPrompt(scenarioCode, dataJson, userQuery);
 
             return chatClient.prompt()
                     .user(prompt)
@@ -212,7 +218,7 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
                 .build();
     }
 
-    // ===== FALLBACK METHODS =====
+    // ===== FALLBACK METHODS ====
 
     public IntentResult detectIntentFallback(String userInput, String sessionContext, Throwable t) {
         log.warn("Fallback for detectIntent due to: {}", t.getMessage());

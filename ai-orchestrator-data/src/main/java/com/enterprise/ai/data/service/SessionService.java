@@ -36,6 +36,25 @@ public class SessionService {
     }
 
     /**
+     * Get paginated chat sessions with filters.
+     */
+    public Page<ChatSession> getSessionsWithFilters(String userId, String sessionId, int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "lastActivityAt"));
+
+        // If both filters are empty, return all
+        if ((userId == null || userId.trim().isEmpty()) &&
+            (sessionId == null || sessionId.trim().isEmpty())) {
+            return sessionRepository.findAll(pageRequest);
+        }
+
+        // Convert empty strings to null for query
+        String userIdFilter = (userId != null && !userId.trim().isEmpty()) ? userId.trim() : null;
+        String sessionIdFilter = (sessionId != null && !sessionId.trim().isEmpty()) ? sessionId.trim() : null;
+
+        return sessionRepository.findByFilters(userIdFilter, sessionIdFilter, pageRequest);
+    }
+
+    /**
      * Get session by ID.
      */
     public Optional<ChatSession> getSessionById(Long id) {

@@ -1,18 +1,21 @@
 <!-- Axis Bank Header -->
 <header class="bg-axis-burgundy text-white shadow-md">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+  <div class="px-6 lg:px-8 py-3">
     <div class="flex items-center justify-between">
-      <!-- Logo -->
+      <!-- Logo Section - Axis Bank Style -->
       <div class="flex items-center gap-3">
-        <a routerLink="/chat" class="flex items-center gap-2 hover:opacity-90 transition-opacity">
-          <svg class="h-10 w-10" viewBox="0 0 40 40" fill="currentColor">
-            <path d="M20 5 L35 35 L5 35 Z"/>
-          </svg>
-          <div>
+        <a routerLink="/chat" class="flex items-center gap-3 hover:opacity-90 transition-opacity">
+          <!-- Axis Bank Logo -->
+          <img src="Axis_Bank-Logo.wine.svg" alt="Axis Bank" class="h-12 w-auto">
+          <!-- Text -->
+          <div class="flex items-center gap-2">
             <span class="text-xl font-bold tracking-wide">AXIS BANK</span>
-            <p class="text-white/70 text-xs">AI Orchestrator</p>
           </div>
         </a>
+        <!-- AI Orchestrator Label -->
+        <div class="border-l border-white/30 pl-3 ml-2">
+          <span class="text-sm font-medium text-white/90">AI Orchestrator</span>
+        </div>
       </div>
 
       <!-- Navigation - Role Based -->
@@ -41,7 +44,7 @@
               <p class="text-xs text-white/70">{{ currentUser.role }}</p>
             </div>
           </div>
-          <button (click)="logout()" 
+          <button (click)="logout()"
             class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-colors">
             Logout
           </button>

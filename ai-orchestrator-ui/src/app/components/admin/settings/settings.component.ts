@@ -2,8 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { AdminService } from '../../../services/admin.service';
-import { UrlWhitelist, OllamaStatus } from '../../../models/admin.model';
+import { HttpClient } from '@angular/common/http';
+import { AlertService } from '../../../services/alert.service';
+import { ActuatorHealth, ActuatorInfo, ActuatorMetrics, ActuatorMetricValue, SystemInfo } from '../../../models/admin.model';
 
 @Component({
   selector: 'app-settings',
@@ -12,79 +13,180 @@ import { UrlWhitelist, OllamaStatus } from '../../../models/admin.model';
   templateUrl: './settings.component.html'
 })
 export class SettingsComponent implements OnInit {
-  ollamaStatus: OllamaStatus | null = null;
-  urlWhitelist: UrlWhitelist[] = [];
   isLoading = true;
+  activeTab: 'health' | 'info' | 'metrics' | 'config' = 'health';
 
-  showAddUrlModal = false;
-  newUrl = {
-    urlPattern: '',
-    description: '',
-    allowedMethods: 'GET'
-  };
+  // Actuator Data
+  health: ActuatorHealth | null = null;
+  info: ActuatorInfo | null = null;
+  metrics: ActuatorMetrics | null = null;
+  systemInfo: SystemInfo | null = null;
 
-  constructor(private adminService: AdminService) {}
+  // Metric Details
+  selectedMetric: string | null = null;
+  metricValue: ActuatorMetricValue | null = null;
+
+  // Common Metrics to Display
+  commonMetrics = [
+    { key: 'jvm.memory.used', label: 'JVM Memory Used', unit: 'bytes' },
+    { key: 'jvm.memory.max', label: 'JVM Memory Max', unit: 'bytes' },
+    { key: 'jvm.threads.live', label: 'Live Threads', unit: 'count' },
+    { key: 'system.cpu.usage', label: 'System CPU Usage', unit: 'percentage' },
+    { key: 'process.uptime', label: 'Process Uptime', unit: 'seconds' },
+    { key: 'hikaricp.connections.active', label: 'Active DB Connections', unit: 'count' },
+    { key: 'http.server.requests', label: 'HTTP Requests', unit: 'count' }
+  ];
+
+  metricValues: Map<string, number> = new Map();
+
+  private readonly baseUrl = 'http://localhost:8080/actuator';
+
+  constructor(
+    private http: HttpClient,
+    private alertService: AlertService
+  ) {}
 
   ngOnInit(): void {
-    this.loadSettings();
+    this.loadAllData();
   }
 
-  loadSettings(): void {
+  loadAllData(): void {
     this.isLoading = true;
-    
-    this.adminService.getOllamaStatus().subscribe(status => {
-      this.ollamaStatus = status;
+    this.loadHealth();
+    this.loadInfo();
+    this.loadMetrics();
+    this.loadCommonMetrics();
+  }
+
+  loadHealth(): void {
+    this.http.get<ActuatorHealth>(`${this.baseUrl}/health`).subscribe({
+      next: (data) => {
+        this.health = data;
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Failed to load health', error);
+        this.alertService.error('Error', 'Failed to load health status');
+        this.isLoading = false;
+      }
     });
+  }
 
-    this.adminService.getUrlWhitelist().subscribe(whitelist => {
-      this.urlWhitelist = whitelist;
-      this.isLoading = false;
+  loadInfo(): void {
+    this.http.get<ActuatorInfo>(`${this.baseUrl}/info`).subscribe({
+      next: (data) => {
+        this.info = data;
+      },
+      error: (error) => {
+        console.error('Failed to load info', error);
+      }
     });
   }
 
-  refreshScenarioCache(): void {
-    this.adminService.refreshScenarioCache().subscribe({
-      next: () => alert('Scenario cache refreshed successfully!'),
-      error: () => alert('Failed to refresh cache')
+  loadMetrics(): void {
+    this.http.get<ActuatorMetrics>(`${this.baseUrl}/metrics`).subscribe({
+      next: (data) => {
+        this.metrics = data;
+      },
+      error: (error) => {
+        console.error('Failed to load metrics', error);
+      }
     });
   }
 
-  clearAllCache(): void {
-    if (confirm('Are you sure you want to clear all caches? This may temporarily slow down the system.')) {
-      this.adminService.clearAllCache().subscribe({
-        next: () => alert('All caches cleared successfully!'),
-        error: () => alert('Failed to clear caches')
-      });
-    }
-  }
-
-  openAddUrlModal(): void {
-    this.newUrl = { urlPattern: '', description: '', allowedMethods: 'GET' };
-    this.showAddUrlModal = true;
-  }
-
-  closeAddUrlModal(): void {
-    this.showAddUrlModal = false;
-  }
-
-  addUrlToWhitelist(): void {
-    if (this.newUrl.urlPattern && this.newUrl.description) {
-      this.adminService.addUrlToWhitelist(this.newUrl).subscribe({
-        next: () => {
-          this.closeAddUrlModal();
-          this.loadSettings();
+  loadCommonMetrics(): void {
+    this.commonMetrics.forEach(metric => {
+      this.http.get<ActuatorMetricValue>(`${this.baseUrl}/metrics/${metric.key}`).subscribe({
+        next: (data) => {
+          const value = data.measurements.find(m => m.statistic === 'VALUE')?.value || 0;
+          this.metricValues.set(metric.key, value);
         },
-        error: () => alert('Failed to add URL to whitelist')
+        error: () => {
+          this.metricValues.set(metric.key, 0);
+        }
       });
+    });
+  }
+
+  loadMetricDetail(metricName: string): void {
+    this.selectedMetric = metricName;
+    this.http.get<ActuatorMetricValue>(`${this.baseUrl}/metrics/${metricName}`).subscribe({
+      next: (data) => {
+        this.metricValue = data;
+      },
+      error: (error) => {
+        console.error('Failed to load metric detail', error);
+        this.alertService.error('Error', 'Failed to load metric details');
+      }
+    });
+  }
+
+  closeMetricDetail(): void {
+    this.selectedMetric = null;
+    this.metricValue = null;
+  }
+
+  setActiveTab(tab: 'health' | 'info' | 'metrics' | 'config'): void {
+    this.activeTab = tab;
+  }
+
+  getHealthStatusColor(status: string): string {
+    switch (status?.toUpperCase()) {
+      case 'UP':
+        return 'text-green-600 bg-green-100';
+      case 'DOWN':
+        return 'text-red-600 bg-red-100';
+      case 'OUT_OF_SERVICE':
+        return 'text-orange-600 bg-orange-100';
+      case 'UNKNOWN':
+        return 'text-gray-600 bg-gray-100';
+      default:
+        return 'text-gray-600 bg-gray-100';
     }
   }
 
-  removeUrl(url: UrlWhitelist): void {
-    if (confirm(`Remove "${url.urlPattern}" from whitelist?`)) {
-      this.adminService.removeUrlFromWhitelist(url.id).subscribe({
-        next: () => this.loadSettings(),
-        error: () => alert('Failed to remove URL')
-      });
+  getHealthIcon(status: string): string {
+    switch (status?.toUpperCase()) {
+      case 'UP':
+        return '✓';
+      case 'DOWN':
+        return '✗';
+      case 'OUT_OF_SERVICE':
+        return '⚠';
+      default:
+        return '?';
     }
+  }
+
+  formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  formatUptime(seconds: number): string {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${days}d ${hours}h ${minutes}m`;
+  }
+
+  formatPercentage(value: number): string {
+    return (value * 100).toFixed(2) + '%';
+  }
+
+  getMetricValue(key: string): number {
+    return this.metricValues.get(key) || 0;
+  }
+
+  refreshAll(): void {
+    this.alertService.info('Refreshing', 'Reloading all system data...');
+    this.loadAllData();
+    setTimeout(() => {
+      this.alertService.success('Refreshed', 'System data reloaded successfully');
+    }, 1000);
   }
 }
+

@@ -1,6 +1,10 @@
 package com.enterprise.ai.api.service;
 
 import com.enterprise.ai.common.dto.IntentResult;
+import com.enterprise.ai.data.entity.AiScenario;
+import com.enterprise.ai.data.service.ConfigCacheService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -12,12 +16,17 @@ import java.util.regex.Pattern;
  * Service for validating intent detection results.
  * Implements the 3-layer protection system:
  * 1. Confidence threshold checking
- * 2. Required parameter enforcement
+ * 2. Required parameter enforcement (from DB)
  * 3. Ambiguity detection and domain sanity checks
+ * 
+ * NOTE: All required parameters are loaded from ai_scenarios table - NO HARDCODING.
  */
 @Slf4j
 @Service
 public class IntentValidationService {
+
+    private final ConfigCacheService configCacheService;
+    private final ObjectMapper objectMapper;
 
     @Value("${intent.confidence.threshold:0.75}")
     private double confidenceThreshold;
@@ -25,14 +34,7 @@ public class IntentValidationService {
     @Value("${intent.confidence.low-threshold:0.60}")
     private double lowConfidenceThreshold;
 
-    // Required parameters for each scenario
-    private static final Map<String, List<String>> REQUIRED_PARAMS = Map.of(
-            "TXN_STATUS", List.of("txnId"),
-            "FILE_STATUS", List.of("fileName"),
-            "ACCOUNT_SUMMARY", List.of("accountId")
-    );
-
-    // Ambiguity detection patterns
+    // Ambiguity detection patterns - could be moved to DB in future
     private static final Map<String, List<Pattern>> AMBIGUITY_PATTERNS = Map.of(
             "BALANCE_WITH_PENDING", List.of(
                     Pattern.compile("(?i)balance.*pending"),
@@ -44,6 +46,11 @@ public class IntentValidationService {
                     Pattern.compile("(?i)^kya\\s+status\\s+hai\\s*$")
             )
     );
+
+    public IntentValidationService(ConfigCacheService configCacheService, ObjectMapper objectMapper) {
+        this.configCacheService = configCacheService;
+        this.objectMapper = objectMapper;
+    }
 
     /**
      * Validation result containing all checks
@@ -108,7 +115,7 @@ public class IntentValidationService {
             );
         }
 
-        // Layer 2: Required parameter enforcement
+        // Layer 2: Required parameter enforcement (from DB)
         List<String> missingParams = validateRequiredParams(intent);
         if (!missingParams.isEmpty()) {
             log.info("Missing required params for {}: {}", intent.getScenario(), missingParams);
@@ -135,9 +142,11 @@ public class IntentValidationService {
 
     /**
      * Validate that all required parameters are present.
+     * Loads required parameters from database via ConfigCacheService.
      */
     private List<String> validateRequiredParams(IntentResult intent) {
-        List<String> requiredParams = REQUIRED_PARAMS.getOrDefault(intent.getScenario(), List.of());
+        // Get required params from DB
+        List<String> requiredParams = getRequiredParamsFromDb(intent.getScenario());
         List<String> missing = new ArrayList<>();
 
         // Check what LLM reported as missing
@@ -164,6 +173,36 @@ public class IntentValidationService {
     }
 
     /**
+     * Get required parameters from database for a scenario.
+     * Falls back to empty list if scenario not found.
+     */
+    private List<String> getRequiredParamsFromDb(String scenarioCode) {
+        return configCacheService.getScenarioByCode(scenarioCode)
+                .map(this::parseRequiredParams)
+                .orElseGet(() -> {
+                    log.warn("Scenario {} not found in database, no required params", scenarioCode);
+                    return List.of();
+                });
+    }
+
+    /**
+     * Parse required_params JSON array from AiScenario.
+     */
+    private List<String> parseRequiredParams(AiScenario scenario) {
+        String json = scenario.getRequiredParams();
+        if (json == null || json.isEmpty()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            log.error("Error parsing required_params for scenario {}, JSON: {}: {}", 
+                    scenario.getScenarioCode(), json, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
      * Check for domain-specific ambiguity patterns.
      */
     private Optional<ValidationResult> checkDomainAmbiguity(IntentResult intent, String userQuery) {
@@ -186,9 +225,11 @@ public class IntentValidationService {
         for (Pattern pattern : AMBIGUITY_PATTERNS.get("GENERIC_STATUS")) {
             if (pattern.matcher(query).find()) {
                 log.info("Ambiguity detected: generic status query");
+                // Get active scenarios for clarification
+                List<String> statusScenarios = getStatusRelatedScenarios();
                 return Optional.of(ValidationResult.ambiguous(
                         "What status would you like to check?",
-                        List.of("TXN_STATUS", "FILE_STATUS", "ACCOUNT_SUMMARY")
+                        statusScenarios
                 ));
             }
         }
@@ -197,15 +238,36 @@ public class IntentValidationService {
     }
 
     /**
-     * Get human-readable description of scenario.
+     * Get status-related scenarios from DB for clarification.
+     */
+    private List<String> getStatusRelatedScenarios() {
+        return configCacheService.getActiveScenarios().stream()
+                .map(AiScenario::getScenarioCode)
+                .filter(code -> code.contains("STATUS") || code.contains("SUMMARY"))
+                .limit(5)  // Limit to 5 options for user-friendliness
+                .toList();
+    }
+
+    /**
+     * Get common scenarios for clarification options (loaded from DB).
+     * Returns up to 5 most relevant scenarios based on user role access.
+     */
+    public List<String> getCommonScenarios() {
+        return configCacheService.getActiveScenarios().stream()
+                .filter(s -> !"AMBIGUOUS".equals(s.getScenarioCode()))
+                .filter(s -> !"UNKNOWN".equals(s.getScenarioCode()))
+                .map(AiScenario::getScenarioCode)
+                .limit(5)
+                .toList();
+    }
+
+    /**
+     * Get human-readable description of scenario from database.
      */
     public String getScenarioDescription(String scenario) {
-        return switch (scenario) {
-            case "TXN_STATUS" -> "transaction status";
-            case "FILE_STATUS" -> "file processing status";
-            case "ACCOUNT_SUMMARY" -> "account summary/balance";
-            default -> scenario.toLowerCase().replace("_", " ");
-        };
+        return configCacheService.getScenarioByCode(scenario)
+                .map(AiScenario::getDescription)
+                .orElse(scenario.toLowerCase().replace("_", " "));
     }
 
     /**

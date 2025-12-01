@@ -104,18 +104,25 @@ public class AdminController {
             return ResponseEntity.badRequest().build();
         }
         
+        // Handle legacy field - intentPrompt maps to llmPromptTemplate
+        String promptTemplate = form.llmPromptTemplate != null ? form.llmPromptTemplate : form.intentPrompt;
+        
         AiScenario scenario = AiScenario.builder()
                 .scenarioCode(form.scenarioCode)
                 .description(form.description)
                 .executionType(form.executionType)
                 .httpMethod(form.httpMethod)
                 .httpUrl(form.httpUrl)
+                .httpHeaders(form.httpHeaders)
                 .sqlQuery(form.sqlQuery)
                 .requestMapping(form.requestMapping)
                 .responseMapping(form.responseMapping)
+                .timeoutMs(form.timeoutMs != null ? form.timeoutMs : 5000)
+                .executorBean(form.executorBean)
                 .securityLevel(form.securityLevel)
                 .requiredParams(form.requiredParams)
-                .llmPromptTemplate(form.intentPrompt)
+                .optionalParams(form.optionalParams)
+                .llmPromptTemplate(promptTemplate)
                 .active(form.active != null ? form.active : true)
                 .promptVersion(1)
                 .build();
@@ -132,16 +139,32 @@ public class AdminController {
         
         return configCacheService.getScenarioById(id)
                 .map(scenario -> {
+                    // Handle legacy field - intentPrompt maps to llmPromptTemplate
+                    String promptTemplate = form.llmPromptTemplate != null ? form.llmPromptTemplate : form.intentPrompt;
+                    
+                    // Store old prompt in history before updating
+                    if (scenario.getLlmPromptTemplate() != null && !scenario.getLlmPromptTemplate().equals(promptTemplate)) {
+                        String history = scenario.getPromptHistory();
+                        String oldPrompt = String.format("{\"version\":%d,\"prompt\":\"%s\"}", 
+                                scenario.getPromptVersion(), 
+                                scenario.getLlmPromptTemplate().replace("\"", "\\\"").replace("\n", "\\n"));
+                        scenario.setPromptHistory(history != null ? history + "," + oldPrompt : "[" + oldPrompt + "]");
+                    }
+                    
                     scenario.setDescription(form.description);
                     scenario.setExecutionType(form.executionType);
                     scenario.setHttpMethod(form.httpMethod);
                     scenario.setHttpUrl(form.httpUrl);
+                    scenario.setHttpHeaders(form.httpHeaders);
                     scenario.setSqlQuery(form.sqlQuery);
                     scenario.setRequestMapping(form.requestMapping);
                     scenario.setResponseMapping(form.responseMapping);
+                    scenario.setTimeoutMs(form.timeoutMs != null ? form.timeoutMs : scenario.getTimeoutMs());
+                    scenario.setExecutorBean(form.executorBean);
                     scenario.setSecurityLevel(form.securityLevel);
                     scenario.setRequiredParams(form.requiredParams);
-                    scenario.setLlmPromptTemplate(form.intentPrompt);
+                    scenario.setOptionalParams(form.optionalParams);
+                    scenario.setLlmPromptTemplate(promptTemplate);
                     scenario.setActive(form.active != null ? form.active : true);
                     scenario.setPromptVersion(scenario.getPromptVersion() + 1);
                     
@@ -217,16 +240,19 @@ public class AdminController {
     // ===================== CHAT SESSIONS =====================
 
     @GetMapping("/sessions")
-    @Operation(summary = "Get chat sessions", description = "Returns paginated chat sessions")
+    @Operation(summary = "Get chat sessions", description = "Returns paginated chat sessions with optional filters")
     public ResponseEntity<Map<String, Object>> getChatSessions(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        
-        log.info("Fetching chat sessions - page: {}, size: {}", page, size);
-        
-        // Use SessionService for paginated results
-        Page<ChatSession> sessionsPage = sessionService.getSessions(page, size);
-        
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String sessionId) {
+
+        log.info("Fetching chat sessions - page: {}, size: {}, userId filter: {}, sessionId filter: {}",
+                page, size, userId, sessionId);
+
+        // Use SessionService for paginated results with filters
+        Page<ChatSession> sessionsPage = sessionService.getSessionsWithFilters(userId, sessionId, page, size);
+
         List<SessionDTO> sessionDTOs = sessionsPage.getContent().stream()
                 .map(this::toSessionDTO)
                 .toList();
@@ -316,13 +342,18 @@ public class AdminController {
         dto.executionType = scenario.getExecutionType();
         dto.httpMethod = scenario.getHttpMethod();
         dto.httpUrl = scenario.getHttpUrl();
+        dto.httpHeaders = scenario.getHttpHeaders();
         dto.sqlQuery = scenario.getSqlQuery();
         dto.requestMapping = scenario.getRequestMapping();
         dto.responseMapping = scenario.getResponseMapping();
+        dto.timeoutMs = scenario.getTimeoutMs();
+        dto.executorBean = scenario.getExecutorBean();
         dto.securityLevel = scenario.getSecurityLevel();
         dto.requiredParams = parseJsonArray(scenario.getRequiredParams());
-        dto.intentPrompt = scenario.getLlmPromptTemplate();
+        dto.optionalParams = parseJsonArray(scenario.getOptionalParams());
+        dto.llmPromptTemplate = scenario.getLlmPromptTemplate();
         dto.promptVersion = scenario.getPromptVersion();
+        dto.promptHistory = scenario.getPromptHistory();
         dto.active = scenario.getActive();
         return dto;
     }
@@ -433,14 +464,18 @@ public class AdminController {
         public String executionType;
         public String httpMethod;
         public String httpUrl;
+        public String httpHeaders;
         public String sqlQuery;
         public String requestMapping;
         public String responseMapping;
+        public Integer timeoutMs;
+        public String executorBean;
         public String securityLevel;
         public List<String> requiredParams;
-        public String intentPrompt;
-        public String responseTemplate;
+        public List<String> optionalParams;
+        public String llmPromptTemplate;
         public Integer promptVersion;
+        public String promptHistory;
         public Boolean active;
     }
 
@@ -451,13 +486,18 @@ public class AdminController {
         public String executionType;
         public String httpMethod;
         public String httpUrl;
+        public String httpHeaders;
         public String sqlQuery;
         public String requestMapping;
         public String responseMapping;
+        public Integer timeoutMs;
+        public String executorBean;
         public String securityLevel;
         public String requiredParams;
+        public String optionalParams;
+        public String llmPromptTemplate;
+        // Legacy field - maps to llmPromptTemplate for backward compatibility
         public String intentPrompt;
-        public String responseTemplate;
         public Boolean active;
     }
 
