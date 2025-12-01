@@ -41,7 +41,7 @@ import java.util.regex.Pattern;
  * - Configurable timeout
  */
 @Slf4j
-//@Component
+@Component
 public class HttpCallExecutor implements DynamicExecutor {
 
     private static final long DEFAULT_TIMEOUT_MS = 5000;

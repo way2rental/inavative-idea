@@ -3,6 +3,7 @@ package com.enterprise.ai.core.scenario;
 import com.enterprise.ai.common.dto.ScenarioRequest;
 import com.enterprise.ai.common.dto.ScenarioResult;
 import com.enterprise.ai.common.enums.ExecutionType;
+import com.enterprise.ai.core.mapper.ResponseMappingService;
 import com.enterprise.ai.core.security.ReadOnlyEnforcementService;
 import com.enterprise.ai.data.entity.AiScenario;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -28,7 +29,7 @@ import java.util.*;
  * - Configurable timeout
  */
 @Slf4j
-//@Component
+@Component
 @RequiredArgsConstructor
 public class QueryExecutor implements DynamicExecutor {
 
@@ -38,6 +39,7 @@ public class QueryExecutor implements DynamicExecutor {
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final ReadOnlyEnforcementService readOnlyEnforcement;
     private final ObjectMapper objectMapper;
+    private final ResponseMappingService responseMappingService;
 
     @Override
     public boolean supports(String executionType) {
@@ -69,7 +71,17 @@ public class QueryExecutor implements DynamicExecutor {
                 rawResults = rawResults.subList(0, MAX_RESULT_SIZE);
             }
 
-            Map<String, Object> shapedResult = applyResponseMapping(rawResults, scenario);
+            // Use ResponseMappingService to map DB results to AI-friendly structured JSON
+            // This applies JSON Path mapping and masking per ENTERPRISE_AI_RESPONSE_MAPPING_AND_SSE_SPEC.md
+            Map<String, Object> aiReadyData;
+            if (responseMappingService.hasMappings(scenarioCode)) {
+                log.info("Using JsonPathResponseMapper for scenario: {}", scenarioCode);
+                aiReadyData = responseMappingService.mapDbResultToAiRequest(scenarioCode, rawResults);
+            } else {
+                log.warn("No response mappings found for scenario: {}, using legacy mapping", scenarioCode);
+                // Fallback to legacy mapping if no mappings configured
+                aiReadyData = applyResponseMapping(rawResults, scenario);
+            }
 
             long executionTime = System.currentTimeMillis() - startTime;
             log.info("DB_QUERY for {} completed in {}ms, {} rows returned", 
@@ -78,7 +90,7 @@ public class QueryExecutor implements DynamicExecutor {
             return ScenarioResult.builder()
                     .scenario(scenarioCode)
                     .success(true)
-                    .data(shapedResult)
+                    .data(aiReadyData)
                     .build();
 
         } catch (Exception e) {
