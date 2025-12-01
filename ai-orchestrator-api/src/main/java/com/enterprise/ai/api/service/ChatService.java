@@ -89,7 +89,7 @@ public class ChatService {
                 return handleValidationFailure(validation, intent, request, sessionId, executionId);
             }
 
-            // Check authorization - deny if user is NOT authorized
+            // Check authorization
             List<String> userRoles = getCurrentUserRoles();
             if (!rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
                 String response = "You don't have permission to access this information.";

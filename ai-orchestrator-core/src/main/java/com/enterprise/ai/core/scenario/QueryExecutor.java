@@ -69,7 +69,6 @@ public class QueryExecutor implements DynamicExecutor {
             readOnlyEnforcement.validateSqlQuery(sqlQuery);
 
             // MANDATORY: Apply Row-Level Security filters
-            // This ensures users can only see their own data (owner_user_id + org_id filters)
             String securedSql = rowLevelSecurityService.applyRowLevelSecurity(
                     sqlQuery,
                     RequestContextHolder.getContext()

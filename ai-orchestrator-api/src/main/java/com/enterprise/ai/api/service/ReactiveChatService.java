@@ -239,7 +239,7 @@ public class ReactiveChatService {
                                         Flux.just("[PROGRESS]🔐 Verifying permissions...\n"),
 
                                         Flux.defer(() -> {
-                                            // Authorization check - deny if NOT authorized
+                                            // Authorization check
                                             if (!rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
                                                 log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
 
@@ -429,7 +429,7 @@ public class ReactiveChatService {
             return handleValidationFailure(validation, intent, request, sessionId, executionId);
         }
 
-        // Authorization check - deny if user is NOT authorized
+        // Authorization check
         List<String> userRoles = getCurrentUserRoles();
         if (!rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
             String response = "You don't have permission to access this information.";
