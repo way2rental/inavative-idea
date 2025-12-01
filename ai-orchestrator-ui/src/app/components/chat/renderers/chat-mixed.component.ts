@@ -15,12 +15,12 @@ import { StructuredResponse, MixedPayload, TablePayload } from '../../../models/
       @if (response.title) {
         <h4 class="text-sm font-semibold text-gray-800 mb-2">{{ response.title }}</h4>
       }
-      
+
       <!-- Text section -->
       @if (textContent) {
         <p class="text-sm text-gray-700 leading-relaxed mb-3">{{ textContent }}</p>
       }
-      
+
       <!-- Table section -->
       @if (table) {
         <div class="overflow-x-auto rounded-xl border border-gray-200">
@@ -48,7 +48,7 @@ import { StructuredResponse, MixedPayload, TablePayload } from '../../../models/
           </table>
         </div>
       }
-      
+
       @if (response.footer) {
         <p class="text-xs text-gray-500 mt-2 italic">{{ response.footer }}</p>
       }
@@ -67,6 +67,14 @@ export class ChatMixedComponent {
   }
 
   get table(): TablePayload | null {
-    return this.payload?.table || null;
+    const tableData = this.payload?.table || null;
+    // Support both 'columns' and 'headers' for backward compatibility
+    if (tableData && !(tableData as any).columns && (tableData as any).headers) {
+      return {
+        columns: (tableData as any).headers,
+        rows: tableData.rows || []
+      };
+    }
+    return tableData;
   }
 }

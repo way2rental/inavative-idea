@@ -226,6 +226,18 @@ public class SsePublisherService {
     }
 
     /**
+     * Create a response event for structured JSON payload.
+     * This is used for the final formatted response from the LLM.
+     * Per spec: {"event": "response", "data": "{\"type\":\"TABLE\",...}"}
+     */
+    public ServerSentEvent<String> createResponseEvent(String jsonData) {
+        return ServerSentEvent.<String>builder()
+                .event("response")
+                .data(jsonData)
+                .build();
+    }
+
+    /**
      * Create a data event with structured response.
      */
     public ServerSentEvent<String> createDataEvent(Map<String, Object> data) {

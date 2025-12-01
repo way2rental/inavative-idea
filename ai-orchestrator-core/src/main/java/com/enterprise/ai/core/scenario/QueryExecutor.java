@@ -38,7 +38,7 @@ import java.util.*;
  * - Configurable timeout
  */
 @Slf4j
-//@Component
+@Component
 @RequiredArgsConstructor
 public class QueryExecutor implements DynamicExecutor {
 

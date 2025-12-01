@@ -186,12 +186,12 @@ public class ReactiveChatService {
         // Now build the response flux with detailed progress indicators
         return Flux.concat(
                 // Stage 1: Initial analysis
-                Flux.just("🔍 Analyzing your request...\n"),
+                Flux.just("[PROGRESS]🔍 Analyzing your request...\n"),
 
                 intentMono.flatMapMany(intent -> {
                     // Stage 2: Understanding complete
                     return Flux.concat(
-                            Flux.just("✅ Request understood - " + intent.getScenario().replace("_", " ").toLowerCase() + "\n"),
+                            Flux.just("[PROGRESS]✅ Request understood - " + intent.getScenario().replace("_", " ").toLowerCase() + "\n"),
 
                             Flux.defer(() -> {
                                 // Validate intent
@@ -219,7 +219,7 @@ public class ReactiveChatService {
 
                                 // Stage 3: Checking permissions
                                 return Flux.concat(
-                                        Flux.just("🔐 Verifying permissions...\n"),
+                                        Flux.just("[PROGRESS]🔐 Verifying permissions...\n"),
 
                                         Flux.defer(() -> {
                                             // Authorization check (roles already validated above)
@@ -248,8 +248,8 @@ public class ReactiveChatService {
                                             log.debug("Executing scenario reactively: {}", intent.getScenario());
 
                                             return Flux.concat(
-                                                    Flux.just("✅ Access granted\n"),
-                                                    Flux.just("📊 Fetching your data...\n"),
+                                                    Flux.just("[PROGRESS]✅ Access granted\n"),
+                                                    Flux.just("[PROGRESS]📊 Fetching your data...\n"),
                                                     scenarioRouter.routeReactive(scenarioRequest)
                                                             .timeout(Duration.ofMillis(maxDbTimeoutMs))
                                                             .doOnSuccess(result -> {
@@ -274,11 +274,14 @@ public class ReactiveChatService {
                                                                 final StringBuilder responseCollector = new StringBuilder();
 
                                                                 return Flux.concat(
-                                                                        Flux.just("✅ Data retrieved\n"),
-                                                                        Flux.just("📝 Preparing your response...\n"),
-                                                                        Flux.just("\n"),
+                                                                        // Status/progress messages
+                                                                        Flux.just("[PROGRESS]✅ Data retrieved\n"),
+                                                                        Flux.just("[PROGRESS]📝 Preparing your response...\n"),
+
+                                                                        // Final structured response with [RESPONSE] marker
                                                                         llmClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery())
-                                                                                .doOnNext(chunk -> responseCollector.append(chunk))
+                                                                                .map(jsonResponse -> "[RESPONSE]" + jsonResponse)
+                                                                                .doOnNext(chunk -> responseCollector.append(chunk.replace("[RESPONSE]", "")))
                                                                                 .doOnComplete(() -> {
                                                                                     log.debug("Response streaming completed");
                                                                                     // Save the complete assistant response

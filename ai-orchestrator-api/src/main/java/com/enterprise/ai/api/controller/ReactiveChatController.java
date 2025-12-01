@@ -104,9 +104,25 @@ public class ReactiveChatController {
                 // 1. ALWAYS emit start event first
                 Flux.just(ssePublisherService.createStartEvent("Processing your request...")),
                 
-                // 2. Process the chat with streaming, wrapped in message events
+                // 2. Process the chat with streaming, with intelligent event type detection
                 reactiveChatService.processChatStreaming(request)
-                        .map(chunk -> ssePublisherService.createMessageEvent(chunk))
+                        .map(chunk -> {
+                            // Log chunk preview for debugging
+                            String preview = chunk.length() > 100 ? chunk.substring(0, 100) + "..." : chunk;
+                            log.debug("Processing chunk (preview): {}", preview);
+
+                            // Detect event type based on marker prefix
+                            if (chunk.startsWith("[PROGRESS]")) {
+                                log.debug("Detected PROGRESS event");
+                                return ssePublisherService.createProgressEvent(chunk.substring(10)); // Remove marker
+                            } else if (chunk.startsWith("[RESPONSE]")) {
+                                log.debug("Detected RESPONSE event, length: {}", chunk.length() - 10);
+                                return ssePublisherService.createResponseEvent(chunk.substring(10)); // Remove marker
+                            } else {
+                                log.debug("Detected MESSAGE event (fallback)");
+                                return ssePublisherService.createMessageEvent(chunk);
+                            }
+                        })
                         .doOnSubscribe(s -> log.debug("Streaming started for user: {}", request.getUserId()))
                         .doOnComplete(() -> {
                             log.debug("Streaming completed for user: {}", request.getUserId());

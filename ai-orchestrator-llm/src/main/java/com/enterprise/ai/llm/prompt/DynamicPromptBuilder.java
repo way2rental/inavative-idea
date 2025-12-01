@@ -51,12 +51,27 @@ public class DynamicPromptBuilder {
         prompt.append("User message: \"").append(userInput).append("\"\n\n");
         
         prompt.append("Analyze the user's intent and return JSON with:\n");
-        prompt.append("- scenario: The detected scenario code\n");
+        prompt.append("- scenario: The detected scenario code (or UNKNOWN if no match)\n");
         prompt.append("- confidence: Confidence score (0.0 to 1.0)\n");
         prompt.append("- params: Extracted parameters as key-value pairs\n");
         prompt.append("- missingParams: Required parameters that are missing\n");
-        prompt.append("- reasoning: Brief explanation\n");
-        
+        prompt.append("- reasoning: Brief explanation\n\n");
+
+        prompt.append("IMPORTANT:\n");
+        prompt.append("- Return ONLY valid JSON, no markdown or extra text\n");
+        prompt.append("- Match user input to the closest scenario from the list above\n");
+        prompt.append("- Extract any parameter values mentioned by the user\n");
+        prompt.append("- If no scenario matches well, use UNKNOWN with low confidence\n\n");
+
+        prompt.append("Example JSON format:\n");
+        prompt.append("{\n");
+        prompt.append("  \"scenario\": \"ACCOUNT_BALANCE\",\n");
+        prompt.append("  \"confidence\": 0.95,\n");
+        prompt.append("  \"params\": {\"accountId\": \"123456\"},\n");
+        prompt.append("  \"missingParams\": [],\n");
+        prompt.append("  \"reasoning\": \"User wants to check account balance\"\n");
+        prompt.append("}\n");
+
         return prompt.toString();
     }
 
@@ -83,16 +98,25 @@ public class DynamicPromptBuilder {
      */
     private String buildScenarioContext() {
         StringBuilder context = new StringBuilder();
-        for (AiScenario scenario : configCacheService.getActiveScenarios()) {
-            context.append("- ").append(scenario.getScenarioCode()).append(": ")
-                    .append(scenario.getDescription() != null ? scenario.getDescription() : "No description")
-                    .append("\n");
-            
+        List<AiScenario> scenarios = configCacheService.getActiveScenarios();
+
+        if (scenarios.isEmpty()) {
+            log.warn("No active scenarios found in configuration!");
+            return "No scenarios configured.\n";
+        }
+
+        for (AiScenario scenario : scenarios) {
+            context.append(scenario.getScenarioCode()).append(": ")
+                    .append(scenario.getDescription() != null ? scenario.getDescription() : "No description");
+
             // Add required params info
             if (scenario.getRequiredParams() != null && !scenario.getRequiredParams().isEmpty()) {
-                context.append("  Required params: ").append(scenario.getRequiredParams()).append("\n");
+                context.append(" (requires: ").append(scenario.getRequiredParams()).append(")");
             }
+            context.append("\n");
         }
+
+        log.debug("Built scenario context with {} scenarios", scenarios.size());
         return context.toString();
     }
 
@@ -143,8 +167,73 @@ public class DynamicPromptBuilder {
         prompt.append("Scenario: ").append(scenarioCode).append("\n");
         prompt.append("Missing parameters: ").append(String.join(", ", missingParams)).append("\n\n");
         prompt.append("Generate a SHORT, FRIENDLY question (under 25 words) to ask for the missing information.");
-        
+        appendStatic(prompt);
         return prompt.toString();
+    }
+
+    private void appendStatic(StringBuilder prompt) {
+        prompt.append("""
+                
+                You are a response formatting engine for a corporate banking system.
+                
+                You MUST return ONLY valid JSON.
+                You MUST return exactly ONE object.
+                You MUST choose exactly ONE type from this list:
+                
+                TEXT, BULLET, TABLE, KV, MIXED, FOLLOW_UP, ERROR
+                
+                Never return:
+                - Markdown
+                - Free-form text
+                - Explanations outside JSON
+                - Partial JSON
+                - Multiple JSON objects
+                
+                Response Schema (STRICT):
+                
+                {
+                  "type": "TEXT | BULLET | TABLE | KV | MIXED | FOLLOW_UP | ERROR",
+                  "title": "Optional",
+                  "confidence": 1.0,
+                  "payload": {},
+                  "footer": "Optional"
+                }
+                
+                Rules:
+                - If data is single info → use KV
+                - If data is bulk rows → use TABLE
+                - If user is missing required params → use FOLLOW_UP
+                - If user is not authorized → use ERROR
+                - If intent is unknown → use ERROR with suggestions
+                - If answer is plain explanation → use TEXT
+                - If answer is list of options → use BULLET
+                - If answer needs text + table → use MIXED
+                
+                FOR TABLE TYPE - CRITICAL:
+                The payload MUST have this EXACT structure (use "columns" NOT "headers"):
+                {
+                  "type": "TABLE",
+                  "title": "Transaction History for ACC001",
+                  "confidence": 1.0,
+                  "payload": {
+                    "columns": ["Date", "Description", "Amount"],
+                    "rows": [
+                      ["2024-01-15", "Salary", "5000.00"],
+                      ["2024-01-14", "Shopping", "-150.00"]
+                    ]
+                  }
+                }
+                
+                CRITICAL FIELD NAMES:
+                - Use "columns" (NOT "headers") for the column headers array
+                - Use "rows" for the data rows (array of arrays)
+                - Each row must match the column count and order
+                - Extract column names from the data object keys
+                - Convert each data object into a row array matching the column order
+                
+                Return ONLY the JSON. No markdown. No commentary. No extra text.
+                
+                """);
     }
 
     /**
@@ -168,7 +257,7 @@ public class DynamicPromptBuilder {
         prompt.append("Raw data: ").append(dataJson).append("\n\n");
         prompt.append("Format this data into a natural, helpful response.\n");
         prompt.append("Keep it under 150 words. Use emojis appropriately.");
-        
+        appendStatic(prompt);
         return prompt.toString();
     }
 

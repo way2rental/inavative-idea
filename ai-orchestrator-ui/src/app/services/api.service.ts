@@ -76,31 +76,35 @@ export class ApiService {
         // Process complete SSE messages in buffer
         // SSE format: event: <type>\ndata: <content>\n\n
         const messages = buffer.split('\n\n');
-        
+
         // Keep last incomplete message in buffer
         buffer = messages.pop() || '';
 
         for (const message of messages) {
           if (!message.trim()) continue;
-          
+
           const lines = message.split('\n');
           let eventType = 'message'; // Default event type
-          let eventData = '';
-          
+          let dataLines: string[] = []; // Collect all data lines for multi-line payloads
+
           for (const line of lines) {
             if (line.startsWith('event:')) {
               eventType = line.substring(6).trim();
             } else if (line.startsWith('data:')) {
               // Handle both "data: " (with space) and "data:" (without space)
-              eventData = line.startsWith('data: ')
+              const dataContent = line.startsWith('data: ')
                 ? line.substring(6)
                 : line.substring(5);
+              dataLines.push(dataContent);
             }
           }
-          
+
+          // Join all data lines (handles multi-line JSON)
+          const eventData = dataLines.join('\n');
+
           // Emit parsed SSE event
           subject.next({ event: eventType, data: eventData });
-          
+
           // CHUNK 3: Mark stream for completion on 'done' event
           // Note: We don't return immediately to ensure all messages in buffer are processed
           if (eventType === 'done') {
@@ -109,7 +113,7 @@ export class ApiService {
               const remainingLines = buffer.split('\n');
               let remainingEventType = 'message';
               let remainingEventData = '';
-              
+
               for (const line of remainingLines) {
                 if (line.startsWith('event:')) {
                   remainingEventType = line.substring(6).trim();
@@ -119,7 +123,7 @@ export class ApiService {
                     : line.substring(5);
                 }
               }
-              
+
               if (remainingEventData || remainingEventType !== 'message') {
                 subject.next({ event: remainingEventType, data: remainingEventData });
               }
@@ -134,18 +138,20 @@ export class ApiService {
       if (buffer.trim()) {
         const lines = buffer.split('\n');
         let eventType = 'message';
-        let eventData = '';
-        
+        let dataLines: string[] = [];
+
         for (const line of lines) {
           if (line.startsWith('event:')) {
             eventType = line.substring(6).trim();
           } else if (line.startsWith('data:')) {
-            eventData = line.startsWith('data: ')
+            const dataContent = line.startsWith('data: ')
               ? line.substring(6)
               : line.substring(5);
+            dataLines.push(dataContent);
           }
         }
-        
+
+        const eventData = dataLines.join('\n');
         if (eventData || eventType !== 'message') {
           subject.next({ event: eventType, data: eventData });
         }

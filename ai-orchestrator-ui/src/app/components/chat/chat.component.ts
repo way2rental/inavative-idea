@@ -164,14 +164,23 @@ export class ChatComponent implements AfterViewChecked {
             // STRUCTURED_CHAT_RESPONSE_UPGRADE: Final structured JSON response (Phase 2)
             // This is the single JSON chunk containing the complete structured response
             try {
+              console.log('[SSE] Received response event, chunk length:', chunk.length);
+              console.log('[SSE] Response chunk preview:', chunk.substring(0, 100));
+
               const structuredResponse: StructuredResponse = JSON.parse(chunk);
+              console.log('[SSE] Parsed structured response, type:', structuredResponse.type);
+
               assistantMessage.structured = structuredResponse;
               assistantMessage.content = undefined; // Clear content, use structured
               assistantMessage.statusMessages = [];
               assistantMessage.isLoading = false;
+              assistantMessage.isStreaming = false;
               isCollectingFinalResponse = true;
+
+              console.log('[SSE] Message updated with structured response');
             } catch (e) {
-              console.error('Failed to parse structured response:', e);
+              console.error('[SSE] Failed to parse structured response:', e);
+              console.error('[SSE] Raw chunk:', chunk);
               // Fallback to text content
               assistantMessage.content = chunk;
               assistantMessage.isLoading = false;
@@ -191,12 +200,30 @@ export class ChatComponent implements AfterViewChecked {
                 assistantMessage.content = '';
               }
             } else {
-              // This is part of the final response (legacy unstructured)
+              // This is part of the final response
               isCollectingFinalResponse = true;
               assistantMessage.statusMessages = [];
               finalResponseBuffer += chunk;
-              assistantMessage.content = finalResponseBuffer;
-              assistantMessage.isLoading = false;
+
+              // Try to parse as structured JSON if it looks like complete JSON
+              const trimmedBuffer = finalResponseBuffer.trim();
+              if (trimmedBuffer.startsWith('{') && trimmedBuffer.endsWith('}')) {
+                try {
+                  const structuredResponse: StructuredResponse = JSON.parse(trimmedBuffer);
+                  // Successfully parsed as JSON - treat as structured response
+                  assistantMessage.structured = structuredResponse;
+                  assistantMessage.content = undefined;
+                  assistantMessage.isLoading = false;
+                } catch (e) {
+                  // Not valid JSON yet or malformed, keep accumulating as text
+                  assistantMessage.content = finalResponseBuffer;
+                  assistantMessage.isLoading = false;
+                }
+              } else {
+                // Not JSON format, keep as plain text
+                assistantMessage.content = finalResponseBuffer;
+                assistantMessage.isLoading = false;
+              }
             }
             break;
 
@@ -293,6 +320,16 @@ export class ChatComponent implements AfterViewChecked {
       },
       complete: () => {
         // Ensure UI is never left in loading state
+        console.log('[SSE] Stream complete callback fired');
+        console.log('[SSE] Final message state:', {
+          hasStructured: !!assistantMessage.structured,
+          structuredType: assistantMessage.structured?.type,
+          hasContent: !!assistantMessage.content,
+          contentPreview: assistantMessage.content?.substring(0, 50),
+          isLoading: assistantMessage.isLoading,
+          isStreaming: assistantMessage.isStreaming
+        });
+
         this.isLoading = false;
         this.isStreaming = false;
         assistantMessage.isLoading = false;
@@ -301,7 +338,7 @@ export class ChatComponent implements AfterViewChecked {
 
         // If we never received a 'done' event, log warning
         if (!hasReceivedDone) {
-          console.warn('Stream completed without receiving done event');
+          console.warn('[SSE] Stream completed without receiving done event');
         }
       }
     });

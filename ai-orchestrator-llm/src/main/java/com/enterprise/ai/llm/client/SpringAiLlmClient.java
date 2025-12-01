@@ -67,17 +67,43 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
     public Flux<String> formatResponseStreaming(String scenarioCode, ScenarioResult result, String userQuery) {
         try {
             String dataJson = objectMapper.writeValueAsString(result.getData());
-            String prompt = promptBuilder.buildResponseFormattingPrompt(scenarioCode, dataJson, userQuery);
+            log.debug("Formatting response for scenario: {}, data length: {}", scenarioCode, dataJson.length());
 
-            // Stream response token by token using Spring AI
+            String prompt = promptBuilder.buildResponseFormattingPrompt(scenarioCode, dataJson, userQuery);
+            log.debug("Prompt length: {}, prompt preview: {}", prompt.length(),
+                    prompt.length() > 200 ? prompt.substring(0, 200) : prompt);
+
+            // Collect the complete response first, then emit as single message
+            // This ensures the frontend receives a complete JSON payload instead of fragments
             return chatClient.prompt()
                     .user(prompt)
                     .stream()
                     .content()
-                    // Buffer tokens for smoother streaming
-                    .bufferTimeout(5, java.time.Duration.ofMillis(100))
-                    .map(tokens -> String.join("", tokens))
-                    .filter(chunk -> !chunk.isEmpty());
+                    .doOnNext(token -> log.trace("LLM token received: {}", token))
+                    .collectList()
+                    .doOnNext(tokens -> log.debug("Collected {} tokens from LLM", tokens.size()))
+                    .map(tokens -> {
+                        String joined = String.join("", tokens);
+                        log.debug("Joined tokens, total length: {}", joined.length());
+                        return joined;
+                    })
+                    .flatMapMany(completeResponse -> {
+                        log.debug("Complete formatted response (length: {}): {}",
+                                completeResponse.length(),
+                                completeResponse.length() > 200 ? completeResponse.substring(0, 200) + "..." : completeResponse);
+
+                        if (completeResponse.isEmpty() || completeResponse.trim().isEmpty()) {
+                            log.error("LLM returned empty response! Using fallback.");
+                            return Flux.just(formatResponseFallback(scenarioCode, result, userQuery,
+                                    new RuntimeException("Empty LLM response")));
+                        }
+
+                        return Flux.just(completeResponse);
+                    })
+                    .onErrorResume(e -> {
+                        log.error("Error in streaming format: {}", e.getMessage(), e);
+                        return Flux.just(formatResponseFallback(scenarioCode, result, userQuery, e));
+                    });
 
         } catch (Exception e) {
             log.error("Error in streaming format: {}", e.getMessage(), e);
@@ -91,11 +117,15 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
         try {
             String prompt = promptBuilder.buildIntentDetectionPrompt(userInput, sessionContext);
 
+            log.debug("Intent detection prompt:\n{}", prompt);
+
             // Call LLM using Spring AI (provider-agnostic)
             String response = chatClient.prompt()
                     .user(prompt)
                     .call()
                     .content();
+
+            log.debug("LLM raw response:\n{}", response);
 
             return parseIntentResult(response);
         } catch (Exception e) {
@@ -143,16 +173,21 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
 
     private IntentResult parseIntentResult(String response) {
         try {
+            log.debug("Parsing intent result from response (length: {})", response != null ? response.length() : 0);
+
             String jsonPart = extractJson(response);
             if (jsonPart == null || jsonPart.isEmpty()) {
-                log.warn("No JSON found in LLM response, returning UNKNOWN intent");
+                log.warn("No JSON found in LLM response, returning UNKNOWN intent. Response was: {}", response);
                 return createUnknownIntent();
             }
+
+            log.debug("Extracted JSON: {}", jsonPart);
 
             // Fix: Remove invalid escape sequences (like \_ )
             jsonPart = jsonPart.replaceAll("\\\\_", "_");
 
             JsonNode node = objectMapper.readTree(jsonPart);
+            log.debug("Parsed JSON node: {}", node);
 
             List<String> missingParams = new ArrayList<>();
             if (node.has("missingParams") && node.get("missingParams").isArray()) {

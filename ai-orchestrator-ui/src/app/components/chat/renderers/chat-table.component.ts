@@ -53,7 +53,8 @@ export class ChatTableComponent {
   }
 
   get columns(): string[] {
-    return this.payload?.columns || [];
+    // Support both 'columns' and 'headers' for backward compatibility
+    return this.payload?.columns || (this.payload as any)?.headers || [];
   }
 
   get rows(): string[][] {
