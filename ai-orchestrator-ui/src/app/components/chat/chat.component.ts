@@ -6,6 +6,9 @@ import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ChatMessage, ChatRequest, ChatResponse } from '../../models/chat.model';
 
+// CHUNK 3: Status message emoji patterns for intermediate status detection
+const STATUS_EMOJI_PATTERNS = ['🔍', '📊', '📈', '💾', '✅', '❌', '⚠️', '🔐'];
+
 @Component({
   selector: 'app-chat',
   standalone: true,
@@ -111,48 +114,114 @@ export class ChatComponent implements AfterViewChecked {
 
     let isCollectingFinalResponse = false;
     let finalResponseBuffer = '';
+    let hasReceivedStart = false;
+    let hasReceivedDone = false;
 
-    // Use regular chat as EventSource may not be available
+    // CHUNK 3 SSE STABILITY: Handle proper event types
     this.apiService.chatStream(request).subscribe({
-      next: (chunk: string) => {
-        // Check if this is a status message (starts with emoji)
-        const statusPatterns = ['🔍', '📊', '📈', '💾', '✅', '❌', '⚠️'];
-        const isStatusMessage = statusPatterns.some(emoji => chunk.trim().startsWith(emoji));
+      next: (event: { event: string; data: string }) => {
+        const { event: eventType, data: chunk } = event;
+        
+        // Handle different SSE event types per CHUNK 3 spec
+        switch (eventType) {
+          case 'start':
+            // Stream initialization - show processing indicator
+            hasReceivedStart = true;
+            assistantMessage.statusMessages = [chunk || 'Processing your request...'];
+            assistantMessage.isLoading = true;
+            break;
+            
+          case 'message':
+            // Regular message token - accumulate for final response
+            // Check if this is a status message (starts with emoji) - use constant
+            const isStatusMessage = STATUS_EMOJI_PATTERNS.some(emoji => chunk.trim().startsWith(emoji));
 
-        if (isStatusMessage && !isCollectingFinalResponse) {
-          // This is an intermediate status message
-          const trimmedChunk = chunk.trim();
-          if (trimmedChunk) {
-            // Replace previous status with new one
-            assistantMessage.statusMessages = [trimmedChunk];
-            assistantMessage.content = '';  // Clear content during status
-          }
-        } else {
-          // This is part of the final response
-          isCollectingFinalResponse = true;
-
-          // Clear status messages when final response starts
-          if (assistantMessage.statusMessages && assistantMessage.statusMessages.length > 0) {
+            if (isStatusMessage && !isCollectingFinalResponse) {
+              // This is an intermediate status message
+              const trimmedChunk = chunk.trim();
+              if (trimmedChunk) {
+                assistantMessage.statusMessages = [trimmedChunk];
+                assistantMessage.content = '';
+              }
+            } else {
+              // This is part of the final response
+              isCollectingFinalResponse = true;
+              assistantMessage.statusMessages = [];
+              finalResponseBuffer += chunk;
+              assistantMessage.content = finalResponseBuffer;
+              assistantMessage.isLoading = false;
+            }
+            break;
+            
+          case 'done':
+            // Stream completed - finalize message
+            hasReceivedDone = true;
+            this.isLoading = false;
+            this.isStreaming = false;
+            assistantMessage.isLoading = false;
+            assistantMessage.isStreaming = false;
             assistantMessage.statusMessages = [];
-          }
-
-          // Accumulate final response
-          finalResponseBuffer += chunk;
-          assistantMessage.content = finalResponseBuffer;
-          assistantMessage.isLoading = false;
+            break;
+            
+          case 'error':
+            // Error occurred - show user-safe message
+            assistantMessage.content = chunk || 'An error occurred. Please try again.';
+            assistantMessage.isLoading = false;
+            assistantMessage.isStreaming = false;
+            assistantMessage.statusMessages = [];
+            assistantMessage.isError = true;
+            break;
+            
+          case 'followup':
+            // Follow-up question from AI
+            try {
+              const followupData = JSON.parse(chunk);
+              assistantMessage.content = followupData.question || chunk;
+              assistantMessage.followUp = followupData;
+            } catch {
+              assistantMessage.content = chunk;
+            }
+            assistantMessage.isLoading = false;
+            break;
+            
+          case 'unknown':
+            // Unknown scenario - show suggestions
+            try {
+              const unknownData = JSON.parse(chunk);
+              assistantMessage.content = unknownData.message || 'I didn\'t understand that.';
+              assistantMessage.suggestions = unknownData.options || [];
+            } catch {
+              assistantMessage.content = chunk;
+            }
+            assistantMessage.isLoading = false;
+            break;
+            
+          default:
+            // Fallback for unknown event types
+            if (chunk) {
+              finalResponseBuffer += chunk;
+              assistantMessage.content = finalResponseBuffer;
+              assistantMessage.isLoading = false;
+            }
         }
       },
       error: () => {
-        // Fallback to regular chat
+        // Fallback to regular chat on stream error
         this.messages.pop();
         this.regularChat(request);
       },
       complete: () => {
+        // CHUNK 3: Ensure UI is never left in loading state
         this.isLoading = false;
         this.isStreaming = false;
         assistantMessage.isLoading = false;
         assistantMessage.isStreaming = false;
-        assistantMessage.statusMessages = [];  // Clear any remaining status messages
+        assistantMessage.statusMessages = [];
+        
+        // If we never received a 'done' event, log warning
+        if (!hasReceivedDone) {
+          console.warn('Stream completed without receiving done event');
+        }
       }
     });
   }

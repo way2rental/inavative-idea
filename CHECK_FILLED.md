@@ -463,6 +463,8 @@ List major packages and what they contain:
 
 ## 11. SSE STREAMING (BACKEND)
 
+### 11.1 Endpoint Details
+
 - SSE endpoint:
     - **Controller Class Name**: `ReactiveChatController`
     - **Endpoint URL**: `POST /api/v2/chat/stream`
@@ -472,36 +474,113 @@ List major packages and what they contain:
     - How do you read streamed tokens?
         - `SpringAiLlmClient.formatResponseStreaming()` uses `chatClient.prompt().stream().content()`
     - Emit SSE events?
-        - Wrapped in `ServerSentEvent.builder().data(chunk).build()`
+        - Wrapped in `ServerSentEvent.builder().event(eventType).data(chunk).build()`
 
-- Sample SSE event payloads:
-  ```
-  data: 🔍 Analyzing your request...
-  
-  data: ✅ Request understood - transaction status
-  
-  data: 🔐 Verifying permissions...
-  
-  data: ✅ Access granted
-  
-  data: 📊 Fetching your data...
-  
-  data: Your transaction UTR123 is SUCCESSFUL...
-  ```
+### 11.2 SSE Event Types (CHUNK 3 IMPLEMENTATION)
+
+Per PRODUCTION CLOSURE TASKS – CHUNK 3, the following SSE events are implemented:
+
+| Event Type | Purpose | Payload |
+|------------|---------|---------|
+| `start` | Stream initialization | `"Processing your request..."` |
+| `message` | Token/content chunk | Text token |
+| `done` | Stream completion | Empty |
+| `error` | User-safe error message | Error text (no technical details) |
+| `followup` | Follow-up question | JSON: `{scenario, missingParams, question}` |
+| `unknown` | Unknown scenario | JSON: `{message, options}` |
+
+### 11.3 SSE Stability Rules (CHUNK 3)
+
+1. **ALWAYS emit `start` event first** – Never begin with content
+2. **ALWAYS emit `done` event at end** – Even on error/timeout
+3. **NEVER leave frontend in loading state** – Timeout after 120s with user-friendly message
+4. **NEVER expose technical errors** – Only user-safe messages to frontend
+
+### 11.4 Sample SSE Event Payloads
+
+```
+event: start
+data: Processing your request...
+
+event: message
+data: 🔍 Analyzing your request...
+
+event: message
+data: ✅ Request understood - transaction status
+
+event: message
+data: Your transaction UTR123 is SUCCESSFUL...
+
+event: done
+data:
+```
+
+Error scenario:
+```
+event: start
+data: Processing your request...
+
+event: error
+data: I apologize, but I encountered an issue processing your request. Please try again.
+
+event: done
+data:
+```
+
+### 11.5 Key Classes
+
+- **SsePublisherService** (`com.enterprise.ai.core.sse`)
+  - `createStartEvent(message)` – Creates start event
+  - `createMessageEvent(data)` – Creates message event
+  - `createDoneEvent()` – Creates done event
+  - `createErrorEvent(message)` – Creates error event (user-safe)
+  - `createFollowUpEvent(scenario, missingParams, question)` – Creates followup event
+  - `createUnknownEvent(message, options)` – Creates unknown event
+  - `streamTokens(tokenFlux, sessionId)` – Wraps flux with start/done events
+
+- **ReactiveChatController** (`com.enterprise.ai.api.controller`)
+  - `processChatStreaming(request)` – Returns `Flux<ServerSentEvent<String>>` with proper event lifecycle
 
 ---
 
 ## 12. FRONTEND CHAT & SSE HANDLING
+
+### 12.1 Chat Component
 
 - Chat component:
     - **File path**: `/ai-orchestrator-ui/src/app/components/chat/chat.component.ts`
     - Where SSE is initialized? `streamMessage(request)` method via `apiService.chatStream()`
     - How messages are appended? Accumulates in `finalResponseBuffer`, updates `assistantMessage.content`
 
+### 12.2 API Service SSE Handling (CHUNK 3)
+
+- **File path**: `/ai-orchestrator-ui/src/app/services/api.service.ts`
+- Returns: `Observable<{ event: string; data: string }>`
+- Parses SSE format: `event: <type>\ndata: <content>\n\n`
+- Handles event types: start, message, done, error, followup, unknown
+
+### 12.3 Frontend SSE Event Handling
+
+| Event Type | Frontend Behavior |
+|------------|-------------------|
+| `start` | Show processing indicator, set isLoading=true |
+| `message` | Accumulate content or show status |
+| `done` | Set isLoading=false, isStreaming=false |
+| `error` | Show error message, set isError=true |
+| `followup` | Parse JSON, show follow-up question |
+| `unknown` | Parse JSON, show suggestion buttons |
+
+### 12.4 Model Updates
+
+- **ChatMessage interface** now includes:
+  - `isError?: boolean` – Flag for error messages
+  - `followUp?: FollowUpData` – Follow-up question data
+  - `suggestions?: string[]` – Suggestions for unknown scenarios
+
 - Does frontend support:
     - Streaming tokens (append text)? YES
-    - Follow-up messages from backend? YES – via `ChatResponse.ResponseType.FOLLOW_UP`
-    - Unknown scenario options? YES – Shows numbered options from `possibleScenarios`
+    - Follow-up messages from backend? YES – via `followup` event
+    - Unknown scenario options? YES – via `unknown` event with suggestion buttons
 
 ---
 

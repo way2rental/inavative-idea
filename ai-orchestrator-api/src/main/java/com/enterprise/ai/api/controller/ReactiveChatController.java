@@ -4,6 +4,7 @@ import com.enterprise.ai.api.service.PerformanceLoggingService;
 import com.enterprise.ai.api.service.ReactiveChatService;
 import com.enterprise.ai.common.dto.ChatRequest;
 import com.enterprise.ai.common.dto.ChatResponse;
+import com.enterprise.ai.core.sse.SsePublisherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,10 +21,19 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Reactive Chat Controller with SSE streaming support.
  * Provides non-blocking endpoints for chat processing.
+ * 
+ * CHUNK 3 SSE STABILITY IMPLEMENTATION:
+ * - ALWAYS emits 'start' event at stream beginning
+ * - Emits 'message' events for each token/chunk
+ * - ALWAYS emits 'done' event at end (even on error)
+ * - On error, emits 'error' event with user-safe message
+ * - NEVER leaves frontend in loading state
+ * - 120 second timeout with graceful fallback
  */
 @Slf4j
 @RestController
@@ -34,6 +44,11 @@ public class ReactiveChatController {
 
     private final ReactiveChatService reactiveChatService;
     private final PerformanceLoggingService perfService;
+    private final SsePublisherService ssePublisherService;
+    
+    private static final Duration MAX_STREAM_DURATION = Duration.ofSeconds(120);
+    private static final String AUTH_ERROR_MESSAGE = "Authentication required. Please log in again.";
+    private static final String GENERIC_ERROR_MESSAGE = "I apologize, but I encountered an issue processing your request. Please try again.";
 
     /**
      * Process chat request reactively (non-blocking).
@@ -52,7 +67,14 @@ public class ReactiveChatController {
 
     /**
      * Process chat request with SSE streaming response using ServerSentEvent wrapper.
-     * This prevents "response already committed" errors by properly wrapping the stream.
+     * 
+     * CHUNK 3 SSE STABILITY CONTRACT:
+     * 1. ALWAYS emit 'start' event first: event: start, data: "Processing your request..."
+     * 2. For each token/chunk: event: message, data: "<token>"
+     * 3. ALWAYS emit 'done' event at end: event: done
+     * 4. On error: event: error, data: "User-safe message"
+     * 5. NEVER send raw technical errors to frontend
+     * 6. NEVER leave frontend in loading state
      *
      * IMPORTANT: Using ServerSentEvent wrapper ensures Spring Security doesn't interfere
      * with the streaming response after it's been committed.
@@ -67,29 +89,48 @@ public class ReactiveChatController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
             log.error("No authentication found for streaming request");
-            return Flux.just(
-                ServerSentEvent.<String>builder()
-                    .data("❌ Authentication required. Please log in again.")
-                    .build()
+            // CHUNK 3: Emit proper event sequence even for auth errors
+            return Flux.concat(
+                Flux.just(ssePublisherService.createStartEvent("Checking authentication...")),
+                Flux.just(ssePublisherService.createErrorEvent(AUTH_ERROR_MESSAGE)),
+                Flux.just(ssePublisherService.createDoneEvent())
             );
         }
 
-        // Process the chat with streaming, wrapped in ServerSentEvent
-        return reactiveChatService.processChatStreaming(request)
-                .map(chunk -> ServerSentEvent.<String>builder()
-                        .data(chunk)
-                        .build())
-                .doOnSubscribe(s -> log.debug("Streaming started for user: {}", request.getUserId()))
-                .doOnComplete(() -> log.debug("Streaming completed for user: {}", request.getUserId()))
-                .doOnError(e -> log.error("Streaming error for user {}: {}", request.getUserId(), e.getMessage()))
-                .onErrorResume(e -> {
-                    log.error("Fatal streaming error for user {}: {}", request.getUserId(), e.getMessage(), e);
-                    return Flux.just(
-                        ServerSentEvent.<String>builder()
-                            .data("❌ An error occurred. Please try again.")
-                            .build()
-                    );
-                });
+        AtomicBoolean streamCompleted = new AtomicBoolean(false);
+        
+        // CHUNK 3: Start with 'start' event, then stream, then always 'done'
+        return Flux.concat(
+                // 1. ALWAYS emit start event first
+                Flux.just(ssePublisherService.createStartEvent("Processing your request...")),
+                
+                // 2. Process the chat with streaming, wrapped in message events
+                reactiveChatService.processChatStreaming(request)
+                        .map(chunk -> ssePublisherService.createMessageEvent(chunk))
+                        .doOnSubscribe(s -> log.debug("Streaming started for user: {}", request.getUserId()))
+                        .doOnComplete(() -> {
+                            log.debug("Streaming completed for user: {}", request.getUserId());
+                            streamCompleted.set(true);
+                        })
+                        .doOnError(e -> {
+                            log.error("Streaming error for user {}: {}", request.getUserId(), e.getMessage());
+                            streamCompleted.set(true);
+                        })
+                        .timeout(MAX_STREAM_DURATION)
+                        .onErrorResume(e -> {
+                            log.error("Fatal streaming error for user {}: {}", request.getUserId(), e.getMessage(), e);
+                            streamCompleted.set(true);
+                            // CHUNK 3: Use centralized error message helper from SsePublisherService
+                            return Flux.just(ssePublisherService.createErrorEvent(
+                                    ssePublisherService.getUserSafeErrorMessage(e)));
+                        }),
+                        
+                // 3. ALWAYS emit done event at end (CHUNK 3 CRITICAL REQUIREMENT)
+                Flux.defer(() -> {
+                    log.debug("Emitting done event for user: {}", request.getUserId());
+                    return Flux.just(ssePublisherService.createDoneEvent());
+                })
+        );
     }
 
     /**

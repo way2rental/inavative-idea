@@ -20,8 +20,8 @@ export class ApiService {
     return this.http.post<ChatResponse>(`${this.baseUrl}/v2/chat`, request);
   }
 
-  chatStream(request: ChatRequest): Observable<string> {
-    const subject = new Subject<string>();
+  chatStream(request: ChatRequest): Observable<{ event: string; data: string }> {
+    const subject = new Subject<{ event: string; data: string }>();
 
     // Get token from localStorage
     let token = '';
@@ -40,13 +40,13 @@ export class ApiService {
       return subject.asObservable();
     }
 
-    // Try streaming endpoint first, fall back to regular if not available
+    // CHUNK 3 SSE STABILITY: Use proper event handling
     fetch(`${this.baseUrl}/v2/chat/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
-        'Accept': 'text/event-stream'  // Important for SSE
+        'Accept': 'text/event-stream'
       },
       body: JSON.stringify(request)
     }).then(async response => {
@@ -74,39 +74,80 @@ export class ApiService {
         buffer += decoder.decode(value, { stream: true });
 
         // Process complete SSE messages in buffer
-        const lines = buffer.split('\n');
+        // SSE format: event: <type>\ndata: <content>\n\n
+        const messages = buffer.split('\n\n');
+        
+        // Keep last incomplete message in buffer
+        buffer = messages.pop() || '';
 
-        // Keep last incomplete line in buffer
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          // SSE format: "data: message" or "data:message" (with or without space)
-          if (line.startsWith('data:')) {
-            // Handle both "data: " (with space) and "data:" (without space)
-            const data = line.startsWith('data: ')
-              ? line.substring(6)  // Remove "data: "
-              : line.substring(5); // Remove "data:"
-
-            // Send even empty strings (they might be intentional line breaks)
-            subject.next(data);
+        for (const message of messages) {
+          if (!message.trim()) continue;
+          
+          const lines = message.split('\n');
+          let eventType = 'message'; // Default event type
+          let eventData = '';
+          
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              eventType = line.substring(6).trim();
+            } else if (line.startsWith('data:')) {
+              // Handle both "data: " (with space) and "data:" (without space)
+              eventData = line.startsWith('data: ')
+                ? line.substring(6)
+                : line.substring(5);
+            }
           }
-          // Ignore comment lines starting with ":"
-          // Also handle plain text for backwards compatibility
-          else if (line.trim() && !line.startsWith(':')) {
-            subject.next(line);
+          
+          // Emit parsed SSE event
+          subject.next({ event: eventType, data: eventData });
+          
+          // CHUNK 3: Mark stream for completion on 'done' event
+          // Note: We don't return immediately to ensure all messages in buffer are processed
+          if (eventType === 'done') {
+            // Process remaining buffer before completing
+            if (buffer.trim()) {
+              const remainingLines = buffer.split('\n');
+              let remainingEventType = 'message';
+              let remainingEventData = '';
+              
+              for (const line of remainingLines) {
+                if (line.startsWith('event:')) {
+                  remainingEventType = line.substring(6).trim();
+                } else if (line.startsWith('data:')) {
+                  remainingEventData = line.startsWith('data: ')
+                    ? line.substring(6)
+                    : line.substring(5);
+                }
+              }
+              
+              if (remainingEventData || remainingEventType !== 'message') {
+                subject.next({ event: remainingEventType, data: remainingEventData });
+              }
+            }
+            subject.complete();
+            return;
           }
         }
       }
 
-      // Process any remaining data in buffer
+      // Process any remaining data in buffer (if stream ended without 'done' event)
       if (buffer.trim()) {
-        if (buffer.startsWith('data:')) {
-          const data = buffer.startsWith('data: ')
-            ? buffer.substring(6)
-            : buffer.substring(5);
-          subject.next(data);
-        } else if (!buffer.startsWith(':')) {
-          subject.next(buffer);
+        const lines = buffer.split('\n');
+        let eventType = 'message';
+        let eventData = '';
+        
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            eventType = line.substring(6).trim();
+          } else if (line.startsWith('data:')) {
+            eventData = line.startsWith('data: ')
+              ? line.substring(6)
+              : line.substring(5);
+          }
+        }
+        
+        if (eventData || eventType !== 'message') {
+          subject.next({ event: eventType, data: eventData });
         }
       }
 
