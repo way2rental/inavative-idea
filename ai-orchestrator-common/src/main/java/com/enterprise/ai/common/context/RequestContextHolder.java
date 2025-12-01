@@ -1,13 +1,16 @@
 package com.enterprise.ai.common.context;
 
+import java.util.List;
+
 /**
  * Thread-local holder for request context.
  * Provides access to internal parameters without passing through LLM/external systems.
  * 
  * SECURITY CRITICAL:
- * - Context is injected at Request Ingress Layer
+ * - Context is injected at Request Ingress Layer (JWT Filter)
  * - Never accepted from frontend blindly
  * - Never logged in plain text to LLM prompts
+ * - Must be cleared at end of request to prevent thread-leak
  */
 public final class RequestContextHolder {
 
@@ -20,15 +23,29 @@ public final class RequestContextHolder {
     /**
      * Set the current request context
      */
-    public static void setContext(RequestContext context) {
+    public static void set(RequestContext context) {
         contextHolder.set(context);
+    }
+
+    /**
+     * Alias for set() - for backward compatibility
+     */
+    public static void setContext(RequestContext context) {
+        set(context);
     }
 
     /**
      * Get the current request context
      */
-    public static RequestContext getContext() {
+    public static RequestContext get() {
         return contextHolder.get();
+    }
+
+    /**
+     * Alias for get() - for backward compatibility
+     */
+    public static RequestContext getContext() {
+        return get();
     }
 
     /**
@@ -43,7 +60,8 @@ public final class RequestContextHolder {
     }
 
     /**
-     * Clear the current request context
+     * Clear the current request context.
+     * MUST be called at end of request to prevent thread-leak in Tomcat thread pool.
      */
     public static void clear() {
         contextHolder.remove();
@@ -66,11 +84,29 @@ public final class RequestContextHolder {
     }
 
     /**
+     * Get org ID from context (for row-level security)
+     */
+    public static String getOrgId() {
+        RequestContext context = contextHolder.get();
+        if (context == null) return null;
+        // orgId takes precedence, fallback to tenantId
+        return context.getOrgId() != null ? context.getOrgId() : context.getTenantId();
+    }
+
+    /**
      * Get role from context
      */
     public static String getRole() {
         RequestContext context = contextHolder.get();
         return context != null ? context.getRole() : null;
+    }
+
+    /**
+     * Get all roles from context
+     */
+    public static List<String> getRoles() {
+        RequestContext context = contextHolder.get();
+        return context != null ? context.getRoles() : null;
     }
 
     /**

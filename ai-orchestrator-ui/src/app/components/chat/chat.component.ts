@@ -6,6 +6,9 @@ import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ChatMessage, ChatRequest, ChatResponse } from '../../models/chat.model';
 
+// CHUNK 3: Status message emoji patterns for intermediate status detection
+const STATUS_EMOJI_PATTERNS = ['🔍', '📊', '📈', '💾', '✅', '❌', '⚠️', '🔐'];
+
 @Component({
   selector: 'app-chat',
   standalone: true,
@@ -111,113 +114,116 @@ export class ChatComponent implements AfterViewChecked {
 
     let isCollectingFinalResponse = false;
     let finalResponseBuffer = '';
-    let hasSeenFinalResponseStart = false;
+    let hasReceivedStart = false;
+    let hasReceivedDone = false;
 
-    // Use regular chat as EventSource may not be available
+    // CHUNK 3 SSE STABILITY: Handle proper event types
     this.apiService.chatStream(request).subscribe({
-      next: (chunk: string) => {
-        if (!chunk || chunk.trim() === '') return;
+      next: (event: { event: string; data: string }) => {
+        const { event: eventType, data: chunk } = event;
 
-        const trimmedChunk = chunk.trim();
+        // Handle different SSE event types per CHUNK 3 spec
+        switch (eventType) {
+          case 'start':
+            // Stream initialization - show processing indicator
+            hasReceivedStart = true;
+            assistantMessage.statusMessages = [chunk || 'Processing your request...'];
+            assistantMessage.isLoading = true;
+            break;
 
-        // Status/intermediate message patterns
-        const statusPatterns = ['🔍', '✅', '☑️', '📊', '📈', '💾', '❌', '⚠️', '🔐', '📋'];
-        const isStatusMessage = statusPatterns.some(emoji => trimmedChunk.startsWith(emoji));
+          case 'message':
+            // Regular message token - accumulate for final response
+            // Check if this is a status message (starts with emoji) - use constant
+            const isStatusMessage = STATUS_EMOJI_PATTERNS.some(emoji => chunk.trim().startsWith(emoji));
 
-        // Check if this looks like the start of final AI response
-        // Final responses typically start with narrative text, not emojis or status indicators
-        const looksLikeFinalResponse = !isStatusMessage &&
-                                       !trimmedChunk.includes('Request understood') &&
-                                       !trimmedChunk.includes('Verifying permissions') &&
-                                       !trimmedChunk.includes('Access granted') &&
-                                       !trimmedChunk.includes('Fetching your data') &&
-                                       !trimmedChunk.includes('Data retrieved') &&
-                                       !trimmedChunk.includes('Preparing your response') &&
-                                       trimmedChunk.length > 10;
+            if (isStatusMessage && !isCollectingFinalResponse) {
+              // This is an intermediate status message
+              const trimmedChunk = chunk.trim();
+              if (trimmedChunk) {
+                assistantMessage.statusMessages = [trimmedChunk];
+                assistantMessage.content = '';
+              }
+            } else {
+              // This is part of the final response
+              isCollectingFinalResponse = true;
+              assistantMessage.statusMessages = [];
+              finalResponseBuffer += chunk;
+              assistantMessage.content = finalResponseBuffer;
+              assistantMessage.isLoading = false;
+            }
+            break;
 
-        if (looksLikeFinalResponse) {
-          hasSeenFinalResponseStart = true;
-        }
-
-        if (isStatusMessage && !hasSeenFinalResponseStart) {
-          // This is an intermediate status message - show only the latest one
-          assistantMessage.statusMessages = [trimmedChunk];
-          assistantMessage.content = '';
-          assistantMessage.isLoading = true;
-        } else if (hasSeenFinalResponseStart) {
-          // We're now in the final response phase
-          isCollectingFinalResponse = true;
-
-          // Clear status messages when final response starts
-          if (!finalResponseBuffer && assistantMessage.statusMessages && assistantMessage.statusMessages.length > 0) {
+          case 'done':
+            // Stream completed - finalize message
+            hasReceivedDone = true;
+            this.isLoading = false;
+            this.isStreaming = false;
+            assistantMessage.isLoading = false;
+            assistantMessage.isStreaming = false;
             assistantMessage.statusMessages = [];
-          }
+            break;
 
-          // Accumulate final response
-          finalResponseBuffer += chunk;
-          assistantMessage.content = this.cleanFinalResponse(finalResponseBuffer);
-          assistantMessage.isLoading = false;
+          case 'error':
+            // Error occurred - show user-safe message
+            assistantMessage.content = chunk || 'An error occurred. Please try again.';
+            assistantMessage.isLoading = false;
+            assistantMessage.isStreaming = false;
+            assistantMessage.statusMessages = [];
+            assistantMessage.isError = true;
+            break;
+
+          case 'followup':
+            // Follow-up question from AI
+            try {
+              const followupData = JSON.parse(chunk);
+              assistantMessage.content = followupData.question || chunk;
+              assistantMessage.followUp = followupData;
+            } catch {
+              assistantMessage.content = chunk;
+            }
+            assistantMessage.isLoading = false;
+            break;
+
+          case 'unknown':
+            // Unknown scenario - show suggestions
+            try {
+              const unknownData = JSON.parse(chunk);
+              assistantMessage.content = unknownData.message || 'I didn\'t understand that.';
+              assistantMessage.suggestions = unknownData.options || [];
+            } catch {
+              assistantMessage.content = chunk;
+            }
+            assistantMessage.isLoading = false;
+            break;
+
+          default:
+            // Fallback for unknown event types
+            if (chunk) {
+              finalResponseBuffer += chunk;
+              assistantMessage.content = finalResponseBuffer;
+              assistantMessage.isLoading = false;
+            }
         }
       },
       error: () => {
-        // Fallback to regular chat
+        // Fallback to regular chat on stream error
         this.messages.pop();
         this.regularChat(request);
       },
       complete: () => {
+        // CHUNK 3: Ensure UI is never left in loading state
         this.isLoading = false;
         this.isStreaming = false;
         assistantMessage.isLoading = false;
         assistantMessage.isStreaming = false;
         assistantMessage.statusMessages = [];
 
-        // Final cleanup of the response
-        if (assistantMessage.content) {
-          assistantMessage.content = this.cleanFinalResponse(assistantMessage.content);
+        // If we never received a 'done' event, log warning
+        if (!hasReceivedDone) {
+          console.warn('Stream completed without receiving done event');
         }
       }
     });
-  }
-
-  /**
-   * Clean up the final response by removing status messages and formatting properly
-   */
-  private cleanFinalResponse(content: string): string {
-    if (!content) return '';
-
-    let cleaned = content;
-
-    // Remove any lingering status messages that might have leaked through
-    const statusPhrases = [
-      /✅\s*Request understood.*?\n/gi,
-      /☑️\s*Request understood.*?\n/gi,
-      /🔍\s*Verifying permissions.*?\n/gi,
-      /✅\s*Access granted.*?\n/gi,
-      /☑️\s*Access granted.*?\n/gi,
-      /📊\s*Fetching your data.*?\n/gi,
-      /✅\s*Data retrieved.*?\n/gi,
-      /☑️\s*Data retrieved.*?\n/gi,
-      /📋\s*Preparing your response.*?\n/gi,
-      /🔐\s*[^\n]*\n/gi,
-      /Request understood[^\n]*\n/gi,
-      /Verifying permissions[^\n]*\n/gi,
-      /Access granted[^\n]*\n/gi,
-      /Fetching your data[^\n]*\n/gi,
-      /Data retrieved[^\n]*\n/gi,
-      /Preparing your response[^\n]*\n/gi
-    ];
-
-    statusPhrases.forEach(pattern => {
-      cleaned = cleaned.replace(pattern, '');
-    });
-
-    // Remove multiple consecutive newlines
-    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-
-    // Trim whitespace
-    cleaned = cleaned.trim();
-
-    return cleaned;
   }
 
   regularChat(request: ChatRequest): void {
@@ -303,20 +309,6 @@ export class ChatComponent implements AfterViewChecked {
     // Remove any leading/trailing whitespace
     formatted = formatted.trim();
 
-    // Remove any remaining status messages that leaked through
-    const statusPatterns = [
-      /[✅☑️🔍📊📈💾❌⚠️🔐📋]\s*Request understood[^\n]*\n?/gi,
-      /[✅☑️🔍📊📈💾❌⚠️🔐📋]\s*Verifying permissions[^\n]*\n?/gi,
-      /[✅☑️🔍📊📈💾❌⚠️🔐📋]\s*Access granted[^\n]*\n?/gi,
-      /[✅☑️🔍📊📈💾❌⚠️🔐📋]\s*Fetching your data[^\n]*\n?/gi,
-      /[✅☑️🔍📊📈💾❌⚠️🔐📋]\s*Data retrieved[^\n]*\n?/gi,
-      /[✅☑️🔍📊📈💾❌⚠️🔐📋]\s*Preparing your response[^\n]*\n?/gi
-    ];
-
-    statusPatterns.forEach(pattern => {
-      formatted = formatted.replace(pattern, '');
-    });
-
     // Format JSON objects/arrays (pretty print)
     formatted = formatted.replace(/```json\n([\s\S]*?)```/g, (match, json) => {
       try {
@@ -343,25 +335,21 @@ export class ChatComponent implements AfterViewChecked {
     // Format inline code
     formatted = formatted.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm text-axis-burgundy">$1</code>');
 
-    // Format bold text (including emoji + bold patterns)
+    // Format bold text
     formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>');
 
     // Format bullet lists
-    formatted = formatted.replace(/^[•\-]\s+(.+)$/gm, '<li class="ml-4 my-1">$1</li>');
-    formatted = formatted.replace(/(<li class="ml-4 my-1">.*?<\/li>\s*)+/gs, '<ul class="list-disc list-inside my-3 space-y-1.5 pl-2">$&</ul>');
+    formatted = formatted.replace(/^- (.+)$/gm, '<li class="ml-4">$1</li>');
+    formatted = formatted.replace(/(<li class="ml-4">.*<\/li>\n?)+/g, '<ul class="list-disc list-inside my-2 space-y-1">$&</ul>');
 
     // Format numbered lists
-    formatted = formatted.replace(/^\d+\.\s+(.+)$/gm, '<li class="ml-4 my-1">$1</li>');
-    formatted = formatted.replace(/(<li class="ml-4 my-1">.*?<\/li>\s*)+/gs, '<ol class="list-decimal list-inside my-3 space-y-1.5 pl-2">$&</ol>');
-
-    // Format key-value pairs (e.g., "Date: value", "Amount: value")
-    formatted = formatted.replace(/^(\w+(?:\s+\w+)?):\s*(.+)$/gm,
-      '<div class="my-1"><span class="font-medium text-gray-700">$1:</span> <span class="text-gray-900">$2</span></div>');
+    formatted = formatted.replace(/^\d+\. (.+)$/gm, '<li class="ml-4">$1</li>');
+    formatted = formatted.replace(/(<li class="ml-4">.*<\/li>\n?)+/g, '<ol class="list-decimal list-inside my-2 space-y-1">$&</ol>');
 
     // Format headers
-    formatted = formatted.replace(/^###\s+(.+)$/gm, '<h3 class="text-base font-semibold text-gray-900 mt-4 mb-2">$1</h3>');
-    formatted = formatted.replace(/^##\s+(.+)$/gm, '<h2 class="text-lg font-semibold text-gray-900 mt-4 mb-2">$1</h2>');
-    formatted = formatted.replace(/^#\s+(.+)$/gm, '<h1 class="text-xl font-bold text-gray-900 mt-4 mb-3">$1</h1>');
+    formatted = formatted.replace(/^### (.+)$/gm, '<h3 class="text-base font-semibold text-gray-900 mt-3 mb-2">$1</h3>');
+    formatted = formatted.replace(/^## (.+)$/gm, '<h2 class="text-lg font-semibold text-gray-900 mt-4 mb-2">$1</h2>');
+    formatted = formatted.replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold text-gray-900 mt-4 mb-3">$1</h1>');
 
     // Format tables (simple markdown-style tables)
     formatted = formatted.replace(/\|(.+)\|\n\|[-\s:|]+\|\n((?:\|.+\|\n?)+)/g, (match, header, rows) => {
@@ -370,18 +358,16 @@ export class ChatComponent implements AfterViewChecked {
         row.split('|').map((cell: string) => cell.trim()).filter((cell: string) => cell)
       );
 
-      let table = '<div class="overflow-x-auto my-4 rounded-lg border border-gray-200 shadow-sm">';
-      table += '<table class="min-w-full divide-y divide-gray-200">';
-      table += '<thead class="bg-gradient-to-r from-axis-burgundy to-red-800 text-white"><tr>';
+      let table = '<div class="overflow-x-auto my-3"><table class="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">';
+      table += '<thead class="bg-gray-50"><tr>';
       headers.forEach((h: string) => {
-        table += `<th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">${h}</th>`;
+        table += `<th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">${h}</th>`;
       });
-      table += '</tr></thead><tbody class="bg-white divide-y divide-gray-100">';
-      rowsArray.forEach((row: string[], index: number) => {
-        const bgClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
-        table += `<tr class="${bgClass} hover:bg-blue-50 transition-colors">`;
+      table += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
+      rowsArray.forEach((row: string[]) => {
+        table += '<tr class="hover:bg-gray-50">';
         row.forEach((cell: string) => {
-          table += `<td class="px-4 py-3 text-sm text-gray-800 whitespace-nowrap">${cell}</td>`;
+          table += `<td class="px-4 py-2 text-sm text-gray-700">${cell}</td>`;
         });
         table += '</tr>';
       });
@@ -389,23 +375,12 @@ export class ChatComponent implements AfterViewChecked {
       return table;
     });
 
-    // Format sections with emoji headers (e.g., "📋 Transaction History:")
-    formatted = formatted.replace(/([\u{1F300}-\u{1F9FF}])\s*([^:\n]+):/gu,
-      '<div class="flex items-center gap-2 my-3 pb-2 border-b border-gray-200"><span class="text-2xl">$1</span><span class="text-lg font-semibold text-gray-800">$2</span></div>');
-
-    // Format line breaks (but preserve structure)
-    formatted = formatted.replace(/\n\n\n+/g, '\n\n'); // Collapse multiple line breaks
-    formatted = formatted.replace(/\n\n/g, '</p><p class="my-2">');
+    // Format line breaks
+    formatted = formatted.replace(/\n\n/g, '<br/><br/>');
     formatted = formatted.replace(/\n/g, '<br/>');
 
-    // Wrap in paragraph tags
-    formatted = '<p class="my-2">' + formatted + '</p>';
-
-    // Clean up empty paragraphs
-    formatted = formatted.replace(/<p class="my-2"><\/p>/g, '');
-
-    // Add spacing for standalone emojis
-    formatted = formatted.replace(/([\u{1F300}-\u{1F9FF}])/gu, '<span class="inline-block mx-1">$1</span>');
+    // Add spacing for emojis
+    formatted = formatted.replace(/([\u{1F300}-\u{1F9FF}])/gu, '<span class="inline-block mr-1">$1</span>');
 
     return formatted;
   }

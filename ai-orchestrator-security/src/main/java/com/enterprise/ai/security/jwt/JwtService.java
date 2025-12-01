@@ -3,6 +3,7 @@ package com.enterprise.ai.security.jwt;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -15,16 +16,82 @@ import java.util.function.Function;
 
 /**
  * Service for JWT token operations.
+ * 
+ * SECURITY CRITICAL:
+ * - JWT secret MUST be loaded from environment variable or Kubernetes Secret
+ * - Application will FAIL TO START if secret is missing or is the default value
+ * - Never hardcode secrets in source code
  */
 @Slf4j
 @Service
 public class JwtService {
 
-    @Value("${jwt.secret:default-secret-key-for-development-only-change-in-production}")
-    private String secret;
+    @Value("${JWT_SECRET:#{null}}")
+    private String jwtSecretEnv;
+
+    @Value("${jwt.secret:#{null}}")
+    private String jwtSecretConfig;
 
     @Value("${jwt.expiration:86400000}")
     private long expiration;
+
+    private String secret;
+
+    /**
+     * Initialize and validate JWT secret on application startup.
+     * Fails fast if secret is missing or insecure.
+     */
+    @PostConstruct
+    public void init() {
+        // Priority: Environment variable > Config file
+        if (jwtSecretEnv != null && !jwtSecretEnv.isBlank()) {
+            secret = jwtSecretEnv;
+            log.info("JWT secret loaded from environment variable");
+        } else if (jwtSecretConfig != null && !jwtSecretConfig.isBlank()) {
+            secret = jwtSecretConfig;
+            log.info("JWT secret loaded from config file");
+        } else {
+            log.error("JWT Secret Missing - Startup Aborted");
+            throw new IllegalStateException("JWT Secret Missing - Startup Aborted. " +
+                    "Set JWT_SECRET environment variable or jwt.secret config property.");
+        }
+
+        // Check for default/insecure secrets
+        if (isInsecureSecret(secret)) {
+            log.error("JWT Secret is insecure (default or too short) - Startup Aborted");
+            throw new IllegalStateException("JWT Secret is insecure - Startup Aborted. " +
+                    "Provide a strong secret with at least 256 bits (32+ characters).");
+        }
+
+        log.info("JWT Service initialized successfully");
+    }
+
+    /**
+     * Check if the secret is insecure (default value or too short)
+     */
+    private boolean isInsecureSecret(String secret) {
+        // List of known insecure/default secrets that should not be used
+        List<String> insecureSecrets = List.of(
+                "default-secret-key-for-development-only-change-in-production",
+                "your-256-bit-secret-key-for-jwt-token-generation-change-in-production",
+                "secret",
+                "changeme",
+                "password"
+        );
+
+        // Check if it's a known insecure secret
+        if (insecureSecrets.contains(secret)) {
+            return true;
+        }
+
+        // Check minimum length (256 bits = 32 bytes) - STRICT enforcement
+        if (secret.length() < 32) {
+            log.error("JWT secret is shorter than required 32 characters (256 bits)");
+            return true;
+        }
+
+        return false;
+    }
 
     private SecretKey getSigningKey() {
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
@@ -52,6 +119,20 @@ public class JwtService {
     public List<String> extractRoles(String token) {
         Claims claims = extractAllClaims(token);
         return claims.get("roles", List.class);
+    }
+
+    /**
+     * Extract orgId from token.
+     * Returns null if not present.
+     */
+    public String extractOrgId(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            return claims.get("orgId", String.class);
+        } catch (Exception e) {
+            log.debug("No orgId claim in token");
+            return null;
+        }
     }
 
     /**

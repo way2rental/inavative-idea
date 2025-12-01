@@ -38,6 +38,15 @@ public class AiScenario {
     private String executionType = "DB_QUERY";
 
     /**
+     * Database key for multi-datasource routing.
+     * Must match a registered datasource in DataSourceRegistryService.
+     * Examples: internal, retail, pfms, upi, wallet, cbs
+     */
+    @Column(name = "db_key", length = 50)
+    @Builder.Default
+    private String dbKey = "internal";
+
+    /**
      * HTTP method for HTTP_CALL type (GET, POST only - read-only enforcement).
      */
     @Column(name = "http_method", length = 10)
