@@ -12,7 +12,6 @@ import {
   ScenarioTestResult,
   DashboardStats,
   PerformanceMetrics,
-  OllamaStatus,
   PromptTemplate,
   PromptFormData,
   IntentConfig,
