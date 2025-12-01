@@ -6,7 +6,13 @@
 **Repository:** way2rental/inavative-idea  
 **Total Java Files:** 104  
 **Total TypeScript Files:** 35+  
-**Technology Stack:** Spring Boot 3.2.0, Angular, PostgreSQL, Ollama LLM
+**Technology Stack:** 
+- **Backend**: Spring Boot 3.2.0, Java 17
+- **Frontend**: Angular 18.2.0, TailwindCSS 3.4.18, TypeScript 5.5.2
+- **Database**: MySQL 8.x (jdbc:mysql://localhost:3306/ai_orchestrator)
+- **LLM**: OpenAI GPT-4o-mini via Spring AI 1.0.0-M6
+- **Cache**: Caffeine (in-memory), Redis (optional)
+- **Resilience**: Resilience4j (circuit breaker, retry, rate limiter)
 
 ---
 
