@@ -10,6 +10,9 @@ import lombok.NoArgsConstructor;
  * Entity for scenario registry with dynamic execution configuration.
  * Supports DB_QUERY, HTTP_CALL, FILE_READ, and KAFKA_CONSUME execution types.
  * All operations are READ-ONLY by design for enterprise security compliance.
+ * 
+ * CLEANUP: Removed unused fields (dbKey, httpHeaders, executorBean, 
+ *          securityLevel, optionalParams, promptVersion, promptHistory)
  */
 @Data
 @Entity
@@ -38,15 +41,6 @@ public class AiScenario {
     private String executionType = "DB_QUERY";
 
     /**
-     * Database key for multi-datasource routing.
-     * Must match a registered datasource in DataSourceRegistryService.
-     * Examples: internal, retail, pfms, upi, wallet, cbs
-     */
-    @Column(name = "db_key", length = 50)
-    @Builder.Default
-    private String dbKey = "internal";
-
-    /**
      * HTTP method for HTTP_CALL type (GET, POST only - read-only enforcement).
      */
     @Column(name = "http_method", length = 10)
@@ -58,12 +52,6 @@ public class AiScenario {
      */
     @Column(name = "http_url", length = 500)
     private String httpUrl;
-
-    /**
-     * HTTP headers as JSON (e.g., {"Content-Type": "application/json"}).
-     */
-    @Column(name = "http_headers", columnDefinition = "JSON")
-    private String httpHeaders;
 
     /**
      * SQL query for DB_QUERY type (SELECT only - read-only enforcement).
@@ -93,33 +81,11 @@ public class AiScenario {
     @Builder.Default
     private Integer timeoutMs = 5000;
 
-    @Column(name = "executor_bean", length = 255)
-    private String executorBean;
-
-    @Column(name = "security_level", length = 50)
-    private String securityLevel;
-
     @Column(name = "required_params", columnDefinition = "JSON")
     private String requiredParams;
 
-    @Column(name = "optional_params", columnDefinition = "JSON")
-    private String optionalParams;
-
     @Column(name = "llm_prompt_template", columnDefinition = "TEXT")
     private String llmPromptTemplate;
-
-    /**
-     * Prompt version for rollback support.
-     */
-    @Column(name = "prompt_version")
-    @Builder.Default
-    private Integer promptVersion = 1;
-
-    /**
-     * History of previous prompt versions as JSON array.
-     */
-    @Column(name = "prompt_history", columnDefinition = "JSON")
-    private String promptHistory;
 
     @Column(name = "active")
     @Builder.Default

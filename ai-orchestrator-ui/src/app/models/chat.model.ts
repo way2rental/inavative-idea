@@ -1,7 +1,24 @@
+/**
+ * Request type for chat messages.
+ * MUST match backend ChatRequest.RequestType enum exactly.
+ */
+export type RequestType = 'QUERY' | 'CONFIRMATION' | 'CLARIFICATION';
+
+/**
+ * Chat request contract - MUST match backend ChatRequest.java exactly.
+ * All optional fields MUST be sent during follow-up interactions.
+ */
 export interface ChatRequest {
   userId: string;
   query: string;
   sessionId?: string;
+  // Follow-up flow fields (MANDATORY for confirmation/clarification)
+  requestType?: RequestType;
+  confirmed?: boolean;
+  selectedOption?: number;
+  pendingActionParams?: { [key: string]: any };
+  pendingScenario?: string;
+  dryRun?: boolean;
 }
 
 export interface ChatResponse {
