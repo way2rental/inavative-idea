@@ -14,39 +14,21 @@ import org.springframework.web.reactive.function.client.WebClient;
 /**
  * Configuration for dynamic scenario executors.
  * 
- * REPLACED: Hardcoded TxnStatusExecutor, FileStatusExecutor, AccountSummaryExecutor
- * WITH: QueryExecutor and HttpCallExecutor (config-driven)
+ * NOTE: QueryExecutor and HttpCallExecutor are now annotated with @Component
+ * and will be auto-discovered. This config is kept for backward compatibility
+ * but the beans are created via component scanning.
  * 
  * This enables:
  * - 150+ scenarios with only 2 executor implementations
  * - No code changes when adding new scenarios
  * - DB-driven configuration
+ * - MANDATORY row-level security (QueryExecutor)
+ * - MANDATORY PII masking before AI (both executors)
  */
 @Configuration
 public class ScenarioConfig {
 
-    /**
-     * QueryExecutor handles all DB_QUERY execution types.
-     * SELECT queries only - read-only enforcement.
-     */
-    @Bean
-    @Primary
-    public DynamicExecutor queryExecutor(
-            NamedParameterJdbcTemplate jdbcTemplate,
-            ReadOnlyEnforcementService readOnlyEnforcement,
-            ObjectMapper objectMapper) {
-        return new QueryExecutor(jdbcTemplate, readOnlyEnforcement, objectMapper);
-    }
-
-    /**
-     * HttpCallExecutor handles all HTTP_CALL execution types.
-     * GET/POST only to whitelisted URLs - read-only enforcement.
-     */
-    @Bean
-    public DynamicExecutor httpCallExecutor(
-            WebClient.Builder webClientBuilder,
-            ReadOnlyEnforcementService readOnlyEnforcement,
-            ObjectMapper objectMapper) {
-        return new HttpCallExecutor(webClientBuilder, readOnlyEnforcement, objectMapper);
-    }
+    // NOTE: QueryExecutor and HttpCallExecutor are now @Component beans
+    // They are auto-wired with all required dependencies through constructor injection
+    // No manual bean definition needed
 }

@@ -173,8 +173,12 @@ rate-limit:
 # ============================================
 # JWT CONFIGURATION
 # ============================================
+# SECURITY CRITICAL: JWT secret MUST be provided via environment variable
+# Application will FAIL TO START if secret is missing or insecure
 jwt:
-  secret: your-256-bit-secret-key-for-jwt-token-generation-change-in-production
+  # Secret loaded from environment variable JWT_SECRET (preferred) or this property
+  # DO NOT use default values in production
+  secret: ${JWT_SECRET:}
   expiration: 86400000                 # 24 hours in milliseconds
 
 # ============================================

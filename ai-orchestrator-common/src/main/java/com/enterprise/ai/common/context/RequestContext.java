@@ -35,6 +35,12 @@ public class RequestContext {
     private String tenantId;
 
     /**
+     * Organization ID for row-level security
+     * Used interchangeably with tenantId for backward compatibility
+     */
+    private String orgId;
+
+    /**
      * User role (ADMIN, USER, AUDITOR, OPERATOR)
      */
     private String role;

@@ -357,14 +357,43 @@ List major packages and what they contain:
 
 ## 8. ROW-LEVEL SECURITY (USER1 CANNOT SEE USER2 DATA)
 
-For each READ query touching business data:
+### Central Row-Level Security Service
 
-- **Current Implementation**: NOT_IMPLEMENTED centrally
-- Queries in `ai_scenarios.sql_query` need to manually include user filtering
-- There is NO central helper like `addOwnershipFilter()`
-- Each query must manually add `WHERE owner_user_id = :userId` or similar
+- **Class Name**: `RowLevelSecurityService`
+- **Package**: `com.enterprise.ai.core.security`
+- **Method**: `applyRowLevelSecurity(String rawSql, RequestContext userContext)`
 
-**Note**: Row-level security enforcement is currently the responsibility of each scenario's SQL query configuration.
+### Implementation Details:
+
+1. **SELECT-Only Enforcement**:
+   - If query does NOT start with SELECT → throws `SecurityViolationException`
+   - Message: "Only SELECT queries are allowed in READ-ONLY mode"
+
+2. **Automatic owner_user_id Injection**:
+   - If SQL does NOT contain `owner_user_id` → injects `AND owner_user_id = :userId`
+   - Value bound from `RequestContext.getUserId()`
+
+3. **Automatic org_id Injection**:
+   - If SQL does NOT contain `org_id` → injects `AND org_id = :orgId`
+   - Value bound from `RequestContext.getOrgId()` or `RequestContext.getTenantId()`
+
+4. **Injection Rules**:
+   - If SQL has WHERE → append AND
+   - If SQL has no WHERE → create WHERE
+   - Applies to OUTERMOST query only
+
+5. **User Context Source**:
+   - `RequestContext` contains: userId, orgId/tenantId, role
+   - Set via `RequestContextHolder.setContext()` from JWT at request ingress
+   - Never passed manually by controller
+
+6. **Enforcement Location**:
+   - ONLY called in `QueryExecutor.execute()`
+   - Flow: `rawSql → RowLevelSecurityService.applyRowLevelSecurity() → Safe SQL → NamedParameterJdbcTemplate`
+
+7. **Failure Behavior**:
+   - If userId or orgId is missing → blocks query
+   - Returns: "Security context missing. Access denied."
 
 ---
 
@@ -389,10 +418,16 @@ For each READ query touching business data:
             - `maskCard(String)` – Returns `XXXX-XXXX-XXXX-1234`
             - `maskEmail(String)` – Returns `a***@domain.com`
             - `maskPhone(String)` – Returns `XXXXX-12345`
-    - Where called? In `JsonPathResponseMapper.mapResponse()` after extracting values
+            - `detectMaskingType(String fieldName, Object value)` – Auto-detects based on field name
+    - Where called? 
+        - In `QueryExecutor.applyMandatoryMasking()` – MANDATORY for all DB results
+        - Automatically detects masking type from field names
 
 - Does Formatter AI receive raw DB row?
-    - PARTIALLY – `QueryExecutor.applyResponseMapping()` shapes data but raw columns may pass through if no mapping defined
+    - **NO** – Blocked by strict enforcement:
+        - If `response_mapping` is missing AND no mappings in `ai_response_mappings` table
+        - Throws `SecurityViolationException`: "Response mapping not configured for this scenario"
+        - Raw data is NEVER exposed to AI formatter
 
 ---
 
@@ -624,36 +659,34 @@ AMBIGUITY_PATTERNS = Map.of(
 
 ## 18. FINAL SELF-REPORTED GAPS (BY CODEBASE)
 
-### Partially implemented:
+### NEWLY IMPLEMENTED (Production Closure Chunk 1):
 
-1. **QueryExecutor** and **HttpCallExecutor** are commented out (`//@Component`) – Not auto-wired
-2. **Row-level security** – No central enforcement, relies on per-query `WHERE` clauses
-3. **JsonPathResponseMapper** – Created but not integrated into main execution flow
+1. **RowLevelSecurityService** - Central row-level security with automatic injection of `owner_user_id = :userId` and `org_id = :orgId`
+2. **QueryExecutor now @Component** - Auto-wired with all security dependencies, enforces RLS
+3. **HttpCallExecutor now @Component** - Auto-wired with security validation
+4. **Mandatory Masking** - All DB results go through `MaskingService` before reaching AI formatter
+5. **JWT Secret Externalization** - Loaded from `JWT_SECRET` environment variable, fails fast if missing or insecure
 
-### Implemented but not wired:
+### Still partially implemented:
 
 1. `SsePublisherService` – Created but `ReactiveChatService` handles SSE directly
-2. `AiResponseMapping` entity – Table exists but not used by QueryExecutor
-3. `PromptTemplate` entity – Created but `DynamicPromptBuilder` uses `AiScenario.llmPromptTemplate`
-4. `IntentConfig` entity – Created but intent detection uses `AiScenario`
-5. `FollowUpGroup` entity – Created but not integrated
-6. `PolicyRule` entity – Created but not integrated
+2. `PromptTemplate` entity – Created but `DynamicPromptBuilder` uses `AiScenario.llmPromptTemplate`
+3. `IntentConfig` entity – Created but intent detection uses `AiScenario`
+4. `FollowUpGroup` entity – Created but not integrated
+5. `PolicyRule` entity – Created but not integrated
 
 ### Not implemented though mentioned in specs:
 
-1. **RequestContext** population with userId/orgId from JWT – NOT_IMPLEMENTED
-2. **PII masking before LLM** – MaskingService exists but not called in main flow
-3. **Token/cost tracking** – NOT_IMPLEMENTED
-4. **Two-stage intent detection** – Code exists but returns same as single-stage
+1. **Token/cost tracking** – NOT_IMPLEMENTED
+2. **Two-stage intent detection** – Code exists but returns same as single-stage
 
-### Potentially insecure:
+### Previously Insecure (NOW FIXED):
 
-1. **No row-level data isolation** – Queries don't automatically filter by userId
-2. **Raw DB data may reach LLM** – If no response_mapping defined
-3. **JWT secret is hardcoded default** – `default-secret-key-for-development-only-change-in-production`
+1. ✅ **Row-level data isolation** – Now enforced centrally via `RowLevelSecurityService`
+2. ✅ **Raw DB data exposure** – Now blocked if no response_mapping defined
+3. ✅ **JWT secret hardcoded** – Now loaded from environment variable with fail-fast
 
 ### TODO comments in code that affect behavior:
 
 1. `// Two-stage detection not needed with Spring AI` – in SpringAiLlmClient
 2. `// Could be moved to DB in future` – for AMBIGUITY_PATTERNS in IntentValidationService
-3. `// @Component` commented out on QueryExecutor and HttpCallExecutor

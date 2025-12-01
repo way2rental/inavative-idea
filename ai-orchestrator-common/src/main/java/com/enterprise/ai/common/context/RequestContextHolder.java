@@ -66,6 +66,16 @@ public final class RequestContextHolder {
     }
 
     /**
+     * Get org ID from context (for row-level security)
+     */
+    public static String getOrgId() {
+        RequestContext context = contextHolder.get();
+        if (context == null) return null;
+        // orgId takes precedence, fallback to tenantId
+        return context.getOrgId() != null ? context.getOrgId() : context.getTenantId();
+    }
+
+    /**
      * Get role from context
      */
     public static String getRole() {

@@ -36,15 +36,17 @@ import java.util.regex.Pattern;
  * - URL whitelist enforcement
  * - URL template variable substitution
  * - Request body building from request_mapping
- * - Response shaping via response_mapping
+ * - Response shaping via response_mapping with MANDATORY masking
  * - Circuit breaker for fault tolerance
  * - Configurable timeout
+ * - Response size limit (1MB)
  */
 @Slf4j
-//@Component
+@Component
 public class HttpCallExecutor implements DynamicExecutor {
 
     private static final long DEFAULT_TIMEOUT_MS = 5000;
+    private static final int MAX_RESPONSE_SIZE_BYTES = 1024 * 1024; // 1MB limit
     private static final Pattern URL_VARIABLE_PATTERN = Pattern.compile("\\{(\\w+)}");
 
     private final WebClient webClient;

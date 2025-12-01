@@ -1,10 +1,18 @@
 package com.enterprise.ai.core.scenario;
 
+import com.enterprise.ai.common.context.RequestContext;
+import com.enterprise.ai.common.context.RequestContextHolder;
 import com.enterprise.ai.common.dto.ScenarioRequest;
 import com.enterprise.ai.common.dto.ScenarioResult;
 import com.enterprise.ai.common.enums.ExecutionType;
+import com.enterprise.ai.common.exception.SecurityViolationException;
+import com.enterprise.ai.core.mapper.JsonPathResponseMapper;
+import com.enterprise.ai.core.mapper.MaskingService;
 import com.enterprise.ai.core.security.ReadOnlyEnforcementService;
+import com.enterprise.ai.core.security.RowLevelSecurityService;
 import com.enterprise.ai.data.entity.AiScenario;
+import com.enterprise.ai.data.entity.AiResponseMapping;
+import com.enterprise.ai.data.repository.AiResponseMappingRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -23,20 +31,26 @@ import java.util.*;
  * 
  * Features:
  * - SELECT-only validation
+ * - MANDATORY row-level security (owner_user_id + org_id)
  * - Named parameter binding from request_mapping
- * - Response shaping via response_mapping
+ * - Response shaping via response_mapping with MANDATORY masking
  * - Configurable timeout
+ * - MAX_ROWS = 1000 enforcement
  */
 @Slf4j
-//@Component
+@Component
 @RequiredArgsConstructor
 public class QueryExecutor implements DynamicExecutor {
 
     private static final long DEFAULT_TIMEOUT_MS = 5000;
-    private static final int MAX_RESULT_SIZE = 1000; // Limit to prevent memory exhaustion
+    private static final int MAX_RESULT_SIZE = 1000; // Hard limit to prevent memory exhaustion
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final ReadOnlyEnforcementService readOnlyEnforcement;
+    private final RowLevelSecurityService rowLevelSecurityService;
+    private final JsonPathResponseMapper responseMapper;
+    private final MaskingService maskingService;
+    private final AiResponseMappingRepository responseMappingRepository;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -50,29 +64,52 @@ public class QueryExecutor implements DynamicExecutor {
         String scenarioCode = scenario.getScenarioCode();
 
         try {
-            // Validate SQL is SELECT only
-            String sqlQuery = scenario.getSqlQuery();
-            readOnlyEnforcement.validateSqlQuery(sqlQuery);
+            // Get user context for row-level security
+            RequestContext userContext = RequestContextHolder.getContext();
+            if (userContext == null) {
+                log.error("Security context missing for scenario {}", scenarioCode);
+                throw new SecurityViolationException(
+                        "Security context missing. Access denied.",
+                        "MISSING_CONTEXT",
+                        null
+                );
+            }
+
+            // Validate SQL is SELECT only (first check)
+            String rawSql = scenario.getSqlQuery();
+            readOnlyEnforcement.validateSqlQuery(rawSql);
+
+            // MANDATORY: Apply row-level security filters
+            String securedSql = rowLevelSecurityService.applyRowLevelSecurity(rawSql, userContext);
+            log.debug("Secured SQL for {}: {}", scenarioCode, securedSql);
 
             // Build parameters from request_mapping
             Map<String, Object> sqlParams = buildSqlParameters(request, scenario);
+            
+            // Add security context parameters
+            sqlParams.put("userId", userContext.getUserId());
+            String orgId = userContext.getOrgId() != null ? userContext.getOrgId() : 
+                          (userContext.getTenantId() != null ? userContext.getTenantId() : "DEFAULT");
+            sqlParams.put("orgId", orgId);
 
             log.info("Executing DB_QUERY for scenario {} with params: {}", scenarioCode, sqlParams.keySet());
 
             // Execute query with timeout
-            List<Map<String, Object>> rawResults = jdbcTemplate.queryForList(sqlQuery, sqlParams);
+            List<Map<String, Object>> rawResults = jdbcTemplate.queryForList(securedSql, sqlParams);
             
-            // Limit result size to prevent memory exhaustion
+            // Enforce MAX_ROWS limit
             if (rawResults.size() > MAX_RESULT_SIZE) {
                 log.warn("Query returned {} rows, truncating to {} for scenario {}", 
                         rawResults.size(), MAX_RESULT_SIZE, scenarioCode);
                 rawResults = rawResults.subList(0, MAX_RESULT_SIZE);
             }
 
-            Map<String, Object> shapedResult = applyResponseMapping(rawResults, scenario);
+            // MANDATORY: Apply response mapping with masking
+            // Raw DB data must NEVER reach the AI formatter
+            Map<String, Object> shapedResult = applyMandatoryMasking(rawResults, scenario);
 
             long executionTime = System.currentTimeMillis() - startTime;
-            log.info("DB_QUERY for {} completed in {}ms, {} rows returned", 
+            log.info("DB_QUERY for {} completed in {}ms, {} rows returned (masked)", 
                     scenarioCode, executionTime, rawResults.size());
 
             return ScenarioResult.builder()
@@ -81,13 +118,21 @@ public class QueryExecutor implements DynamicExecutor {
                     .data(shapedResult)
                     .build();
 
+        } catch (SecurityViolationException e) {
+            log.error("Security violation in DB_QUERY for {}: {}", scenarioCode, e.getMessage());
+            return ScenarioResult.builder()
+                    .scenario(scenarioCode)
+                    .success(false)
+                    .errorMessage("Security violation: " + e.getMessage())
+                    .data(Map.of("error", "Access denied"))
+                    .build();
         } catch (Exception e) {
             log.error("DB_QUERY execution failed for {}: {}", scenarioCode, e.getMessage());
             return ScenarioResult.builder()
                     .scenario(scenarioCode)
                     .success(false)
-                    .errorMessage("Database query failed: " + e.getMessage())
-                    .data(Map.of("error", e.getMessage()))
+                    .errorMessage("Database query failed. Please try again.")
+                    .data(Map.of("error", "Query execution error"))
                     .build();
         }
     }
@@ -181,8 +226,140 @@ public class QueryExecutor implements DynamicExecutor {
     }
 
     /**
+     * Apply MANDATORY masking to query results before they reach the AI formatter.
+     * Raw DB data must NEVER be passed to the AI.
+     * 
+     * If response_mapping is missing, execution is BLOCKED.
+     */
+    private Map<String, Object> applyMandatoryMasking(List<Map<String, Object>> rawResults, AiScenario scenario) {
+        String scenarioCode = scenario.getScenarioCode();
+        log.info("Applying mandatory masking for {}: {} rows", scenarioCode, rawResults.size());
+        
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        if (rawResults.isEmpty()) {
+            result.put("data", List.of());
+            result.put("count", 0);
+            return result;
+        }
+
+        // Check if response_mapping exists
+        if (scenario.getResponseMapping() == null || scenario.getResponseMapping().isBlank()) {
+            // Try to get mappings from ai_response_mappings table
+            List<AiResponseMapping> dbMappings = responseMappingRepository.findByScenarioCodeAndActiveTrue(scenarioCode);
+            
+            if (dbMappings.isEmpty()) {
+                // STRICT: Block execution if no mapping is configured
+                log.error("Response mapping not configured for scenario {}. Blocking raw data exposure.", scenarioCode);
+                throw new SecurityViolationException(
+                        "Response mapping not configured for this scenario",
+                        "MISSING_RESPONSE_MAPPING",
+                        scenarioCode
+                );
+            }
+            
+            // Use DB mappings
+            return applyDbMappingsWithMasking(rawResults, dbMappings);
+        }
+
+        try {
+            Map<String, String> mappings = objectMapper.readValue(
+                    scenario.getResponseMapping(), 
+                    new TypeReference<Map<String, String>>() {}
+            );
+
+            if (rawResults.size() == 1) {
+                // Single row - map and mask fields directly
+                Map<String, Object> row = rawResults.get(0);
+                for (Map.Entry<String, String> entry : mappings.entrySet()) {
+                    String outputField = entry.getKey();
+                    String sourceField = extractFieldName(entry.getValue());
+                    Object value = row.get(sourceField);
+                    
+                    // Apply masking based on field name detection
+                    String maskingType = maskingService.detectMaskingType(outputField, value);
+                    Object maskedValue = maskingService.mask(value, maskingType);
+                    result.put(outputField, maskedValue);
+                }
+            } else {
+                // Multiple rows - map and mask each row
+                List<Map<String, Object>> maskedRows = new ArrayList<>();
+                for (Map<String, Object> row : rawResults) {
+                    Map<String, Object> maskedRow = new LinkedHashMap<>();
+                    for (Map.Entry<String, String> entry : mappings.entrySet()) {
+                        String outputField = entry.getKey();
+                        String sourceField = extractFieldName(entry.getValue());
+                        Object value = row.get(sourceField);
+                        
+                        // Apply masking
+                        String maskingType = maskingService.detectMaskingType(outputField, value);
+                        Object maskedValue = maskingService.mask(value, maskingType);
+                        maskedRow.put(outputField, maskedValue);
+                    }
+                    maskedRows.add(maskedRow);
+                }
+                result.put("data", maskedRows);
+                result.put("count", maskedRows.size());
+            }
+        } catch (SecurityViolationException e) {
+            throw e; // Re-throw security exceptions
+        } catch (Exception e) {
+            log.error("Failed to apply response_mapping for {}: {}", scenarioCode, e.getMessage());
+            // STRICT: Do not fallback to raw data
+            throw new SecurityViolationException(
+                    "Response mapping failed for this scenario",
+                    "RESPONSE_MAPPING_ERROR",
+                    scenarioCode
+            );
+        }
+
+        return result;
+    }
+
+    /**
+     * Apply mappings from ai_response_mappings table with masking.
+     */
+    private Map<String, Object> applyDbMappingsWithMasking(List<Map<String, Object>> rawResults, 
+                                                            List<AiResponseMapping> dbMappings) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        if (rawResults.size() == 1) {
+            Map<String, Object> row = rawResults.get(0);
+            for (AiResponseMapping mapping : dbMappings) {
+                String sourceField = mapping.getSourceField();
+                String targetField = mapping.getTargetField();
+                String maskingType = mapping.getMaskingType();
+                
+                Object value = row.get(sourceField);
+                Object maskedValue = maskingService.mask(value, maskingType);
+                result.put(targetField, maskedValue);
+            }
+        } else {
+            List<Map<String, Object>> maskedRows = new ArrayList<>();
+            for (Map<String, Object> row : rawResults) {
+                Map<String, Object> maskedRow = new LinkedHashMap<>();
+                for (AiResponseMapping mapping : dbMappings) {
+                    String sourceField = mapping.getSourceField();
+                    String targetField = mapping.getTargetField();
+                    String maskingType = mapping.getMaskingType();
+                    
+                    Object value = row.get(sourceField);
+                    Object maskedValue = maskingService.mask(value, maskingType);
+                    maskedRow.put(targetField, maskedValue);
+                }
+                maskedRows.add(maskedRow);
+            }
+            result.put("data", maskedRows);
+            result.put("count", maskedRows.size());
+        }
+        
+        return result;
+    }
+
+    /**
      * Apply response_mapping to shape query results.
      * response_mapping format: {"outputField": "$.column_name"}
+     * @deprecated Use applyMandatoryMasking instead
      */
     private Map<String, Object> applyResponseMapping(List<Map<String, Object>> rawResults, AiScenario scenario) {
         log.info("Applying response mapping for {}: {} rows",scenario.getScenarioCode(), rawResults.size());
