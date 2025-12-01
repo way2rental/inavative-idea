@@ -45,6 +45,7 @@ public class ReactiveChatService {
     private final ChatMessageRepository messageRepository;
     private final AiAuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
+    private final com.enterprise.ai.llm.client.ConversationalAiService conversationalAiService;
     // Removed: OllamaProperties - No longer needed with Spring AI
 
     // Configurable runtime protection limits
@@ -66,6 +67,7 @@ public class ReactiveChatService {
             ChatMessageRepository messageRepository,
             AiAuditLogRepository auditLogRepository,
             ObjectMapper objectMapper,
+            com.enterprise.ai.llm.client.ConversationalAiService conversationalAiService,
             // Removed: OllamaProperties parameter
             @Value("${runtime.protection.max-execution-time-ms:60000}") long maxExecutionTimeMs,
             @Value("${runtime.protection.max-ollama-timeout-ms:120000}") long maxOllamaTimeoutMs,
@@ -81,6 +83,7 @@ public class ReactiveChatService {
         this.messageRepository = messageRepository;
         this.auditLogRepository = auditLogRepository;
         this.objectMapper = objectMapper;
+        this.conversationalAiService = conversationalAiService;
         // Removed: this.ollamaProperties = ollamaProperties;
         this.maxExecutionTimeMs = maxExecutionTimeMs;
         this.maxOllamaTimeoutMs = maxOllamaTimeoutMs;
@@ -208,6 +211,20 @@ public class ReactiveChatService {
                                             requestTime, Instant.now(), false,
                                             "Validation failed: " + message, intent, null);
 
+                                    // Handle unknown intent with conversational AI
+                                    if (validation.isUnknown()) {
+                                        log.info("Unknown intent detected - engaging conversational AI");
+                                        return conversationalAiService
+                                                .generateConversationalResponse(request.getQuery(), request.getUserId())
+                                                .flatMapMany(conversationalResponse ->
+                                                    Flux.just("\n" + conversationalResponse)
+                                                )
+                                                .onErrorResume(e -> {
+                                                    log.error("Conversational AI failed: {}", e.getMessage());
+                                                    return Flux.just("\n" + getDefaultUnknownMessage());
+                                                });
+                                    }
+
                                     // Generate user-friendly missing parameter message using AI
                                     if (!validation.missingRequiredParams().isEmpty()) {
                                         return generateMissingParamMessage(intent.getScenario(),
@@ -309,52 +326,78 @@ public class ReactiveChatService {
     }
 
     /**
-     * Generate user-friendly missing parameter message using AI.
+     * Generate user-friendly missing parameter message as structured JSON.
+     * Frontend expects FOLLOW_UP type structured response.
+     * Keep it simple - just the question, no extra formatting.
      */
     private Flux<String> generateMissingParamMessage(String scenarioCode, List<String> missingParams, String userQuery) {
-        return Flux.concat(
-                Flux.just("\n🔍 **Missing Information**\n\n"),
-                llmClient.generateFollowUpQuestion(scenarioCode, missingParams)
-                        .map(question -> {
-                            // Enhance the AI-generated question with helpful formatting
-                            StringBuilder message = new StringBuilder();
-                            message.append(question).append("\n\n");
-                            message.append("**Missing parameters:** ");
-                            message.append(String.join(", ", missingParams.stream()
-                                    .map(param -> param.replace("_", " "))
-                                    .map(this::capitalize)
-                                    .toList()));
-                            message.append("\n\n***Below is the Description of User asking to provide:**\n");
-                            message.append(scenarioRouter.getScenario(scenarioCode).getDescription());
-                            message.append("\n\n");
-                            message.append("*Please provide this information and try again.*");
-                            return message.toString();
-                        })
-                        .onErrorResume(e -> {
-                            // Fallback to simple message if AI fails
-                            log.error("Failed to generate follow-up question: {}", e.getMessage());
-                            return Mono.just(generateSimpleMissingParamMessage(scenarioCode, missingParams));
-                        })
-        );
+        return llmClient.generateFollowUpQuestion(scenarioCode, missingParams)
+                .map(question -> {
+                    // Build structured FOLLOW_UP response - SIMPLE VERSION
+                    try {
+                        // Format missing params for tracking (not display)
+                        List<String> formattedParams = missingParams.stream()
+                                .map(param -> capitalize(param.replace("_", " ")))
+                                .toList();
+
+                        // Build clean, simple JSON - ONLY the question for display
+                        Map<String, Object> response = new LinkedHashMap<>();
+                        response.put("type", "FOLLOW_UP");
+                        response.put("title", ""); // No title, keeps it clean
+                        response.put("confidence", 1.0);
+
+                        Map<String, Object> payload = new LinkedHashMap<>();
+                        // ONLY the question - no extra text
+                        payload.put("question", question);
+                        payload.put("missingParams", formattedParams); // For context tracking, not display
+                        response.put("payload", payload);
+                        response.put("scenario", scenarioCode); // For context tracking
+
+                        return "\n" + objectMapper.writeValueAsString(response);
+                    } catch (Exception e) {
+                        log.error("Failed to build structured follow-up: {}", e.getMessage());
+                        return generateSimpleMissingParamMessageAsJson(scenarioCode, missingParams, question);
+                    }
+                })
+                .flatMapMany(Flux::just)
+                .onErrorResume(e -> {
+                    // Fallback to simple structured message if AI fails
+                    log.error("Failed to generate follow-up question: {}", e.getMessage());
+                    return Flux.just(generateSimpleMissingParamMessageAsJson(
+                        scenarioCode, missingParams, "Could you please provide the required information?"));
+                });
     }
 
     /**
-     * Generate simple missing parameter message as fallback.
+     * Generate simple missing parameter message as structured JSON fallback.
+     * Keep it simple - just a clean question.
      */
-    private String generateSimpleMissingParamMessage(String scenarioCode, List<String> missingParams) {
-        String scenarioName = scenarioCode.replace("_", " ").toLowerCase();
-        String params = String.join(", ", missingParams.stream()
-                .map(param -> "**" + capitalize(param.replace("_", " ")) + "**")
-                .toList());
+    private String generateSimpleMissingParamMessageAsJson(String scenarioCode, List<String> missingParams, String question) {
+        try {
+            List<String> formattedParams = missingParams.stream()
+                    .map(param -> capitalize(param.replace("_", " ")))
+                    .toList();
 
-        return String.format("""
-                
-                To help you with %s, I need some additional information:
-                
-                Missing: %s
-                
-                Please provide this information and ask again.
-                """, scenarioName, params);
+            // Simple, clean question - no extra formatting
+            String cleanQuestion = question;
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("type", "FOLLOW_UP");
+            response.put("title", "");
+            response.put("confidence", 1.0);
+
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("question", cleanQuestion);
+            payload.put("missingParams", formattedParams);
+            response.put("payload", payload);
+            response.put("scenario", scenarioCode);
+
+            return "\n" + objectMapper.writeValueAsString(response);
+        } catch (Exception e) {
+            log.error("Failed to create fallback JSON: {}", e.getMessage());
+            // Last resort: minimal valid JSON with simple question
+            return "\n{\"type\":\"FOLLOW_UP\",\"title\":\"\",\"payload\":{\"question\":\"" + question + "\",\"missingParams\":[]},\"scenario\":\"" + scenarioCode + "\"}";
+        }
     }
 
     /**
@@ -808,5 +851,26 @@ public class ReactiveChatService {
                 .responseType(ChatResponse.ResponseType.ERROR)
                 .followUpRequired(false)
                 .build();
+    }
+
+    /**
+     * Default conversational message for unknown intents (fallback).
+     */
+    private String getDefaultUnknownMessage() {
+        return """
+                I'd be happy to help! 👋
+                
+                I couldn't quite understand your request. Could you tell me what you're looking for?
+                
+                Here are some common actions:
+                • 💰 Check account balance
+                • 📜 View transaction history
+                • 📊 Get account summary
+                • 💳 View card details
+                • 🏦 Check loan status
+                • 📈 Analyze spending
+                
+                What would you like to do?
+                """;
     }
 }

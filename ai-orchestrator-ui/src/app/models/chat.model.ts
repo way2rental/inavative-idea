@@ -98,7 +98,7 @@ export interface ErrorPayload {
 
 /**
  * Chat message model per STRUCTURED_CHAT_RESPONSE_UPGRADE.md Section 6.1.
- * 
+ *
  * Key changes:
  * - content: used ONLY for streaming status messages
  * - structured: final response (rendered by type)
@@ -115,6 +115,12 @@ export interface ChatMessage {
   isError?: boolean;
   followUp?: FollowUpData;
   suggestions?: string[];
+  // Context for follow-up responses
+  pendingContext?: {
+    scenario: string;
+    params: { [key: string]: any };
+    missingParams: string[];
+  };
 }
 
 // Legacy support: Follow-up event payload

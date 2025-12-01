@@ -48,6 +48,13 @@ export class ChatComponent implements AfterViewChecked {
   showSidebar = true;
   isChatOpen = true; // Chat widget open by default
 
+  // Pending context for follow-up responses
+  private pendingContext: {
+    scenario: string;
+    params: { [key: string]: any };
+    missingParams: string[];
+  } | null = null;
+
   // Quick actions for Corporate Banking - matches database scenarios
   quickActions = [
     { icon: '💰', label: 'Account Balance', query: 'Check account balance for account ' },
@@ -106,9 +113,21 @@ export class ChatComponent implements AfterViewChecked {
     };
     this.messages.push(userMessage);
 
+    // Check if we have pending context (previous FOLLOW_UP)
+    let enhancedQuery = message;
+    if (this.pendingContext) {
+      // If user provided just a value (likely the missing param), enhance the query
+      const firstMissingParam = this.pendingContext.missingParams[0];
+      if (firstMissingParam && !message.toLowerCase().includes(this.pendingContext.scenario.toLowerCase())) {
+        // User likely provided just the missing value, reconstruct intent
+        enhancedQuery = `${this.pendingContext.scenario.replace(/_/g, ' ').toLowerCase()} for ${firstMissingParam} ${message}`;
+        console.log('[Context] Enhanced query:', enhancedQuery);
+      }
+    }
+
     const request: ChatRequest = {
       userId: this.authService.getCurrentUser()?.username || 'anonymous',
-      query: message,
+      query: enhancedQuery,
       sessionId: this.sessionId || undefined
     };
 
@@ -205,22 +224,39 @@ export class ChatComponent implements AfterViewChecked {
               assistantMessage.statusMessages = [];
               finalResponseBuffer += chunk;
 
-              // Try to parse as structured JSON if it looks like complete JSON
-              const trimmedBuffer = finalResponseBuffer.trim();
-              if (trimmedBuffer.startsWith('{') && trimmedBuffer.endsWith('}')) {
+              // Try to extract JSON from buffer (may have text prefix/suffix)
+              const jsonMatch = finalResponseBuffer.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
                 try {
-                  const structuredResponse: StructuredResponse = JSON.parse(trimmedBuffer);
+                  const structuredResponse: StructuredResponse = JSON.parse(jsonMatch[0]);
                   // Successfully parsed as JSON - treat as structured response
                   assistantMessage.structured = structuredResponse;
                   assistantMessage.content = undefined;
                   assistantMessage.isLoading = false;
+                  console.log('[SSE] Parsed structured response:', structuredResponse.type);
+
+                  // If this is a FOLLOW_UP, save the context for next message
+                  if (structuredResponse.type === 'FOLLOW_UP') {
+                    const payload = structuredResponse.payload as any;
+                    this.pendingContext = {
+                      scenario: structuredResponse.scenario || '',
+                      params: {}, // Will be filled when user provides values
+                      missingParams: payload.missingParams || []
+                    };
+                    assistantMessage.pendingContext = this.pendingContext;
+                    console.log('[Context] Saved pending context:', this.pendingContext);
+                  } else {
+                    // Clear pending context on successful response
+                    this.pendingContext = null;
+                  }
                 } catch (e) {
                   // Not valid JSON yet or malformed, keep accumulating as text
                   assistantMessage.content = finalResponseBuffer;
                   assistantMessage.isLoading = false;
+                  console.debug('[SSE] Failed to parse JSON, showing as text');
                 }
               } else {
-                // Not JSON format, keep as plain text
+                // No JSON pattern found yet, keep as plain text
                 assistantMessage.content = finalResponseBuffer;
                 assistantMessage.isLoading = false;
               }
@@ -305,11 +341,46 @@ export class ChatComponent implements AfterViewChecked {
             break;
 
           default:
-            // Fallback for unknown event types
+            // Fallback for unknown event types - handle as message
             if (chunk) {
+              // This is part of the final response
+              isCollectingFinalResponse = true;
+              assistantMessage.statusMessages = [];
               finalResponseBuffer += chunk;
-              assistantMessage.content = finalResponseBuffer;
-              assistantMessage.isLoading = false;
+
+              // Try to extract JSON from the buffer (might have text prefix)
+              const jsonMatch = finalResponseBuffer.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                try {
+                  const structuredResponse: StructuredResponse = JSON.parse(jsonMatch[0]);
+                  // Successfully parsed as JSON - treat as structured response
+                  assistantMessage.structured = structuredResponse;
+                  assistantMessage.content = undefined;
+                  assistantMessage.isLoading = false;
+                  console.log('[SSE] Extracted and parsed structured response:', structuredResponse.type);
+
+                  // Save pending context for FOLLOW_UP
+                  if (structuredResponse.type === 'FOLLOW_UP') {
+                    const payload = structuredResponse.payload as any;
+                    this.pendingContext = {
+                      scenario: structuredResponse.scenario || '',
+                      params: {},
+                      missingParams: payload.missingParams || []
+                    };
+                    assistantMessage.pendingContext = this.pendingContext;
+                    console.log('[Context] Saved pending context:', this.pendingContext);
+                  } else {
+                    this.pendingContext = null;
+                  }
+                } catch (e) {
+                  // Not valid JSON yet or malformed, keep accumulating
+                  console.debug('[SSE] JSON extraction failed, accumulating...');
+                }
+              } else {
+                // No JSON pattern found, treat as plain text
+                assistantMessage.content = finalResponseBuffer;
+                assistantMessage.isLoading = false;
+              }
             }
         }
       },

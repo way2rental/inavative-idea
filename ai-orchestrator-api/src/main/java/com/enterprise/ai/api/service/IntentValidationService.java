@@ -60,28 +60,33 @@ public class IntentValidationService {
             boolean needsConfirmation,
             boolean isAmbiguous,
             boolean hasLowConfidence,
+            boolean isUnknown,
             List<String> missingRequiredParams,
             String validationMessage,
             List<String> suggestedScenarios
     ) {
         public static ValidationResult valid() {
-            return new ValidationResult(true, false, false, false, List.of(), null, null);
+            return new ValidationResult(true, false, false, false, false, List.of(), null, null);
         }
 
         public static ValidationResult needsConfirmation(String message) {
-            return new ValidationResult(false, true, false, false, List.of(), message, null);
+            return new ValidationResult(false, true, false, false, false, List.of(), message, null);
         }
 
         public static ValidationResult ambiguous(String message, List<String> scenarios) {
-            return new ValidationResult(false, false, true, false, List.of(), message, scenarios);
+            return new ValidationResult(false, false, true, false, false, List.of(), message, scenarios);
         }
 
         public static ValidationResult lowConfidence(String message) {
-            return new ValidationResult(false, false, false, true, List.of(), message, null);
+            return new ValidationResult(false, false, false, true, false, List.of(), message, null);
+        }
+
+        public static ValidationResult unknown(String message) {
+            return new ValidationResult(false, false, false, false, true, List.of(), message, null);
         }
 
         public static ValidationResult missingParams(List<String> params) {
-            return new ValidationResult(false, false, false, false, params, 
+            return new ValidationResult(false, false, false, false, false, params,
                     "Missing required parameters: " + String.join(", ", params), null);
         }
     }
@@ -94,8 +99,9 @@ public class IntentValidationService {
 
         // Layer 1: Check for UNKNOWN or invalid scenario
         if (intent.getScenario() == null || "UNKNOWN".equals(intent.getScenario())) {
-            log.info("Unknown intent detected");
-            return ValidationResult.lowConfidence("Unable to understand the request");
+            log.info("Unknown intent detected - will engage conversationally");
+            // Return special flag to trigger conversational AI
+            return ValidationResult.unknown(intent.getReasoning() != null ? intent.getReasoning() : "UNKNOWN_INTENT");
         }
 
         // Layer 1: Confidence threshold check

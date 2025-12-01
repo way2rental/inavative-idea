@@ -271,7 +271,7 @@
                             <app-chat-table *ngSwitchCase="'TABLE'" [response]="message.structured"></app-chat-table>
                             <app-chat-mixed *ngSwitchCase="'MIXED'" [response]="message.structured"></app-chat-mixed>
                             <app-chat-follow-up *ngSwitchCase="'FOLLOW_UP'" [response]="message.structured"></app-chat-follow-up>
-                            <app-chat-error *ngSwitchCase="'ERROR'" 
+                            <app-chat-error *ngSwitchCase="'ERROR'"
                               [response]="message.structured"
                               (suggestionClicked)="insertQuery($event)"></app-chat-error>
                             <!-- Default fallback for unknown types -->
