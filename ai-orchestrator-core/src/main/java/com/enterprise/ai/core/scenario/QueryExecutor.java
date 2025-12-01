@@ -1,11 +1,11 @@
 package com.enterprise.ai.core.scenario;
 
+import com.enterprise.ai.common.context.RequestContextHolder;
 import com.enterprise.ai.common.dto.ScenarioRequest;
 import com.enterprise.ai.common.dto.ScenarioResult;
 import com.enterprise.ai.common.enums.ExecutionType;
 import com.enterprise.ai.common.exception.SecurityViolationException;
 import com.enterprise.ai.core.mapper.ResponseMappingService;
-import com.enterprise.ai.common.exception.SecurityViolationException;
 import com.enterprise.ai.core.datasource.DataSourceRegistryService;
 import com.enterprise.ai.core.mapper.JsonPathResponseMapper;
 import com.enterprise.ai.core.mapper.MaskingService;
@@ -13,7 +13,6 @@ import com.enterprise.ai.core.security.ReadOnlyEnforcementService;
 import com.enterprise.ai.core.security.RowLevelSecurityService;
 import com.enterprise.ai.data.entity.AiResponseMapping;
 import com.enterprise.ai.data.entity.AiScenario;
-import com.enterprise.ai.data.entity.AiResponseMapping;
 import com.enterprise.ai.data.repository.AiResponseMappingRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -69,13 +68,27 @@ public class QueryExecutor implements DynamicExecutor {
             String sqlQuery = scenario.getSqlQuery();
             readOnlyEnforcement.validateSqlQuery(sqlQuery);
 
+            // MANDATORY: Apply Row-Level Security filters
+            // This ensures users can only see their own data (owner_user_id + org_id filters)
+            String securedSql = rowLevelSecurityService.applyRowLevelSecurity(
+                    sqlQuery,
+                    RequestContextHolder.getContext()
+            );
+            log.debug("Row-Level Security applied. Original: {}, Secured: {}", sqlQuery, securedSql);
+
             // Build parameters from request_mapping
             Map<String, Object> sqlParams = buildSqlParameters(request, scenario);
+            
+            // Add user context parameters for RLS filters
+            if (RequestContextHolder.getContext() != null) {
+                sqlParams.put("userId", RequestContextHolder.getContext().getUserId());
+                sqlParams.put("orgId", RequestContextHolder.getContext().getTenantId());
+            }
 
             log.info("Executing DB_QUERY for scenario {} with params: {}", scenarioCode, sqlParams.keySet());
 
-            // Execute query with timeout
-            List<Map<String, Object>> rawResults = jdbcTemplate.queryForList(sqlQuery, sqlParams);
+            // Execute query with secured SQL and timeout
+            List<Map<String, Object>> rawResults = jdbcTemplate.queryForList(securedSql, sqlParams);
             
             // Limit result size to prevent memory exhaustion
             if (rawResults.size() > MAX_RESULT_SIZE) {

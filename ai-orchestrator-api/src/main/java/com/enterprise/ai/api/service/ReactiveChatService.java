@@ -239,8 +239,8 @@ public class ReactiveChatService {
                                         Flux.just("[PROGRESS]🔐 Verifying permissions...\n"),
 
                                         Flux.defer(() -> {
-                                            // Authorization check (roles already validated above)
-                                            if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
+                                            // Authorization check - deny if NOT authorized
+                                            if (!rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
                                                 log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
 
                                                 // Log authorization failure to audit
@@ -429,9 +429,9 @@ public class ReactiveChatService {
             return handleValidationFailure(validation, intent, request, sessionId, executionId);
         }
 
-        // Authorization check
+        // Authorization check - deny if user is NOT authorized
         List<String> userRoles = getCurrentUserRoles();
-        if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
+        if (!rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
             String response = "You don't have permission to access this information.";
             saveMessageSync(sessionId, "assistant", response);
             return Mono.just(buildResponse(sessionId, response, ChatResponse.ResponseType.ERROR, 
