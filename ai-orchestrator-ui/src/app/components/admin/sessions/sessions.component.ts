@@ -1,13 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../services/admin.service';
+import { AlertService } from '../../../services/alert.service';
 import { ChatSession } from '../../../models/admin.model';
 
 @Component({
   selector: 'app-sessions',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './sessions.component.html'
 })
 export class SessionsComponent implements OnInit {
@@ -17,9 +19,19 @@ export class SessionsComponent implements OnInit {
   pageSize = 20;
   isLoading = true;
 
+  // Filters
+  filterUserId = '';
+  filterSessionId = '';
+
+  // Selected session for details
+  selectedSession: ChatSession | null = null;
+
   Math = Math; // Expose Math to template
 
-  constructor(private adminService: AdminService) {}
+  constructor(
+    private adminService: AdminService,
+    private alertService: AlertService
+  ) {}
 
   ngOnInit(): void {
     this.loadSessions();
@@ -27,16 +39,37 @@ export class SessionsComponent implements OnInit {
 
   loadSessions(): void {
     this.isLoading = true;
-    this.adminService.getChatSessions(this.currentPage, this.pageSize).subscribe({
+    this.adminService.getChatSessions(this.currentPage, this.pageSize, this.filterUserId, this.filterSessionId).subscribe({
       next: (response) => {
         this.sessions = response.content;
         this.totalElements = response.totalElements;
         this.isLoading = false;
       },
-      error: () => {
+      error: (error) => {
         this.isLoading = false;
+        this.alertService.error('Error', 'Failed to load sessions: ' + error.message);
       }
     });
+  }
+
+  applyFilters(): void {
+    this.currentPage = 0; // Reset to first page when filtering
+    this.loadSessions();
+  }
+
+  clearFilters(): void {
+    this.filterUserId = '';
+    this.filterSessionId = '';
+    this.currentPage = 0;
+    this.loadSessions();
+  }
+
+  viewDetails(session: ChatSession): void {
+    this.selectedSession = session;
+  }
+
+  closeDetails(): void {
+    this.selectedSession = null;
   }
 
   nextPage(): void {
@@ -53,17 +86,37 @@ export class SessionsComponent implements OnInit {
     }
   }
 
-  getTimeSince(dateString: string): string {
+  getTotalPages(): number {
+    return Math.ceil(this.totalElements / this.pageSize);
+  }
+
+  getStatusColor(status: string): string {
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return 'text-green-600';
+      case 'completed':
+        return 'text-blue-600';
+      case 'expired':
+        return 'text-gray-600';
+      default:
+        return 'text-gray-600';
+    }
+  }
+
+  formatDate(dateString: string): string {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d ago`;
+    return date.toLocaleString();
+  }
+
+  formatDuration(start: string, end: string): string {
+    if (!start || !end) return 'N/A';
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const durationMs = endDate.getTime() - startDate.getTime();
+    const minutes = Math.floor(durationMs / 60000);
+    const seconds = Math.floor((durationMs % 60000) / 1000);
+    return `${minutes}m ${seconds}s`;
   }
 }
+

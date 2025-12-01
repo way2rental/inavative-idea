@@ -114,10 +114,83 @@ export interface PerformanceMetrics {
   requestsPerMinute: number;
 }
 
-export interface OllamaStatus {
-  connected: boolean;
-  baseUrl: string;
-  model: string;
-  enabled: boolean;
-  lastCheckTime: string;
+// ============================================
+// ACTUATOR & SYSTEM MONITORING MODELS
+// ============================================
+
+export interface ActuatorHealth {
+  status: string;
+  components?: {
+    [key: string]: {
+      status: string;
+      details?: any;
+    };
+  };
+}
+
+export interface ActuatorInfo {
+  app?: {
+    name?: string;
+    version?: string;
+    description?: string;
+  };
+  java?: {
+    version?: string;
+    vendor?: string;
+    runtime?: string;
+  };
+  os?: {
+    name?: string;
+    version?: string;
+    arch?: string;
+  };
+}
+
+export interface ActuatorMetrics {
+  names: string[];
+}
+
+export interface ActuatorMetricValue {
+  name: string;
+  measurements: Array<{
+    statistic: string;
+    value: number;
+  }>;
+  availableTags: Array<{
+    tag: string;
+    values: string[];
+  }>;
+}
+
+export interface SystemInfo {
+  jvm: {
+    memory: {
+      used: number;
+      max: number;
+      percentage: number;
+    };
+    threads: number;
+    uptime: number;
+  };
+  system: {
+    cpuCount: number;
+    osName: string;
+    osVersion: string;
+  };
+}
+
+export interface CircuitBreakerInfo {
+  name: string;
+  state: string;
+  failureRate: number;
+  slowCallRate: number;
+  bufferedCalls: number;
+  failedCalls: number;
+  successfulCalls: number;
+}
+
+export interface RateLimiterInfo {
+  name: string;
+  availablePermissions: number;
+  numberOfWaitingThreads: number;
 }

@@ -24,4 +24,6 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   isLoading?: boolean;
+  isStreaming?: boolean;
+  statusMessages?: string[];
 }

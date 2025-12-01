@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../services/admin.service';
+import { AlertService } from '../../../services/alert.service';
 import { Scenario } from '../../../models/admin.model';
 
 interface RoleMapping {
@@ -34,7 +35,10 @@ export class RbacComponent implements OnInit {
   selectedRole = '';
   selectedScenario = '';
 
-  constructor(private adminService: AdminService) {}
+  constructor(
+    private adminService: AdminService,
+    private alertService: AlertService
+  ) {}
 
   ngOnInit(): void {
     this.loadData();
@@ -42,7 +46,7 @@ export class RbacComponent implements OnInit {
 
   loadData(): void {
     this.isLoading = true;
-    
+
     // Load scenarios
     this.adminService.getScenarios().subscribe(scenarios => {
       this.scenarios = scenarios;
@@ -89,17 +93,28 @@ export class RbacComponent implements OnInit {
         next: () => {
           this.closeAddModal();
           this.loadData();
+          this.alertService.success('Success', 'Mapping added successfully');
         },
-        error: () => alert('Failed to add mapping')
+        error: () => this.alertService.error('Error', 'Failed to add mapping')
       });
     }
   }
 
-  removeMapping(role: string, scenarioCode: string): void {
-    if (confirm(`Remove "${scenarioCode}" from "${role}"?`)) {
+  async removeMapping(role: string, scenarioCode: string): Promise<void> {
+    const confirmed = await this.alertService.confirm(
+      'Remove Mapping',
+      `Remove "${scenarioCode}" from "${role}"?`,
+      'Remove',
+      'Cancel'
+    );
+
+    if (confirmed) {
       this.adminService.removeRbacMapping(role, scenarioCode).subscribe({
-        next: () => this.loadData(),
-        error: () => alert('Failed to remove mapping')
+        next: () => {
+          this.loadData();
+          this.alertService.success('Success', 'Mapping removed successfully');
+        },
+        error: () => this.alertService.error('Error', 'Failed to remove mapping')
       });
     }
   }
@@ -107,10 +122,10 @@ export class RbacComponent implements OnInit {
   refreshCache(): void {
     this.adminService.refreshRbacCache().subscribe({
       next: () => {
-        alert('RBAC cache refreshed successfully!');
+        this.alertService.success('Cache Refreshed', 'RBAC cache refreshed successfully!');
         this.loadData();
       },
-      error: () => alert('Failed to refresh cache')
+      error: () => this.alertService.error('Error', 'Failed to refresh cache')
     });
   }
 

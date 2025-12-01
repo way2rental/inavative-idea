@@ -11,8 +11,7 @@ import {
   ScenarioTestRequest,
   ScenarioTestResult,
   DashboardStats,
-  PerformanceMetrics,
-  OllamaStatus
+  PerformanceMetrics
 } from '../models/admin.model';
 import { environment } from '../../environments/environment';
 
@@ -69,18 +68,18 @@ export class AdminService {
     );
   }
 
-  // Ollama Status - fetches from backend health check
-  getOllamaStatus(): Observable<OllamaStatus> {
-    return this.http.get<OllamaStatus>(`${this.baseUrl}/ollama/health`).pipe(
-      catchError(this.handleError('getOllamaStatus', {
-        connected: false,
-        baseUrl: '',
-        model: '',
-        enabled: false,
-        lastCheckTime: new Date().toISOString()
-      }))
-    );
-  }
+//   // Ollama Status - fetches from backend health check
+//   getOllamaStatus(): Observable<OllamaStatus> {
+//     return this.http.get<OllamaStatus>(`${this.baseUrl}/ollama/health`).pipe(
+//       catchError(this.handleError('getOllamaStatus', {
+//         connected: false,
+//         baseUrl: '',
+//         model: '',
+//         enabled: false,
+//         lastCheckTime: new Date().toISOString()
+//       }))
+//     );
+//   }
 
   // Scenarios CRUD - all data from DB
   getScenarios(): Observable<Scenario[]> {
@@ -129,9 +128,19 @@ export class AdminService {
     );
   }
 
-  // Chat Sessions - all data from DB
-  getChatSessions(page = 0, size = 20): Observable<{ content: ChatSession[]; totalElements: number }> {
-    const params = new HttpParams().set('page', page.toString()).set('size', size.toString());
+  // Chat Sessions - all data from DB with filters
+  getChatSessions(page = 0, size = 20, userId?: string, sessionId?: string): Observable<{ content: ChatSession[]; totalElements: number }> {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('size', size.toString());
+
+    if (userId && userId.trim()) {
+      params = params.set('userId', userId.trim());
+    }
+    if (sessionId && sessionId.trim()) {
+      params = params.set('sessionId', sessionId.trim());
+    }
+
     return this.http.get<{ content: ChatSession[]; totalElements: number }>(`${this.baseUrl}/admin/sessions`, { params }).pipe(
       catchError(this.handleError('getChatSessions', { content: [], totalElements: 0 }))
     );

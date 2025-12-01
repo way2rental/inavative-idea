@@ -85,7 +85,7 @@ public class AnalyticsService {
         List<Double> weeklySuccessRates = new ArrayList<>();
 
         for (int i = weeks - 1; i >= 0; i--) {
-            Instant weekEnd = now.minus((long) i, ChronoUnit.WEEKS);
+            Instant weekEnd = now.minus(i, ChronoUnit.WEEKS);
             Instant weekStart = weekEnd.minus(7, ChronoUnit.DAYS);
 
             long total = auditLogRepository.countByRequestTimeBetween(weekStart, weekEnd);

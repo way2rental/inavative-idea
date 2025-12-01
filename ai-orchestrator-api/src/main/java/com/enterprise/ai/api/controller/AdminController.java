@@ -240,16 +240,19 @@ public class AdminController {
     // ===================== CHAT SESSIONS =====================
 
     @GetMapping("/sessions")
-    @Operation(summary = "Get chat sessions", description = "Returns paginated chat sessions")
+    @Operation(summary = "Get chat sessions", description = "Returns paginated chat sessions with optional filters")
     public ResponseEntity<Map<String, Object>> getChatSessions(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        
-        log.info("Fetching chat sessions - page: {}, size: {}", page, size);
-        
-        // Use SessionService for paginated results
-        Page<ChatSession> sessionsPage = sessionService.getSessions(page, size);
-        
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String sessionId) {
+
+        log.info("Fetching chat sessions - page: {}, size: {}, userId filter: {}, sessionId filter: {}",
+                page, size, userId, sessionId);
+
+        // Use SessionService for paginated results with filters
+        Page<ChatSession> sessionsPage = sessionService.getSessionsWithFilters(userId, sessionId, page, size);
+
         List<SessionDTO> sessionDTOs = sessionsPage.getContent().stream()
                 .map(this::toSessionDTO)
                 .toList();

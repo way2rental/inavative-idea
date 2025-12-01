@@ -2,7 +2,8 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../services/admin.service';
-import { DashboardStats, PerformanceMetrics, OllamaStatus, Scenario, AuditLog } from '../../../models/admin.model';
+import { AlertService } from '../../../services/alert.service';
+import { DashboardStats, PerformanceMetrics, Scenario, AuditLog } from '../../../models/admin.model';
 import { interval, Subscription } from 'rxjs';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration, ChartData, ChartType } from 'chart.js';
@@ -14,9 +15,11 @@ import { ChartConfiguration, ChartData, ChartType } from 'chart.js';
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit, OnDestroy {
+  // Expose Math to template
+  Math = Math;
+
   stats: DashboardStats | null = null;
   metrics: PerformanceMetrics | null = null;
-  ollamaStatus: OllamaStatus | null = null;
   recentScenarios: Scenario[] = [];
   recentLogs: AuditLog[] = [];
   isLoading = true;
@@ -181,7 +184,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   };
 
-  constructor(private adminService: AdminService) {}
+  constructor(
+    private adminService: AdminService,
+    private alertService: AlertService
+  ) {}
 
   ngOnInit(): void {
     this.loadDashboardData();
@@ -207,11 +213,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Load performance metrics
     this.adminService.getPerformanceMetrics().subscribe(metrics => {
       this.metrics = metrics;
-    });
-
-    // Load Ollama status
-    this.adminService.getOllamaStatus().subscribe(status => {
-      this.ollamaStatus = status;
     });
 
     // Load recent scenarios
@@ -265,10 +266,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   refreshCache(): void {
     this.adminService.refreshScenarioCache().subscribe({
       next: () => {
-        alert('Cache refreshed successfully!');
+        this.alertService.success('Success', 'Cache refreshed successfully!');
         this.loadDashboardData();
       },
-      error: () => alert('Failed to refresh cache')
+      error: () => this.alertService.error('Error', 'Failed to refresh cache')
     });
   }
 }

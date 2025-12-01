@@ -69,7 +69,6 @@ public class QueryExecutor implements DynamicExecutor {
                 rawResults = rawResults.subList(0, MAX_RESULT_SIZE);
             }
 
-            // Apply response_mapping to shape output
             Map<String, Object> shapedResult = applyResponseMapping(rawResults, scenario);
 
             long executionTime = System.currentTimeMillis() - startTime;
@@ -186,6 +185,7 @@ public class QueryExecutor implements DynamicExecutor {
      * response_mapping format: {"outputField": "$.column_name"}
      */
     private Map<String, Object> applyResponseMapping(List<Map<String, Object>> rawResults, AiScenario scenario) {
+        log.info("Applying response mapping for {}: {} rows",scenario.getScenarioCode(), rawResults.size());
         Map<String, Object> result = new LinkedHashMap<>();
         
         if (rawResults.isEmpty()) {

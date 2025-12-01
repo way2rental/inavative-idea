@@ -183,104 +183,186 @@ public class ReactiveChatService {
                 .doOnError(e -> log.error("Intent detection failed in streaming: {}", e.getMessage()))
                 .cache(); // Cache to avoid re-executing intent detection
 
-        // Now build the response flux with progress indicators
+        // Now build the response flux with detailed progress indicators
         return Flux.concat(
-                // Send initial progress AFTER auth check
+                // Stage 1: Initial analysis
                 Flux.just("🔍 Analyzing your request...\n"),
 
                 intentMono.flatMapMany(intent -> {
-                    // Validate intent
-                    IntentValidationService.ValidationResult validation =
-                            validationService.validate(intent, request.getQuery());
-
-                    if (!validation.isValid()) {
-                        String message = validation.validationMessage();
-                        log.debug("Validation failed, returning error message");
-
-                        // Log validation failure to audit
-                        Instant requestTime = Instant.now();
-                        logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
-                                requestTime, Instant.now(), false,
-                                "Validation failed: " + message, intent, null);
-
-                        return Flux.just("\n" + message);
-                    }
-
-                    // Authorization check (roles already validated above)
-                    if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
-                        log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
-
-                        // Log authorization failure to audit
-                        Instant requestTime = Instant.now();
-                        logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
-                                requestTime, Instant.now(), false,
-                                "Authorization denied for roles: " + userRoles, intent, null);
-
-                        return Flux.just(String.format("\n❌ You don't have permission to access this information.\nYour roles: %s\nRequired scenario: %s", userRoles, intent.getScenario()));
-                    }
-
-                    log.debug("Authorization successful for user with roles: {}", userRoles);
-
-                    // Execute scenario
-                    ScenarioRequest scenarioRequest = ScenarioRequest.builder()
-                            .scenario(intent.getScenario())
-                            .params(intent.getParams())
-                            .userId(request.getUserId())
-                            .build();
-
-                    log.debug("Executing scenario reactively: {}", intent.getScenario());
-
+                    // Stage 2: Understanding complete
                     return Flux.concat(
-                            Flux.just("\n📊 Fetching data...\n"),
-                            scenarioRouter.routeReactive(scenarioRequest)
-                                    .timeout(Duration.ofMillis(maxDbTimeoutMs))
-                                    .doOnSuccess(result -> {
-                                        log.debug("Scenario executed, starting streaming response");
-                                        // Log successful execution to audit
-                                        Instant requestTime = Instant.now();
-                                        logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
-                                                requestTime, Instant.now(), true, null, intent, result);
-                                    })
-                                    .doOnError(e -> {
-                                        log.error("Scenario execution failed: {}", e.getMessage());
-                                        // Log execution failure to audit
-                                        Instant requestTime = Instant.now();
-                                        logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
-                                                requestTime, Instant.now(), false,
-                                                "Scenario execution failed: " + e.getMessage(), intent, null);
-                                    })
-                                    .flatMapMany(result -> {
-                                        log.debug("Formatting response as stream");
+                            Flux.just("✅ Request understood - " + intent.getScenario().replace("_", " ").toLowerCase() + "\n"),
 
-                                        // Collect the response to save it later
-                                        final StringBuilder responseCollector = new StringBuilder();
+                            Flux.defer(() -> {
+                                // Validate intent
+                                IntentValidationService.ValidationResult validation =
+                                        validationService.validate(intent, request.getQuery());
 
-                                        return Flux.concat(
-                                                Flux.just("\n"),
-                                                llmClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery())
-                                                        .doOnNext(chunk -> responseCollector.append(chunk))
-                                                        .doOnComplete(() -> {
-                                                            log.debug("Response streaming completed");
-                                                            // Save the complete assistant response
-                                                            String completeResponse = responseCollector.toString().trim();
-                                                            if (!completeResponse.isEmpty()) {
-                                                                saveMessageSync(sessionId, "assistant", completeResponse);
-                                                            }
-                                                        })
-                                                        .doOnError(e -> log.error("Response streaming error: {}", e.getMessage()))
-                                        );
-                                    })
+                                if (!validation.isValid()) {
+                                    String message = validation.validationMessage();
+                                    log.debug("Validation failed, returning error message");
+
+                                    // Log validation failure to audit
+                                    Instant requestTime = Instant.now();
+                                    logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                            requestTime, Instant.now(), false,
+                                            "Validation failed: " + message, intent, null);
+
+                                    // Generate user-friendly missing parameter message using AI
+                                    if (!validation.missingRequiredParams().isEmpty()) {
+                                        return generateMissingParamMessage(intent.getScenario(),
+                                                validation.missingRequiredParams(), request.getQuery());
+                                    }
+
+                                    return Flux.just("\n" + message);
+                                }
+
+                                // Stage 3: Checking permissions
+                                return Flux.concat(
+                                        Flux.just("🔐 Verifying permissions...\n"),
+
+                                        Flux.defer(() -> {
+                                            // Authorization check (roles already validated above)
+                                            if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
+                                                log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
+
+                                                // Log authorization failure to audit
+                                                Instant requestTime = Instant.now();
+                                                logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                                        requestTime, Instant.now(), false,
+                                                        "Authorization denied for roles: " + userRoles, intent, null);
+
+                                                return Flux.just(String.format("\n❌ You don't have permission to access this information.\n\n**Your roles:** %s\n**Required scenario:** %s",
+                                                        userRoles, intent.getScenario()));
+                                            }
+
+                                            log.debug("Authorization successful for user with roles: {}", userRoles);
+
+                                            // Stage 4: Execute scenario
+                                            ScenarioRequest scenarioRequest = ScenarioRequest.builder()
+                                                    .scenario(intent.getScenario())
+                                                    .params(intent.getParams())
+                                                    .userId(request.getUserId())
+                                                    .build();
+
+                                            log.debug("Executing scenario reactively: {}", intent.getScenario());
+
+                                            return Flux.concat(
+                                                    Flux.just("✅ Access granted\n"),
+                                                    Flux.just("📊 Fetching your data...\n"),
+                                                    scenarioRouter.routeReactive(scenarioRequest)
+                                                            .timeout(Duration.ofMillis(maxDbTimeoutMs))
+                                                            .doOnSuccess(result -> {
+                                                                log.debug("Scenario executed, starting streaming response");
+                                                                // Log successful execution to audit
+                                                                Instant requestTime = Instant.now();
+                                                                logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                                                        requestTime, Instant.now(), true, null, intent, result);
+                                                            })
+                                                            .doOnError(e -> {
+                                                                log.error("Scenario execution failed: {}", e.getMessage());
+                                                                // Log execution failure to audit
+                                                                Instant requestTime = Instant.now();
+                                                                logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
+                                                                        requestTime, Instant.now(), false,
+                                                                        "Scenario execution failed: " + e.getMessage(), intent, null);
+                                                            })
+                                                            .flatMapMany(result -> {
+                                                                log.debug("Formatting response as stream");
+
+                                                                // Collect the response to save it later
+                                                                final StringBuilder responseCollector = new StringBuilder();
+
+                                                                return Flux.concat(
+                                                                        Flux.just("✅ Data retrieved\n"),
+                                                                        Flux.just("📝 Preparing your response...\n"),
+                                                                        Flux.just("\n"),
+                                                                        llmClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery())
+                                                                                .doOnNext(chunk -> responseCollector.append(chunk))
+                                                                                .doOnComplete(() -> {
+                                                                                    log.debug("Response streaming completed");
+                                                                                    // Save the complete assistant response
+                                                                                    String completeResponse = responseCollector.toString().trim();
+                                                                                    if (!completeResponse.isEmpty()) {
+                                                                                        saveMessageSync(sessionId, "assistant", completeResponse);
+                                                                                    }
+                                                                                })
+                                                                                .doOnError(e -> log.error("Response streaming error: {}", e.getMessage()))
+                                                                );
+                                                            })
+                                            );
+                                        })
+                                );
+                            })
                     );
                 })
         )
         .timeout(Duration.ofMillis(maxExecutionTimeMs),
-                Flux.just("\n⏱️ Request timeout. The operation is taking longer than expected. Please try again."))
+                Flux.just("\n⏱️ **Request timeout.** The operation is taking longer than expected. Please try again."))
         .onErrorResume(e -> {
             log.error("Streaming error: {}", e.getMessage(), e);
-            return Flux.just("\n❌ An error occurred: " + e.getMessage() + "\nPlease try again.");
+            return Flux.just("\n❌ **An error occurred:** " + e.getMessage() + "\n\nPlease try again or contact support if the issue persists.");
         });
     }
 
+    /**
+     * Generate user-friendly missing parameter message using AI.
+     */
+    private Flux<String> generateMissingParamMessage(String scenarioCode, List<String> missingParams, String userQuery) {
+        return Flux.concat(
+                Flux.just("\n🔍 **Missing Information**\n\n"),
+                llmClient.generateFollowUpQuestion(scenarioCode, missingParams)
+                        .map(question -> {
+                            // Enhance the AI-generated question with helpful formatting
+                            StringBuilder message = new StringBuilder();
+                            message.append(question).append("\n\n");
+                            message.append("**Missing parameters:** ");
+                            message.append(String.join(", ", missingParams.stream()
+                                    .map(param -> param.replace("_", " "))
+                                    .map(this::capitalize)
+                                    .toList()));
+                            message.append("\n\n***Below is the Description of User asking to provide:**\n");
+                            message.append(scenarioRouter.getScenario(scenarioCode).getDescription());
+                            message.append("\n\n");
+                            message.append("*Please provide this information and try again.*");
+                            return message.toString();
+                        })
+                        .onErrorResume(e -> {
+                            // Fallback to simple message if AI fails
+                            log.error("Failed to generate follow-up question: {}", e.getMessage());
+                            return Mono.just(generateSimpleMissingParamMessage(scenarioCode, missingParams));
+                        })
+        );
+    }
+
+    /**
+     * Generate simple missing parameter message as fallback.
+     */
+    private String generateSimpleMissingParamMessage(String scenarioCode, List<String> missingParams) {
+        String scenarioName = scenarioCode.replace("_", " ").toLowerCase();
+        String params = String.join(", ", missingParams.stream()
+                .map(param -> "**" + capitalize(param.replace("_", " ")) + "**")
+                .toList());
+
+        return String.format("""
+                
+                To help you with %s, I need some additional information:
+                
+                Missing: %s
+                
+                Please provide this information and ask again.
+                """, scenarioName, params);
+    }
+
+    /**
+     * Capitalize first letter of a string.
+     */
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
+    }
 
     private Mono<ChatResponse> processIntent(
             IntentResult intent, 
