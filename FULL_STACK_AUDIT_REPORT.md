@@ -191,7 +191,7 @@ public class ChatRequest {
 | **God Class** | `ChatService.java` | 518 lines, 15+ methods, multiple responsibilities |
 | **Dead Code** | `applyMandatoryMasking()` QueryExecutor.java:219-302 | Never called |
 | **Inverted Logic** | `RbacService.java:174` | `return !authorized` - returns opposite meaning |
-| **Security Bypass** | `JwtService.java:73-76` | `if(true) return false` bypasses security check |
+| **Security Bypass** | `JwtService.java:73-76` | `if(true) return false` - this hardcoded condition bypasses the entire insecure secret validation, allowing the application to start with default/weak JWT secrets |
 | **Hardcoded Secret** | `JwtService.java:29,32` | Default JWT secret in code |
 
 ### Scalability & Extensibility Issues
@@ -561,7 +561,7 @@ hikari:
 
 ### G.4. State Management
 
-- No Redux/NgRx/Akita detected
+- No NgRx/NGXS/Elf (Angular state management libraries) detected
 - BehaviorSubject used for currentUser$ (simple approach)
 - Chat messages stored in component state
 
@@ -821,7 +821,7 @@ import com.enterprise.ai.data.entity.AiResponseMapping;
 ```java
 public boolean anyRoleAuthorized(List<String> roles, String scenarioCode) {
     if (roles == null || roles.isEmpty()) {
-        return true;  // No roles = authorized?
+        return true;  // ISSUE: Empty roles should deny access, not grant it
     }
     boolean authorized = roles.stream().anyMatch(role -> isAuthorized(role, scenarioCode));
     return !authorized;  // ❌ WRONG
@@ -1070,7 +1070,10 @@ App
 | **Documentation** | 7/10 | Good inline docs, specs present |
 | **DevOps** | 2/10 | Only Ollama in docker-compose |
 | **Testing** | 1/10 | Only 1 test file found |
-| **Overall** | **4.4/10** | Critical security issues must be addressed |
+| **Overall** | **4.0/10** | Weighted average with security issues having 2x weight |
+
+**Score Calculation:** `(6+4+6+3×2+6+5+7+2+1) / 11 = 44/11 = 4.0`  
+Security weight doubled due to critical impact on production readiness.
 
 ---
 
