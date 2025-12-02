@@ -158,21 +158,7 @@ public class HttpCallExecutor implements DynamicExecutor {
             // MANDATORY: Inject security headers from RequestContext
             requestSpec = injectSecurityHeaders(requestSpec, userContext);
 
-            // Add custom headers if specified
-            if (scenario.getHttpHeaders() != null && !scenario.getHttpHeaders().isBlank()) {
-                try {
-                    Map<String, String> headers = objectMapper.readValue(
-                            scenario.getHttpHeaders(), 
-                            new TypeReference<Map<String, String>>() {}
-                    );
-                    for (Map.Entry<String, String> header : headers.entrySet()) {
-                        requestSpec = ((WebClient.RequestHeadersSpec<?>) requestSpec)
-                                .header(header.getKey(), header.getValue());
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to parse http_headers: {}", e.getMessage());
-                }
-            }
+            // Note: Custom headers removed - security headers injected via injectSecurityHeaders()
 
             return requestSpec
                     .retrieve()
@@ -237,7 +223,6 @@ public class HttpCallExecutor implements DynamicExecutor {
                             "url", url,
                             "urlWhitelisted", true,
                             "requestBody", requestBody,
-                            "headers", scenario.getHttpHeaders(),
                             "responseMapping", scenario.getResponseMapping(),
                             "timeoutMs", scenario.getTimeoutMs()
                     ))

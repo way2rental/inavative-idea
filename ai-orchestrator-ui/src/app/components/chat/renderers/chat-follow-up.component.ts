@@ -5,22 +5,26 @@ import { StructuredResponse, FollowUpPayload } from '../../../models/chat.model'
 /**
  * FOLLOW_UP Response Renderer per STRUCTURED_CHAT_RESPONSE_UPGRADE.md Section 7.
  * Renders highlighted question with missing parameters.
+ * No outer wrapper - parent already provides chat bubble styling.
  */
 @Component({
   selector: 'app-chat-follow-up',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="chat-follow-up-response">
-      <div class="bg-white rounded-lg p-3 max-w-md">
-        <p class="text-gray-800 text-sm leading-relaxed">{{ question }}</p>
+    <div class="follow-up-content">
+      <p class="text-gray-800 text-sm leading-relaxed">{{ question }}</p>
+      <div *ngIf="missingParams.length > 0" class="mt-2 text-xs text-gray-500">
+        <span class="font-medium">Looking for:</span>
+        <span *ngFor="let param of missingParams; let last = last">
+          {{ param }}{{ last ? '' : ', ' }}
+        </span>
       </div>
     </div>
   `,
   styles: [`
-    .chat-follow-up-response {
-      display: flex;
-      margin-bottom: 1rem;
+    .follow-up-content {
+      /* No additional styling needed - parent provides chat bubble */
     }
   `]
 })

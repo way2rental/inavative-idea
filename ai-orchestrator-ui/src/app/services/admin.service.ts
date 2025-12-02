@@ -20,7 +20,14 @@ import {
   FollowUpGroupFormData,
   FollowUpQuestion,
   PolicyRule,
-  PolicyFormData
+  PolicyFormData,
+  ResponseMapping,
+  ResponseMappingForm,
+  JsonPathTestRequest,
+  JsonPathTestResult,
+  RoleScenarioMapping,
+  RbacMatrix,
+  BulkRbacRequest
 } from '../models/admin.model';
 import { environment } from '../../environments/environment';
 
@@ -383,7 +390,135 @@ export class AdminService {
     return this.http.post<any>(`${this.baseUrl}/admin/policies/${id}/test`, testContext);
   }
 
-  // RBAC Management
+  // ===================== RESPONSE MAPPINGS =====================
+
+  getResponseMappings(scenarioCode?: string): Observable<ResponseMapping[]> {
+    const params: any = {};
+    if (scenarioCode) {
+      params.scenarioCode = scenarioCode;
+    }
+    return this.http.get<ResponseMapping[]>(`${this.baseUrl}/admin/response-mappings`, { params }).pipe(
+      catchError(this.handleError('getResponseMappings', []))
+    );
+  }
+
+  getResponseMappingById(id: number): Observable<ResponseMapping> {
+    return this.http.get<ResponseMapping>(`${this.baseUrl}/admin/response-mappings/${id}`);
+  }
+
+  getResponseMappingScenarios(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.baseUrl}/admin/response-mappings/scenarios`).pipe(
+      catchError(this.handleError('getResponseMappingScenarios', []))
+    );
+  }
+
+  createResponseMapping(mapping: ResponseMappingForm): Observable<ResponseMapping> {
+    return this.http.post<ResponseMapping>(`${this.baseUrl}/admin/response-mappings`, mapping);
+  }
+
+  updateResponseMapping(id: number, mapping: ResponseMappingForm): Observable<ResponseMapping> {
+    return this.http.put<ResponseMapping>(`${this.baseUrl}/admin/response-mappings/${id}`, mapping);
+  }
+
+  deleteResponseMapping(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/response-mappings/${id}`);
+  }
+
+  toggleResponseMappingStatus(id: number, active: boolean): Observable<ResponseMapping> {
+    return this.http.patch<ResponseMapping>(`${this.baseUrl}/admin/response-mappings/${id}/status`, { active });
+  }
+
+  testJsonPath(request: JsonPathTestRequest): Observable<JsonPathTestResult> {
+    return this.http.post<JsonPathTestResult>(`${this.baseUrl}/admin/response-mappings/test`, request);
+  }
+
+  refreshResponseMappingCache(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/admin/response-mappings/cache/refresh`, {});
+  }
+
+  deleteResponseMappingsByScenario(scenarioCode: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.baseUrl}/admin/response-mappings/scenario/${scenarioCode}`);
+  }
+
+  // ===================== RBAC MANAGEMENT (ENHANCED) =====================
+
+  getAllRbacMappings(): Observable<RoleScenarioMapping[]> {
+    return this.http.get<RoleScenarioMapping[]>(`${this.baseUrl}/admin/rbac/mappings`).pipe(
+      catchError(this.handleError('getAllRbacMappings', []))
+    );
+  }
+
+  getRbacMappingById(id: number): Observable<RoleScenarioMapping> {
+    return this.http.get<RoleScenarioMapping>(`${this.baseUrl}/admin/rbac/mappings/${id}`);
+  }
+
+  getAllRoles(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.baseUrl}/admin/rbac/roles`).pipe(
+      catchError(this.handleError('getAllRoles', []))
+    );
+  }
+
+  getAllMappedScenarios(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.baseUrl}/admin/rbac/scenarios`).pipe(
+      catchError(this.handleError('getAllMappedScenarios', []))
+    );
+  }
+
+  getScenariosByRole(roleName: string): Observable<string[]> {
+    return this.http.get<string[]>(`${this.baseUrl}/admin/rbac/roles/${roleName}/scenarios`).pipe(
+      catchError(this.handleError('getScenariosByRole', []))
+    );
+  }
+
+  getRolesByScenario(scenarioCode: string): Observable<string[]> {
+    return this.http.get<string[]>(`${this.baseUrl}/admin/rbac/scenarios/${scenarioCode}/roles`).pipe(
+      catchError(this.handleError('getRolesByScenario', []))
+    );
+  }
+
+  checkRbacAccess(roleName: string, scenarioCode: string): Observable<{ hasAccess: boolean }> {
+    return this.http.get<{ hasAccess: boolean }>(`${this.baseUrl}/admin/rbac/check-access`, {
+      params: { roleName, scenarioCode }
+    });
+  }
+
+  grantRbacAccess(roleName: string, scenarioCode: string): Observable<RoleScenarioMapping> {
+    return this.http.post<RoleScenarioMapping>(`${this.baseUrl}/admin/rbac/mappings`, { roleName, scenarioCode });
+  }
+
+  revokeRbacAccess(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/rbac/mappings/${id}`);
+  }
+
+  revokeRbacAccessByRoleAndScenario(roleName: string, scenarioCode: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.baseUrl}/admin/rbac/revoke`, {
+      params: { roleName, scenarioCode }
+    });
+  }
+
+  bulkGrantRbacAccess(request: BulkRbacRequest): Observable<RoleScenarioMapping[]> {
+    return this.http.post<RoleScenarioMapping[]>(`${this.baseUrl}/admin/rbac/mappings/bulk`, request);
+  }
+
+  revokeAllFromRole(roleName: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.baseUrl}/admin/rbac/roles/${roleName}/revoke-all`);
+  }
+
+  revokeAllFromScenario(scenarioCode: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.baseUrl}/admin/rbac/scenarios/${scenarioCode}/revoke-all`);
+  }
+
+  getRbacMatrix(): Observable<RbacMatrix> {
+    return this.http.get<RbacMatrix>(`${this.baseUrl}/admin/rbac/matrix`).pipe(
+      catchError(this.handleError('getRbacMatrix', { roles: [], scenarios: [], mappings: [] }))
+    );
+  }
+
+//   refreshRbacCache(): Observable<{ message: string }> {
+//     return this.http.post<{ message: string }>(`${this.baseUrl}/admin/rbac/cache/refresh`, {});
+//   }
+
+  // RBAC Management (Legacy - keeping for backward compatibility)
   getRbacMappings(): Observable<Record<string, string[]>> {
     return this.http.get<Record<string, string[]>>(`${this.baseUrl}/admin/rbac/mappings`).pipe(
       catchError(this.handleError('getRbacMappings', {}))

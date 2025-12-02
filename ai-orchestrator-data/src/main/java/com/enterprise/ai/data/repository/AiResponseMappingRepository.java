@@ -2,6 +2,7 @@ package com.enterprise.ai.data.repository;
 
 import com.enterprise.ai.data.entity.AiResponseMapping;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -36,4 +37,10 @@ public interface AiResponseMappingRepository extends JpaRepository<AiResponseMap
      * Delete all mappings for a scenario
      */
     void deleteByScenarioCode(String scenarioCode);
+
+    /**
+     * Get distinct scenario codes that have mappings
+     */
+    @Query("SELECT DISTINCT m.scenarioCode FROM AiResponseMapping m ORDER BY m.scenarioCode")
+    List<String> findDistinctScenarioCodes();
 }

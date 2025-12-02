@@ -70,7 +70,10 @@ export class ChatComponent implements AfterViewChecked {
   constructor(
     private apiService: ApiService,
     private authService: AuthService
-  ) {}
+  ) {
+    // Load chat history on initialization
+    this.loadChatHistory();
+  }
 
   ngAfterViewChecked(): void {
     this.scrollToBottom();
@@ -113,6 +116,11 @@ export class ChatComponent implements AfterViewChecked {
     };
     this.messages.push(userMessage);
 
+    // Only clear inputMessage if user typed it manually (not from suggestions)
+    if (!query) {
+      this.inputMessage = '';
+    }
+
     // Check if we have pending context (previous FOLLOW_UP)
     let enhancedQuery = message;
     if (this.pendingContext) {
@@ -131,7 +139,6 @@ export class ChatComponent implements AfterViewChecked {
       sessionId: this.sessionId || undefined
     };
 
-    this.inputMessage = '';
     this.isLoading = true;
 
     // Try streaming first
@@ -169,6 +176,12 @@ export class ChatComponent implements AfterViewChecked {
             hasReceivedStart = true;
             assistantMessage.statusMessages = [chunk || 'Processing your request...'];
             assistantMessage.isLoading = true;
+            break;
+
+          case 'session':
+            // Session ID received - store it for subsequent requests
+            this.sessionId = chunk;
+            console.log('[SSE] Session ID captured:', this.sessionId);
             break;
 
           case 'progress':
@@ -411,6 +424,9 @@ export class ChatComponent implements AfterViewChecked {
         if (!hasReceivedDone) {
           console.warn('[SSE] Stream completed without receiving done event');
         }
+
+        // Save chat history after each complete message
+//         this.saveChatHistory();
       }
     });
   }
@@ -456,6 +472,9 @@ export class ChatComponent implements AfterViewChecked {
   clearChat(): void {
     this.messages = [];
     this.sessionId = null;
+    // Clear local storage chat history
+    localStorage.removeItem('chatHistory');
+    localStorage.removeItem('chatSessionId');
   }
 
   onKeyPress(event: KeyboardEvent): void {
@@ -463,6 +482,194 @@ export class ChatComponent implements AfterViewChecked {
       event.preventDefault();
       this.sendMessage();
     }
+  }
+
+  /**
+   * Copy message content to clipboard
+   */
+  copyToClipboard(message: ChatMessage): void {
+    let textToCopy = '';
+
+    if (message.structured) {
+      // Extract text from structured response
+      const payload = message.structured.payload;
+      if (message.structured.type === 'TEXT') {
+        textToCopy = payload.message || '';
+      } else if (message.structured.type === 'TABLE') {
+        // Format table as text
+        const columns = payload.columns || [];
+        const rows = payload.rows || [];
+        textToCopy = columns.join('\t') + '\n' + rows.map((r: string[]) => r.join('\t')).join('\n');
+      } else if (message.structured.type === 'KV') {
+        textToCopy = Object.entries(payload).map(([k, v]) => `${k}: ${v}`).join('\n');
+      } else if (message.structured.type === 'BULLET') {
+        textToCopy = (payload.items || []).map((item: string) => `• ${item}`).join('\n');
+      } else {
+        textToCopy = JSON.stringify(payload, null, 2);
+      }
+
+      if (message.structured.title) {
+        textToCopy = message.structured.title + '\n\n' + textToCopy;
+      }
+    } else {
+      textToCopy = message.content || '';
+    }
+
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      // Show a brief toast notification (could be enhanced with a proper toast service)
+      console.log('Copied to clipboard');
+    });
+  }
+
+  /**
+   * React to a message (like/dislike)
+   */
+  reactToMessage(message: ChatMessage, reaction: 'like' | 'dislike'): void {
+    const previousReaction = message.reaction;
+
+    if (message.reaction === reaction) {
+      message.reaction = null; // Toggle off
+    } else {
+      message.reaction = reaction;
+    }
+
+    // Only send to backend if we're setting a reaction (not removing)
+    if (message.reaction) {
+      // Find the user message that triggered this response
+      const messageIndex = this.messages.indexOf(message);
+      const userMessage = messageIndex > 0 ? this.messages[messageIndex - 1] : null;
+
+      // Extract response text for storage
+      let aiResponse = '';
+      if (message.structured) {
+        if (message.structured.type === 'TEXT') {
+          aiResponse = message.structured.payload?.message || '';
+        } else {
+          aiResponse = JSON.stringify(message.structured.payload).substring(0, 500);
+        }
+      } else {
+        aiResponse = message.content || '';
+      }
+
+      // Send feedback to backend
+      this.apiService.submitFeedback({
+        sessionId: this.sessionId || '',
+        userId: this.authService.getCurrentUser()?.username || 'anonymous',
+        feedbackType: message.reaction,
+        scenarioCode: message.structured?.scenario || '',
+        userQuery: userMessage?.content || '',
+        aiResponse: aiResponse.substring(0, 4000)
+      }).subscribe({
+        next: () => {
+          console.log('Feedback submitted successfully');
+          this.showToast(reaction === 'like' ? '👍 Thanks for the feedback!' : '👎 Thanks, we\'ll improve!');
+        },
+        error: (err) => {
+          console.error('Failed to submit feedback:', err);
+          // Revert on error
+          message.reaction = previousReaction;
+        }
+      });
+    }
+
+    // Save to local history
+    this.saveChatHistory();
+  }
+
+  /**
+   * Show a temporary toast notification
+   */
+  private showToast(message: string): void {
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-20 right-10 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // Remove after 2 seconds
+    setTimeout(() => {
+      toast.classList.add('opacity-0', 'transition-opacity');
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  }
+
+  /**
+   * Regenerate the last assistant response
+   */
+  regenerateResponse(): void {
+    // Find the last user message
+    const lastUserMessageIndex = [...this.messages].reverse().findIndex(m => m.role === 'user');
+    if (lastUserMessageIndex === -1) return;
+
+    const actualIndex = this.messages.length - 1 - lastUserMessageIndex;
+    const userMessage = this.messages[actualIndex];
+
+    // Remove all messages after the user message
+    this.messages = this.messages.slice(0, actualIndex + 1);
+
+    // Resend the message
+    const request: ChatRequest = {
+      userId: this.authService.getCurrentUser()?.username || 'anonymous',
+      query: userMessage.content || '',
+      sessionId: this.sessionId || undefined
+    };
+
+    this.isLoading = true;
+    this.streamMessage(request);
+  }
+
+  /**
+   * Save chat history to localStorage
+   */
+  private saveChatHistory(): void {
+    if (this.messages.length > 0) {
+      const historyData = {
+        messages: this.messages.map(m => ({
+          role: m.role,
+          content: m.content,
+          structured: m.structured,
+          timestamp: m.timestamp,
+          reaction: m.reaction
+        })),
+        sessionId: this.sessionId
+      };
+      localStorage.setItem('chatHistory', JSON.stringify(historyData));
+      if (this.sessionId) {
+        localStorage.setItem('chatSessionId', this.sessionId);
+      }
+    }
+  }
+
+  /**
+   * Load chat history from localStorage
+   */
+  private loadChatHistory(): void {
+    const saved = localStorage.getItem('chatHistory');
+    const savedSessionId = localStorage.getItem('chatSessionId');
+
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        this.messages = data.messages.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp)
+        }));
+        this.sessionId = savedSessionId || data.sessionId || null;
+      } catch (e) {
+        console.error('Failed to load chat history:', e);
+      }
+    }
+  }
+
+  /**
+   * Get suggested follow-up questions from the last response
+   */
+  getSuggestedFollowUps(): string[] {
+    const lastAssistantMessage = [...this.messages].reverse().find(m => m.role === 'assistant' && m.structured);
+    if (lastAssistantMessage?.structured?.suggestedFollowUps) {
+      return lastAssistantMessage.structured.suggestedFollowUps;
+    }
+    return [];
   }
 
   getCurrentUser(): string {

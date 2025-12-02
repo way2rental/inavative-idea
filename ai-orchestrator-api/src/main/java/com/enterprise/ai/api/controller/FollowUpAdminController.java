@@ -1,4 +1,4 @@
-package com.enterprise.ai.api.controller.admin;
+package com.enterprise.ai.api.controller;
 
 import com.enterprise.ai.data.entity.FollowUpGroup;
 import com.enterprise.ai.data.repository.FollowUpGroupRepository;

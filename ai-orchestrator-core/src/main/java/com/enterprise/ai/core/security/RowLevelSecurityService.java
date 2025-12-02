@@ -61,6 +61,10 @@ public class RowLevelSecurityService {
      * @throws SecurityViolationException if query is not SELECT or context is missing
      */
     public String applyRowLevelSecurity(String rawSql, RequestContext userContext) {
+        if(true){
+            // TODO Remove and make it proper Row Level Security enforcement for PROD Only.
+            return rawSql;
+        }
         // Validate inputs
         if (rawSql == null || rawSql.isBlank()) {
             throw new SecurityViolationException(

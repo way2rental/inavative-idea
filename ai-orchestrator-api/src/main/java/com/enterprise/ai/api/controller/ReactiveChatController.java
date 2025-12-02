@@ -112,7 +112,10 @@ public class ReactiveChatController {
                             log.debug("Processing chunk (preview): {}", preview);
 
                             // Detect event type based on marker prefix
-                            if (chunk.startsWith("[PROGRESS]")) {
+                            if (chunk.startsWith("[SESSION]")) {
+                                log.debug("Detected SESSION event");
+                                return ssePublisherService.createSessionEvent(chunk.substring(9)); // Remove marker
+                            } else if (chunk.startsWith("[PROGRESS]")) {
                                 log.debug("Detected PROGRESS event");
                                 return ssePublisherService.createProgressEvent(chunk.substring(10)); // Remove marker
                             } else if (chunk.startsWith("[RESPONSE]")) {

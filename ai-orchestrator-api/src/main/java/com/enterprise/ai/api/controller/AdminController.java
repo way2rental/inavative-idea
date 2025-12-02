@@ -113,18 +113,13 @@ public class AdminController {
                 .executionType(form.executionType)
                 .httpMethod(form.httpMethod)
                 .httpUrl(form.httpUrl)
-                .httpHeaders(form.httpHeaders)
                 .sqlQuery(form.sqlQuery)
                 .requestMapping(form.requestMapping)
                 .responseMapping(form.responseMapping)
                 .timeoutMs(form.timeoutMs != null ? form.timeoutMs : 5000)
-                .executorBean(form.executorBean)
-                .securityLevel(form.securityLevel)
                 .requiredParams(form.requiredParams)
-                .optionalParams(form.optionalParams)
                 .llmPromptTemplate(promptTemplate)
                 .active(form.active != null ? form.active : true)
-                .promptVersion(1)
                 .build();
         
         // Save via ConfigCacheService - automatically updates cache
@@ -142,31 +137,17 @@ public class AdminController {
                     // Handle legacy field - intentPrompt maps to llmPromptTemplate
                     String promptTemplate = form.llmPromptTemplate != null ? form.llmPromptTemplate : form.intentPrompt;
                     
-                    // Store old prompt in history before updating
-                    if (scenario.getLlmPromptTemplate() != null && !scenario.getLlmPromptTemplate().equals(promptTemplate)) {
-                        String history = scenario.getPromptHistory();
-                        String oldPrompt = String.format("{\"version\":%d,\"prompt\":\"%s\"}", 
-                                scenario.getPromptVersion(), 
-                                scenario.getLlmPromptTemplate().replace("\"", "\\\"").replace("\n", "\\n"));
-                        scenario.setPromptHistory(history != null ? history + "," + oldPrompt : "[" + oldPrompt + "]");
-                    }
-                    
                     scenario.setDescription(form.description);
                     scenario.setExecutionType(form.executionType);
                     scenario.setHttpMethod(form.httpMethod);
                     scenario.setHttpUrl(form.httpUrl);
-                    scenario.setHttpHeaders(form.httpHeaders);
                     scenario.setSqlQuery(form.sqlQuery);
                     scenario.setRequestMapping(form.requestMapping);
                     scenario.setResponseMapping(form.responseMapping);
                     scenario.setTimeoutMs(form.timeoutMs != null ? form.timeoutMs : scenario.getTimeoutMs());
-                    scenario.setExecutorBean(form.executorBean);
-                    scenario.setSecurityLevel(form.securityLevel);
                     scenario.setRequiredParams(form.requiredParams);
-                    scenario.setOptionalParams(form.optionalParams);
                     scenario.setLlmPromptTemplate(promptTemplate);
                     scenario.setActive(form.active != null ? form.active : true);
-                    scenario.setPromptVersion(scenario.getPromptVersion() + 1);
                     
                     // Save via ConfigCacheService - automatically updates cache
                     AiScenario saved = configCacheService.saveScenario(scenario);
@@ -342,18 +323,12 @@ public class AdminController {
         dto.executionType = scenario.getExecutionType();
         dto.httpMethod = scenario.getHttpMethod();
         dto.httpUrl = scenario.getHttpUrl();
-        dto.httpHeaders = scenario.getHttpHeaders();
         dto.sqlQuery = scenario.getSqlQuery();
         dto.requestMapping = scenario.getRequestMapping();
         dto.responseMapping = scenario.getResponseMapping();
         dto.timeoutMs = scenario.getTimeoutMs();
-        dto.executorBean = scenario.getExecutorBean();
-        dto.securityLevel = scenario.getSecurityLevel();
         dto.requiredParams = parseJsonArray(scenario.getRequiredParams());
-        dto.optionalParams = parseJsonArray(scenario.getOptionalParams());
         dto.llmPromptTemplate = scenario.getLlmPromptTemplate();
-        dto.promptVersion = scenario.getPromptVersion();
-        dto.promptHistory = scenario.getPromptHistory();
         dto.active = scenario.getActive();
         return dto;
     }
@@ -464,18 +439,12 @@ public class AdminController {
         public String executionType;
         public String httpMethod;
         public String httpUrl;
-        public String httpHeaders;
         public String sqlQuery;
         public String requestMapping;
         public String responseMapping;
         public Integer timeoutMs;
-        public String executorBean;
-        public String securityLevel;
         public List<String> requiredParams;
-        public List<String> optionalParams;
         public String llmPromptTemplate;
-        public Integer promptVersion;
-        public String promptHistory;
         public Boolean active;
     }
 
@@ -486,15 +455,11 @@ public class AdminController {
         public String executionType;
         public String httpMethod;
         public String httpUrl;
-        public String httpHeaders;
         public String sqlQuery;
         public String requestMapping;
         public String responseMapping;
         public Integer timeoutMs;
-        public String executorBean;
-        public String securityLevel;
         public String requiredParams;
-        public String optionalParams;
         public String llmPromptTemplate;
         // Legacy field - maps to llmPromptTemplate for backward compatibility
         public String intentPrompt;

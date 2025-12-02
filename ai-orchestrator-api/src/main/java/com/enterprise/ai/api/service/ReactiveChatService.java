@@ -159,6 +159,9 @@ public class ReactiveChatService {
      *
      * CRITICAL: Authentication and authorization checks MUST happen BEFORE sending any data
      * to prevent "response already committed" Spring Security errors.
+     *
+     * CONTEXT RETENTION: When asking for missing parameters, we store the pending scenario
+     * in the session. When the user replies, we check for pending context first.
      */
     public Flux<String> processChatStreaming(ChatRequest request) {
         String executionId = UUID.randomUUID().toString();
@@ -177,9 +180,35 @@ public class ReactiveChatService {
         String sessionId = getOrCreateSessionSync(request);
         saveMessageSync(sessionId, "user", request.getQuery());
         String sessionContext = getSessionContextSync(sessionId);
+        log.info("Processing chat for session: {}", sessionId);
+
+        // Check for pending follow-up context (user is answering a previous question)
+        ChatSession session = sessionRepository.findBySessionId(sessionId).orElse(null);
+        if (session != null && session.hasPendingFollowUp()) {
+            log.info("Found pending follow-up context: scenario={}, missingParams={}",
+                    session.getPendingScenario(), session.getPendingParams());
+            // Prepend session ID to pending follow-up response
+            return Flux.concat(
+                    Flux.just("[SESSION]" + sessionId),
+                    processPendingFollowUp(request, session, sessionContext, userRoles, executionId)
+            );
+        }
+
+        // Get last used params for context resolution (e.g., "same account", "that account")
+        String lastUsedParamsJson = session != null ? session.getLastUsedParams() : null;
+        if (lastUsedParamsJson != null && !lastUsedParamsJson.isEmpty()) {
+            log.debug("Using last used params for context: {}", lastUsedParamsJson);
+        }
+
+        // Get user's allowed scenarios for RBAC-filtered intent detection
+        // This ensures the LLM only suggests scenarios the user can access
+        Set<String> allowedScenarios = getAllowedScenariosForRoles(userRoles);
+        log.debug("User allowed scenarios (RBAC): {}", allowedScenarios);
 
         // Cache the intent detection to avoid re-execution
-        Mono<IntentResult> intentMono = llmClient.detectIntent(request.getQuery(), sessionContext)
+        // Pass lastUsedParamsJson so LLM can resolve references like "same account"
+        // Pass allowedScenarios so LLM only suggests scenarios the user can access
+        Mono<IntentResult> intentMono = llmClient.detectIntent(request.getQuery(), sessionContext, lastUsedParamsJson, allowedScenarios)
                 .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
                 .doOnSuccess(intent -> log.info("Intent detected for streaming: scenario={}, confidence={}",
                         intent.getScenario(), intent.getConfidence()))
@@ -188,6 +217,8 @@ public class ReactiveChatService {
 
         // Now build the response flux with detailed progress indicators
         return Flux.concat(
+                // Session ID event for frontend to capture
+                Flux.just("[SESSION]" + sessionId),
                 // Stage 1: Initial analysis
                 Flux.just("[PROGRESS]🔍 Analyzing your request...\n"),
 
@@ -226,7 +257,10 @@ public class ReactiveChatService {
                                     }
 
                                     // Generate user-friendly missing parameter message using AI
+                                    // Also store pending state for context retention
                                     if (!validation.missingRequiredParams().isEmpty()) {
+                                        storePendingFollowUp(request.getSessionId() != null ? request.getSessionId() : sessionId,
+                                                intent.getScenario(), validation.missingRequiredParams(), intent.getParams());
                                         return generateMissingParamMessage(intent.getScenario(),
                                                 validation.missingRequiredParams(), request.getQuery());
                                     }
@@ -239,8 +273,8 @@ public class ReactiveChatService {
                                         Flux.just("[PROGRESS]🔐 Verifying permissions...\n"),
 
                                         Flux.defer(() -> {
-                                            // Authorization check (roles already validated above)
-                                            if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
+                                            // Authorization check
+                                            if (!rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
                                                 log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
 
                                                 // Log authorization failure to audit
@@ -275,6 +309,8 @@ public class ReactiveChatService {
                                                                 Instant requestTime = Instant.now();
                                                                 logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
                                                                         requestTime, Instant.now(), true, null, intent, result);
+                                                                // Store last used params for future context resolution
+                                                                storeLastUsedParams(sessionId, intent.getParams());
                                                             })
                                                             .doOnError(e -> {
                                                                 log.error("Scenario execution failed: {}", e.getMessage());
@@ -333,31 +369,8 @@ public class ReactiveChatService {
     private Flux<String> generateMissingParamMessage(String scenarioCode, List<String> missingParams, String userQuery) {
         return llmClient.generateFollowUpQuestion(scenarioCode, missingParams)
                 .map(question -> {
-                    // Build structured FOLLOW_UP response - SIMPLE VERSION
-                    try {
-                        // Format missing params for tracking (not display)
-                        List<String> formattedParams = missingParams.stream()
-                                .map(param -> capitalize(param.replace("_", " ")))
-                                .toList();
-
-                        // Build clean, simple JSON - ONLY the question for display
-                        Map<String, Object> response = new LinkedHashMap<>();
-                        response.put("type", "FOLLOW_UP");
-                        response.put("title", ""); // No title, keeps it clean
-                        response.put("confidence", 1.0);
-
-                        Map<String, Object> payload = new LinkedHashMap<>();
-                        // ONLY the question - no extra text
-                        payload.put("question", question);
-                        payload.put("missingParams", formattedParams); // For context tracking, not display
-                        response.put("payload", payload);
-                        response.put("scenario", scenarioCode); // For context tracking
-
-                        return "\n" + objectMapper.writeValueAsString(response);
-                    } catch (Exception e) {
-                        log.error("Failed to build structured follow-up: {}", e.getMessage());
-                        return generateSimpleMissingParamMessageAsJson(scenarioCode, missingParams, question);
-                    }
+                    log.info("Generating structured follow-up for missing params: {}, question : {}", missingParams, question);
+                    return "[RESPONSE]" + question;
                 })
                 .flatMapMany(Flux::just)
                 .onErrorResume(e -> {
@@ -392,11 +405,12 @@ public class ReactiveChatService {
             response.put("payload", payload);
             response.put("scenario", scenarioCode);
 
-            return "\n" + objectMapper.writeValueAsString(response);
+            // Use [RESPONSE] marker so frontend detects this as structured response
+            return "[RESPONSE]" + objectMapper.writeValueAsString(response);
         } catch (Exception e) {
             log.error("Failed to create fallback JSON: {}", e.getMessage());
-            // Last resort: minimal valid JSON with simple question
-            return "\n{\"type\":\"FOLLOW_UP\",\"title\":\"\",\"payload\":{\"question\":\"" + question + "\",\"missingParams\":[]},\"scenario\":\"" + scenarioCode + "\"}";
+            // Last resort: minimal valid JSON with simple question - also with [RESPONSE] marker
+            return "[RESPONSE]{\"type\":\"FOLLOW_UP\",\"title\":\"\",\"payload\":{\"question\":\"" + question + "\",\"missingParams\":[]},\"scenario\":\"" + scenarioCode + "\"}";
         }
     }
 
@@ -431,7 +445,7 @@ public class ReactiveChatService {
 
         // Authorization check
         List<String> userRoles = getCurrentUserRoles();
-        if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
+        if (!rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
             String response = "You don't have permission to access this information.";
             saveMessageSync(sessionId, "assistant", response);
             return Mono.just(buildResponse(sessionId, response, ChatResponse.ResponseType.ERROR, 
@@ -691,6 +705,206 @@ public class ReactiveChatService {
 
     // ===== HELPER METHODS =====
 
+    /**
+     * Store pending follow-up state in the session.
+     * Called when we ask the user for missing parameters.
+     */
+    private void storePendingFollowUp(String sessionId, String scenarioCode, List<String> missingParams, Map<String, Object> collectedParams) {
+        try {
+            Optional<ChatSession> sessionOpt = sessionRepository.findBySessionId(sessionId);
+            if (sessionOpt.isPresent()) {
+                ChatSession session = sessionOpt.get();
+                session.setPendingScenario(scenarioCode);
+                session.setPendingParams(String.join(",", missingParams));
+                if (collectedParams != null && !collectedParams.isEmpty()) {
+                    session.setCollectedParams(objectMapper.writeValueAsString(collectedParams));
+                }
+                sessionRepository.save(session);
+                log.info("Stored pending follow-up: scenario={}, missingParams={}", scenarioCode, missingParams);
+            }
+        } catch (Exception e) {
+            log.error("Failed to store pending follow-up state: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Store last used params after successful scenario execution.
+     * This enables context resolution like "same account", "that account".
+     */
+    private void storeLastUsedParams(String sessionId, Map<String, Object> params) {
+        if (params == null || params.isEmpty()) {
+            return;
+        }
+        try {
+            Optional<ChatSession> sessionOpt = sessionRepository.findBySessionId(sessionId);
+            if (sessionOpt.isPresent()) {
+                ChatSession session = sessionOpt.get();
+                session.setLastUsedParams(objectMapper.writeValueAsString(params));
+                sessionRepository.save(session);
+                log.info("Stored last used params for session {}: {}", sessionId, params);
+            }
+        } catch (Exception e) {
+            log.error("Failed to store last used params for session {}", sessionId, e);
+        }
+    }
+
+    /**
+     * Clear pending follow-up state from the session.
+     * Called after successfully completing the pending scenario.
+     */
+    private void clearPendingFollowUp(String sessionId) {
+        try {
+            Optional<ChatSession> sessionOpt = sessionRepository.findBySessionId(sessionId);
+            if (sessionOpt.isPresent()) {
+                ChatSession session = sessionOpt.get();
+                session.clearPendingState();
+                sessionRepository.save(session);
+                log.debug("Cleared pending follow-up state for session: {}", sessionId);
+            }
+        } catch (Exception e) {
+            log.error("Failed to clear pending follow-up state: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Process a follow-up response when we have pending context.
+     * The user is answering our question about missing parameters.
+     */
+    private Flux<String> processPendingFollowUp(ChatRequest request, ChatSession session,
+                                                 String sessionContext, List<String> userRoles, String executionId) {
+        String pendingScenario = session.getPendingScenario();
+        String pendingParamsStr = session.getPendingParams();
+        List<String> missingParams = pendingParamsStr != null ?
+                Arrays.asList(pendingParamsStr.split(",")) : List.of();
+
+        log.info("Processing pending follow-up for scenario: {}, user provided: {}",
+                pendingScenario, request.getQuery());
+
+        // Build enhanced context that tells the LLM this is a follow-up to a previous question
+        String enhancedContext = String.format(
+                "IMPORTANT CONTEXT: The user was previously asked about %s scenario and we need %s. " +
+                "The user's current message is their response to that question.\n\n%s",
+                pendingScenario, String.join(", ", missingParams), sessionContext);
+
+        return Flux.concat(
+                Flux.just("[PROGRESS]🔍 Processing your response...\n"),
+
+                // Use LLM to extract the parameter from user's response
+                llmClient.detectIntent(request.getQuery(), enhancedContext)
+                        .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
+                        .flatMapMany(detectedIntent -> {
+                            // Build the params map combining previously collected params with new ones
+                            Map<String, Object> combinedParams = new HashMap<>();
+
+                            // Load previously collected params
+                            String collectedJson = session.getCollectedParams();
+                            if (collectedJson != null && !collectedJson.isEmpty()) {
+                                try {
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> collected = objectMapper.readValue(collectedJson, Map.class);
+                                    combinedParams.putAll(collected);
+                                } catch (Exception e) {
+                                    log.warn("Failed to parse collected params: {}", e.getMessage());
+                                }
+                            }
+
+                            // Add newly detected params
+                            if (detectedIntent.getParams() != null) {
+                                combinedParams.putAll(detectedIntent.getParams());
+                            }
+
+                            // If the user's message IS the parameter value, extract it directly
+                            if (missingParams.size() == 1 && !combinedParams.containsKey(missingParams.get(0))) {
+                                String paramName = missingParams.get(0);
+                                String userValue = request.getQuery().trim();
+                                // If the query looks like a direct value (not a sentence), use it
+                                if (userValue.split("\\s+").length <= 3) {
+                                    combinedParams.put(paramName, userValue);
+                                    log.info("Extracted direct value for {}: {}", paramName, userValue);
+                                }
+                            }
+
+                            log.info("Combined params for pending scenario: {}", combinedParams);
+
+                            // Create intent with the pending scenario and combined params
+                            IntentResult intent = IntentResult.builder()
+                                    .scenario(pendingScenario)
+                                    .confidence(0.95)
+                                    .params(combinedParams)
+                                    .missingParams(List.of())
+                                    .reasoning("Follow-up response to previous question")
+                                    .build();
+
+                            // Validate if we now have all required params
+                            IntentValidationService.ValidationResult validation =
+                                    validationService.validate(intent, request.getQuery());
+
+                            // Still missing params?
+                            if (!validation.missingRequiredParams().isEmpty()) {
+                                log.info("Still missing params after follow-up: {}", validation.missingRequiredParams());
+                                // Update stored pending params with remaining missing ones
+                                storePendingFollowUp(session.getSessionId(), pendingScenario,
+                                        validation.missingRequiredParams(), combinedParams);
+                                return generateMissingParamMessage(pendingScenario,
+                                        validation.missingRequiredParams(), request.getQuery());
+                            }
+
+                            // Clear pending state since we now have all params
+                            clearPendingFollowUp(session.getSessionId());
+
+                            // Authorization check
+                            if (!rbacService.anyRoleAuthorized(userRoles, pendingScenario)) {
+                                log.warn("User not authorized for pending scenario: {}", pendingScenario);
+                                return Flux.just("\n❌ You don't have permission to access this information.");
+                            }
+
+                            // Execute the scenario
+                            ScenarioRequest scenarioRequest = ScenarioRequest.builder()
+                                    .scenario(pendingScenario)
+                                    .params(combinedParams)
+                                    .userId(request.getUserId())
+                                    .build();
+
+                            // Store combined params for future context resolution before execution
+                            final Map<String, Object> finalCombinedParams = combinedParams;
+
+                            return Flux.concat(
+                                    Flux.just("[PROGRESS]✅ Got it!\n"),
+                                    Flux.just("[PROGRESS]🔐 Verifying permissions...\n"),
+                                    Flux.just("[PROGRESS]✅ Access granted\n"),
+                                    Flux.just("[PROGRESS]📊 Fetching your data...\n"),
+                                    scenarioRouter.routeReactive(scenarioRequest)
+                                            .timeout(Duration.ofMillis(maxDbTimeoutMs))
+                                            .flatMapMany(result -> {
+                                                log.debug("Pending scenario executed successfully");
+                                                // Store last used params for context resolution
+                                                storeLastUsedParams(session.getSessionId(), finalCombinedParams);
+                                                return Flux.concat(
+                                                        Flux.just("[PROGRESS]✅ Data retrieved\n"),
+                                                        Flux.just("[PROGRESS]📝 Preparing your response...\n"),
+                                                        llmClient.formatResponseStreaming(pendingScenario, result, request.getQuery())
+                                                                .map(jsonResponse -> "[RESPONSE]" + jsonResponse)
+                                                                .doOnComplete(() -> {
+                                                                    log.debug("Pending follow-up completed successfully");
+                                                                    Instant requestTime = Instant.now();
+                                                                    logAuditAsync(executionId, request.getUserId(), pendingScenario,
+                                                                            requestTime, Instant.now(), true, null, intent, result);
+                                                                })
+                                                );
+                                            })
+                                            .onErrorResume(e -> {
+                                                log.error("Pending scenario execution failed: {}", e.getMessage());
+                                                return Flux.just("\n❌ Failed to retrieve your data. Please try again.");
+                                            })
+                            );
+                        })
+                        .onErrorResume(e -> {
+                            log.error("Error processing pending follow-up: {}", e.getMessage());
+                            return Flux.just("\n❌ I had trouble understanding your response. Please try again.");
+                        })
+        );
+    }
+
     private boolean isAffirmativeResponse(String response) {
         if (response == null) return false;
         return response.toLowerCase().trim().matches(AFFIRMATIVE_PATTERN);
@@ -802,6 +1016,20 @@ public class ReactiveChatService {
                 .toList();
         log.debug("Extracted roles from authentication: {}", roles);
         return roles;
+    }
+
+    /**
+     * Get all scenarios allowed for the given roles.
+     * Used for RBAC-filtered intent detection - only show scenarios the user can access.
+     */
+    private Set<String> getAllowedScenariosForRoles(List<String> roles) {
+        Set<String> allowedScenarios = new HashSet<>();
+        for (String role : roles) {
+            allowedScenarios.addAll(rbacService.getAllowedScenarios(role));
+        }
+        // Always allow UNKNOWN for conversational responses
+        allowedScenarios.add("UNKNOWN");
+        return allowedScenarios;
     }
 
     private void logAuditAsync(String executionId, String userId, String scenarioCode,

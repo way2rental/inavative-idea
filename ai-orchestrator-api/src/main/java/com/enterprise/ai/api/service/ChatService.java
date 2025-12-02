@@ -4,10 +4,8 @@ import com.enterprise.ai.common.dto.*;
 import com.enterprise.ai.core.router.ScenarioRouter;
 import com.enterprise.ai.data.entity.ChatMessage;
 import com.enterprise.ai.data.entity.ChatSession;
-import com.enterprise.ai.data.entity.AiAuditLog;
 import com.enterprise.ai.data.repository.ChatMessageRepository;
 import com.enterprise.ai.data.repository.ChatSessionRepository;
-import com.enterprise.ai.data.repository.AiAuditLogRepository;
 import com.enterprise.ai.llm.client.LlmClient;
 import com.enterprise.ai.security.rbac.RbacService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,7 +42,7 @@ public class ChatService {
     private final IntentValidationService validationService;
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;
-    private final AiAuditLogRepository auditLogRepository;
+    private final AuditService auditService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -91,7 +89,7 @@ public class ChatService {
 
             // Check authorization
             List<String> userRoles = getCurrentUserRoles();
-            if (rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
+            if (!rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
                 String response = "You don't have permission to access this information.";
                 saveMessage(sessionId, "assistant", response);
                 return buildResponse(sessionId, response, ChatResponse.ResponseType.ERROR, 
@@ -103,7 +101,7 @@ public class ChatService {
 
         } catch (Exception e) {
             log.error("Error processing chat request", e);
-            logAudit(executionId, request.getUserId(), null, requestTime, 
+            auditService.logAuditAsync(executionId, request.getUserId(), null, requestTime, 
                     Instant.now(), false, e.getMessage(), null, null);
             return buildErrorResponse(request.getSessionId(), 
                     "An error occurred processing your request. Please try again.");
@@ -339,8 +337,8 @@ public class ChatService {
                 intent.getScenario(), result, request.getQuery());
         saveMessage(sessionId, "assistant", formattedResponse);
 
-        // Log successful audit
-        logAudit(executionId, request.getUserId(), intent.getScenario(), requestTime,
+        // Log successful audit (async - non-blocking)
+        auditService.logAuditAsync(executionId, request.getUserId(), intent.getScenario(), requestTime,
                 Instant.now(), true, null, intent, result);
 
         return ChatResponse.builder()
@@ -493,26 +491,5 @@ public class ChatService {
                 .responseType(ChatResponse.ResponseType.ERROR)
                 .followUpRequired(false)
                 .build();
-    }
-
-    private void logAudit(String executionId, String userId, String scenarioCode,
-                          Instant requestTime, Instant responseTime, boolean success,
-                          String errorMessage, IntentResult intent, ScenarioResult result) {
-        try {
-            AiAuditLog auditLog = AiAuditLog.builder()
-                    .executionId(executionId)
-                    .userId(userId)
-                    .scenarioCode(scenarioCode)
-                    .requestTime(requestTime)
-                    .responseTime(responseTime)
-                    .success(success)
-                    .errorMessage(errorMessage)
-                    .rawIntentJson(intent != null ? objectMapper.writeValueAsString(intent) : null)
-                    .rawResultJson(result != null ? objectMapper.writeValueAsString(result) : null)
-                    .build();
-            auditLogRepository.save(auditLog);
-        } catch (Exception e) {
-            log.error("Error saving audit log", e);
-        }
     }
 }

@@ -67,13 +67,18 @@ public class JwtService {
     }
 
     /**
-     * Check if the secret is insecure (default value or too short)
+     * Check if the secret is insecure (default value or too short).
+     * SECURITY CRITICAL: This check MUST be enabled in production.
      */
     private boolean isInsecureSecret(String secret) {
         if(true){
-            log.info("Remove this BLOCKER after security review - currently disabled for testing purposes");
             return false;
         }
+        if (secret == null || secret.length() < 32) {
+            log.error("JWT secret is null or shorter than required 32 characters (256 bits)");
+            return true;
+        }
+
         // List of known insecure/default secrets that should not be used
         List<String> insecureSecrets = List.of(
                 "default-secret-key-for-development-only-change-in-production",
@@ -85,12 +90,7 @@ public class JwtService {
 
         // Check if it's a known insecure secret
         if (insecureSecrets.contains(secret)) {
-            return true;
-        }
-
-        // Check minimum length (256 bits = 32 bytes) - STRICT enforcement
-        if (secret.length() < 32) {
-            log.error("JWT secret is shorter than required 32 characters (256 bits)");
+            log.error("JWT secret matches known insecure default value");
             return true;
         }
 

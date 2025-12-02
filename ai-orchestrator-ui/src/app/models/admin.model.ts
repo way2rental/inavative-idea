@@ -276,6 +276,62 @@ export interface RateLimiterInfo {
   numberOfWaitingThreads: number;
 }
 
+// ===================== RESPONSE MAPPINGS =====================
+
+export interface ResponseMapping {
+  id: number;
+  scenarioCode: string;
+  sourceType: string;
+  sourceField?: string;
+  targetField: string;
+  jsonPath: string;
+  maskingType: string;
+  displayOrder: number;
+  active: boolean;
+}
+
+export interface ResponseMappingForm {
+  scenarioCode: string;
+  sourceType: string;
+  sourceField?: string;
+  targetField: string;
+  jsonPath: string;
+  maskingType: string;
+  displayOrder: number;
+  active: boolean;
+}
+
+export interface JsonPathTestRequest {
+  jsonPath: string;
+  sampleJson: string;
+}
+
+export interface JsonPathTestResult {
+  success: boolean;
+  result?: any;
+  error?: string;
+  expression: string;
+}
+
+// ===================== RBAC MANAGEMENT =====================
+
+export interface RoleScenarioMapping {
+  id: number;
+  roleName: string;
+  scenarioCode: string;
+}
+
+export interface RbacMatrix {
+  roles: string[];
+  scenarios: string[];
+  mappings: RoleScenarioMapping[];
+}
+
+export interface BulkRbacRequest {
+  roleName: string;
+  scenarioCodes: string[];
+}
+
 // ===================== PROMPT TEMPLATES =====================
 
 export interface PromptTemplate {

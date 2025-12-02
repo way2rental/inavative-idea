@@ -226,6 +226,17 @@ public class SsePublisherService {
     }
 
     /**
+     * Create a session event to send session ID to frontend.
+     * Frontend must capture this and use for subsequent requests.
+     */
+    public ServerSentEvent<String> createSessionEvent(String sessionId) {
+        return ServerSentEvent.<String>builder()
+                .event("session")
+                .data(sessionId)
+                .build();
+    }
+
+    /**
      * Create a response event for structured JSON payload.
      * This is used for the final formatted response from the LLM.
      * Per spec: {"event": "response", "data": "{\"type\":\"TABLE\",...}"}

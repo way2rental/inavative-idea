@@ -1,7 +1,24 @@
+/**
+ * Request type for chat messages.
+ * MUST match backend ChatRequest.RequestType enum exactly.
+ */
+export type RequestType = 'QUERY' | 'CONFIRMATION' | 'CLARIFICATION';
+
+/**
+ * Chat request contract - MUST match backend ChatRequest.java exactly.
+ * All optional fields MUST be sent during follow-up interactions.
+ */
 export interface ChatRequest {
   userId: string;
   query: string;
   sessionId?: string;
+  // Follow-up flow fields (MANDATORY for confirmation/clarification)
+  requestType?: RequestType;
+  confirmed?: boolean;
+  selectedOption?: number;
+  pendingActionParams?: { [key: string]: any };
+  pendingScenario?: string;
+  dryRun?: boolean;
 }
 
 export interface ChatResponse {
@@ -41,6 +58,8 @@ export interface StructuredResponse {
   footer?: string;
   sessionId?: string;
   scenario?: string;
+  /** Suggested follow-up questions for ChatGPT-like experience */
+  suggestedFollowUps?: string[];
 }
 
 /**
@@ -121,6 +140,10 @@ export interface ChatMessage {
     params: { [key: string]: any };
     missingParams: string[];
   };
+  // Message feedback/reactions
+  reaction?: 'like' | 'dislike' | null;
+  // Message ID for regeneration
+  messageId?: string;
 }
 
 // Legacy support: Follow-up event payload

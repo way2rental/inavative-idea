@@ -1,11 +1,12 @@
 package com.enterprise.ai.core.scenario;
 
+import com.enterprise.ai.common.context.RequestContextHolder;
 import com.enterprise.ai.common.dto.ScenarioRequest;
 import com.enterprise.ai.common.dto.ScenarioResult;
 import com.enterprise.ai.common.enums.ExecutionType;
 import com.enterprise.ai.common.exception.SecurityViolationException;
+import com.enterprise.ai.core.filter.FilterEngine;
 import com.enterprise.ai.core.mapper.ResponseMappingService;
-import com.enterprise.ai.common.exception.SecurityViolationException;
 import com.enterprise.ai.core.datasource.DataSourceRegistryService;
 import com.enterprise.ai.core.mapper.JsonPathResponseMapper;
 import com.enterprise.ai.core.mapper.MaskingService;
@@ -13,7 +14,6 @@ import com.enterprise.ai.core.security.ReadOnlyEnforcementService;
 import com.enterprise.ai.core.security.RowLevelSecurityService;
 import com.enterprise.ai.data.entity.AiResponseMapping;
 import com.enterprise.ai.data.entity.AiScenario;
-import com.enterprise.ai.data.entity.AiResponseMapping;
 import com.enterprise.ai.data.repository.AiResponseMappingRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,6 +36,7 @@ import java.util.*;
  * - Named parameter binding from request_mapping
  * - Response shaping via response_mapping
  * - Configurable timeout
+ * - FilterEngine integration for dynamic SQL generation
  */
 @Slf4j
 @Component
@@ -53,6 +54,7 @@ public class QueryExecutor implements DynamicExecutor {
     private final AiResponseMappingRepository responseMappingRepository;
     private final ObjectMapper objectMapper;
     private final ResponseMappingService responseMappingService;
+    private final FilterEngine filterEngine;
 
     @Override
     public boolean supports(String executionType) {
@@ -65,23 +67,78 @@ public class QueryExecutor implements DynamicExecutor {
         String scenarioCode = scenario.getScenarioCode();
 
         try {
-            // Validate SQL is SELECT only
+            // Get the base SQL query
             String sqlQuery = scenario.getSqlQuery();
+            
+            // Validate SQL is SELECT only
             readOnlyEnforcement.validateSqlQuery(sqlQuery);
 
-            // Build parameters from request_mapping
-            Map<String, Object> sqlParams = buildSqlParameters(request, scenario);
+            // Build parameters - use FilterEngine if scenario has filter definitions
+            Map<String, Object> sqlParams;
+            String finalSql;
+            
+            if (scenario.usesFilterEngine()) {
+                log.debug("Using FilterEngine for scenario: {}", scenarioCode);
+                
+                // Build filters from extracted parameters
+                FilterEngine.FilterResult filterResult = filterEngine.buildFilters(scenario, request.getParams());
+                
+                // Check for missing mandatory filters
+                if (filterResult.hasMissingParams()) {
+                    log.warn("Missing mandatory filters for {}: {}", scenarioCode, filterResult.missingMandatory());
+                    return ScenarioResult.builder()
+                            .scenario(scenarioCode)
+                            .success(false)
+                            .errorMessage("Missing required information: " + String.join(", ", filterResult.missingMandatory()))
+                            .data(Map.of("missingParams", filterResult.missingMandatory()))
+                            .build();
+                }
+                
+                // Check for validation errors
+                if (!filterResult.validationErrors().isEmpty()) {
+                    log.warn("Validation errors for {}: {}", scenarioCode, filterResult.validationErrors());
+                    return ScenarioResult.builder()
+                            .scenario(scenarioCode)
+                            .success(false)
+                            .errorMessage("Invalid input: " + String.join("; ", filterResult.validationErrors()))
+                            .data(Map.of("validationErrors", filterResult.validationErrors()))
+                            .build();
+                }
+                
+                // Build dynamic query with filters
+                finalSql = filterEngine.buildDynamicQuery(scenario, filterResult);
+                sqlParams = new HashMap<>(filterResult.parameters());
+                
+                log.debug("FilterEngine generated SQL: {}", finalSql);
+            } else {
+                // Legacy behavior - build parameters from request_mapping
+                sqlParams = buildSqlParameters(request, scenario);
+                
+                // MANDATORY: Apply Row-Level Security filters
+                finalSql = rowLevelSecurityService.applyRowLevelSecurity(
+                        sqlQuery,
+                        RequestContextHolder.getContext()
+                );
+                log.debug("Row-Level Security applied. Original: {}, Secured: {}", sqlQuery, finalSql);
+            }
+            
+            // Add user context parameters for RLS filters (always)
+            if (RequestContextHolder.getContext() != null) {
+                sqlParams.put("userId", RequestContextHolder.getContext().getUserId());
+                sqlParams.put("orgId", RequestContextHolder.getContext().getTenantId());
+            }
 
             log.info("Executing DB_QUERY for scenario {} with params: {}", scenarioCode, sqlParams.keySet());
 
-            // Execute query with timeout
-            List<Map<String, Object>> rawResults = jdbcTemplate.queryForList(sqlQuery, sqlParams);
+            // Execute query with secured SQL and timeout
+            List<Map<String, Object>> rawResults = jdbcTemplate.queryForList(finalSql, sqlParams);
             
             // Limit result size to prevent memory exhaustion
-            if (rawResults.size() > MAX_RESULT_SIZE) {
+            int maxResults = scenario.getMaxResults() != null ? scenario.getMaxResults() : MAX_RESULT_SIZE;
+            if (rawResults.size() > maxResults) {
                 log.warn("Query returned {} rows, truncating to {} for scenario {}", 
-                        rawResults.size(), MAX_RESULT_SIZE, scenarioCode);
-                rawResults = rawResults.subList(0, MAX_RESULT_SIZE);
+                        rawResults.size(), maxResults, scenarioCode);
+                rawResults = rawResults.subList(0, maxResults);
             }
 
             Map<String, Object> aiReadyData;
@@ -89,8 +146,9 @@ public class QueryExecutor implements DynamicExecutor {
                 log.info("Using JsonPathResponseMapper for scenario: {}", scenarioCode);
                 aiReadyData = responseMappingService.mapDbResultToAiRequest(scenarioCode, rawResults);
             } else {
-                log.warn("No response mappings found for scenario: {}, using legacy mapping", scenarioCode);
-                aiReadyData = applyResponseMapping(rawResults, scenario);
+                log.info("Using mandatory masking with response_mapping for scenario: {}", scenarioCode);
+                // MANDATORY: Use applyMandatoryMasking instead of legacy applyResponseMapping
+                aiReadyData = applyMandatoryMasking(rawResults, scenario);
             }
 
             long executionTime = System.currentTimeMillis() - startTime;
@@ -112,12 +170,12 @@ public class QueryExecutor implements DynamicExecutor {
                     .data(Map.of("error", "Access denied"))
                     .build();
         } catch (Exception e) {
-            log.error("DB_QUERY execution failed for {}: {}", scenarioCode, e.getMessage());
+            log.error("DB_QUERY execution failed for {}: {}", scenarioCode, e.getMessage(), e);
             return ScenarioResult.builder()
                     .scenario(scenarioCode)
                     .success(false)
                     .errorMessage("Database query failed. Please try again.")
-                    .data(Map.of("error", "Query execution error"))
+                    .data(Map.of("error", "Query execution error", "details", e.getMessage()))
                     .build();
         }
     }
@@ -336,73 +394,6 @@ public class QueryExecutor implements DynamicExecutor {
             }
             result.put("data", maskedRows);
             result.put("count", maskedRows.size());
-        }
-
-        return result;
-    }
-
-    /**
-     * Apply response_mapping to shape query results.
-     * response_mapping format: {"outputField": "$.column_name"}
-     */
-    private Map<String, Object> applyResponseMapping(List<Map<String, Object>> rawResults, AiScenario scenario) {
-        log.info("Applying response mapping for {}: {} rows",scenario.getScenarioCode(), rawResults.size());
-        Map<String, Object> result = new LinkedHashMap<>();
-        
-        if (rawResults.isEmpty()) {
-            result.put("data", List.of());
-            result.put("count", 0);
-            return result;
-        }
-
-        if (scenario.getResponseMapping() == null || scenario.getResponseMapping().isBlank()) {
-            // No mapping, return raw results
-            if (rawResults.size() == 1) {
-                result.putAll(rawResults.get(0));
-            } else {
-                result.put("data", rawResults);
-                result.put("count", rawResults.size());
-            }
-            return result;
-        }
-
-        try {
-            Map<String, String> mappings = objectMapper.readValue(
-                    scenario.getResponseMapping(), 
-                    new TypeReference<Map<String, String>>() {}
-            );
-
-            if (rawResults.size() == 1) {
-                // Single row - map fields directly
-                Map<String, Object> row = rawResults.get(0);
-                for (Map.Entry<String, String> entry : mappings.entrySet()) {
-                    String outputField = entry.getKey();
-                    String sourceField = extractFieldName(entry.getValue());
-                    result.put(outputField, row.get(sourceField));
-                }
-            } else {
-                // Multiple rows - map each row
-                List<Map<String, Object>> mappedRows = new ArrayList<>();
-                for (Map<String, Object> row : rawResults) {
-                    Map<String, Object> mappedRow = new LinkedHashMap<>();
-                    for (Map.Entry<String, String> entry : mappings.entrySet()) {
-                        String outputField = entry.getKey();
-                        String sourceField = extractFieldName(entry.getValue());
-                        mappedRow.put(outputField, row.get(sourceField));
-                    }
-                    mappedRows.add(mappedRow);
-                }
-                result.put("data", mappedRows);
-                result.put("count", mappedRows.size());
-            }
-        } catch (Exception e) {
-            log.warn("Failed to apply response_mapping, returning raw: {}", e.getMessage());
-            if (rawResults.size() == 1) {
-                result.putAll(rawResults.get(0));
-            } else {
-                result.put("data", rawResults);
-                result.put("count", rawResults.size());
-            }
         }
 
         return result;

@@ -1,14 +1,94 @@
-@if (showHeader) {
-  <app-header></app-header>
+<!-- Enhanced App Container with Advanced Features -->
+<div class="app-wrapper" [@routeAnimations]="prepareRoute(outlet)">
+
+  <!-- Header with Slide Animation -->
+  @if (showHeader) {
+    <app-header [@slideDown] class="app-header"></app-header>
+  }
+
+  <!-- Main Application Container -->
+  <div class="app-container"
+       [class.with-header]="showHeader"
+       [class.sidebar-active]="showAdminSidebar">
+
+    <!-- Admin Sidebar with Transitions -->
+    @if (showAdminSidebar) {
+      <aside [@sidebarAnimation]
+             class="sidebar-container"
+             [class.collapsed]="sidebarCollapsed">
+        <app-admin-sidebar
+          [collapsed]="sidebarCollapsed"
+          (collapsedChange)="onSidebarToggle($event)">
+        </app-admin-sidebar>
+      </aside>
+    }
+
+    <!-- Main Content Area with Loading & Error States -->
+    <main class="app-main"
+          [class.with-sidebar]="showAdminSidebar"
+          [class.sidebar-collapsed]="sidebarCollapsed"
+          role="main">
+
+      <!-- Loading Overlay for Route Changes -->
+      @if (isLoading) {
+        <div class="route-loading-overlay" [@fadeInOut]>
+          <div class="loading-spinner-container">
+            <div class="loading-spinner"></div>
+            <p class="loading-text">Loading...</p>
+          </div>
+        </div>
+      }
+
+      <!-- Router Outlet with Animation -->
+      <div class="router-container" [@routeFadeAnimation]="prepareRoute(outlet)">
+        <router-outlet #outlet="outlet"></router-outlet>
+      </div>
+
+      <!-- Scroll to Top Button -->
+      @if (showScrollTop) {
+        <button class="scroll-to-top-btn"
+                (click)="scrollToTop()"
+                [@fadeInOut]
+                aria-label="Scroll to top">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      }
+    </main>
+  </div>
+</div>
+
+<!-- Global Systems -->
+<app-alert></app-alert>
+<app-modal></app-modal>
+
+<!-- Network Status Indicator -->
+@if (!isOnline) {
+  <div class="offline-banner" [@slideDown]>
+    <div class="flex items-center gap-2">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" />
+      </svg>
+      <span>You're offline. Some features may not work.</span>
+    </div>
+  </div>
 }
 
-<main class="app-main" [class.with-header]="showHeader">
-  <router-outlet></router-outlet>
-</main>
-
-<!-- Global Alert System -->
-<app-alert></app-alert>
-
-<!-- Global Modal System -->
-<app-modal></app-modal>
+<!-- Session Timeout Warning -->
+@if (showSessionWarning) {
+  <div class="session-warning-banner" [@slideDown]>
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>Your session will expire in {{ sessionTimeRemaining }} seconds</span>
+      </div>
+      <button (click)="extendSession()" class="btn-secondary text-sm">
+        Extend Session
+      </button>
+    </div>
+  </div>
+}
 

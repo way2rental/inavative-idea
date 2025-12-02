@@ -142,9 +142,7 @@ public class ScenarioSandboxTesterService {
                 "executionType", scenario.getExecutionType() != null ? scenario.getExecutionType() : "DB_QUERY",
                 "active", Boolean.TRUE.equals(scenario.getActive()),
                 "timeoutMs", scenario.getTimeoutMs() != null ? scenario.getTimeoutMs() : 5000,
-                "requiredParams", scenario.getRequiredParams() != null ? scenario.getRequiredParams() : "[]",
-                "optionalParams", scenario.getOptionalParams() != null ? scenario.getOptionalParams() : "[]",
-                "promptVersion", scenario.getPromptVersion() != null ? scenario.getPromptVersion() : 1
+                "requiredParams", scenario.getRequiredParams() != null ? scenario.getRequiredParams() : "[]"
         );
     }
 

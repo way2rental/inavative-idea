@@ -21,11 +21,17 @@
             Corporate Banking
           </span>
         </h1>
-        <p class="text-gray-600 flex items-center gap-2">
+        <p class="text-gray-600 flex items-center gap-2 mb-2">
           <svg class="w-5 h-5 text-axis-burgundy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
           AI-Powered Support • Secure • Fast
+        </p>
+        <p class="text-sm text-gray-500 flex items-center gap-2">
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="font-medium">Powered by Mahendra Malviya</span>
         </p>
       </div>
     </div>
@@ -289,19 +295,28 @@
                       <div class="flex items-center gap-2 mt-2 ml-2">
                         <p class="text-xs text-gray-400">{{ message.timestamp | date:'shortTime' }}</p>
                         @if (!message.isLoading) {
-                          <button class="text-gray-400 hover:text-axis-burgundy transition-colors" title="Copy">
+                          <button (click)="copyToClipboard(message)" class="text-gray-400 hover:text-axis-burgundy transition-colors" title="Copy">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
                           </button>
-                          <button class="text-gray-400 hover:text-green-500 transition-colors" title="Good response">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <button (click)="reactToMessage(message, 'like')"
+                            [class]="message.reaction === 'like' ? 'text-green-500' : 'text-gray-400 hover:text-green-500'"
+                            class="transition-colors" title="Good response">
+                            <svg class="w-3.5 h-3.5" [attr.fill]="message.reaction === 'like' ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
                             </svg>
                           </button>
-                          <button class="text-gray-400 hover:text-red-500 transition-colors" title="Bad response">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <button (click)="reactToMessage(message, 'dislike')"
+                            [class]="message.reaction === 'dislike' ? 'text-red-500' : 'text-gray-400 hover:text-red-500'"
+                            class="transition-colors" title="Bad response">
+                            <svg class="w-3.5 h-3.5" [attr.fill]="message.reaction === 'dislike' ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+                            </svg>
+                          </button>
+                          <button (click)="regenerateResponse()" class="text-gray-400 hover:text-axis-burgundy transition-colors" title="Regenerate">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
                           </button>
                         }
@@ -319,6 +334,21 @@
               </div>
             }
           </div>
+
+          <!-- Suggested Follow-ups (ChatGPT-like) -->
+          @if (getSuggestedFollowUps().length > 0 && !isLoading) {
+            <div class="mt-4 space-y-2">
+              <p class="text-xs text-gray-400 font-medium">Suggested follow-ups:</p>
+              <div class="flex flex-wrap gap-2">
+                @for (suggestion of getSuggestedFollowUps(); track suggestion) {
+                  <button (click)="sendMessage(suggestion)"
+                    class="px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-full hover:border-axis-burgundy hover:bg-axis-burgundy/5 transition-all text-gray-600 hover:text-axis-burgundy">
+                    {{ suggestion }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
         }
       </div>
 

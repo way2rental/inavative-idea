@@ -158,11 +158,12 @@ public class RbacService {
 
     /**
      * Check if any of the given roles is authorized for a scenario.
+     * Returns true if any role is authorized, false otherwise.
      */
     public boolean anyRoleAuthorized(List<String> roles, String scenarioCode) {
         if (roles == null || roles.isEmpty()) {
-            log.debug("No roles provided for authorization check");
-            return true;
+            log.warn("No roles provided for authorization check - denying access");
+            return false;
         }
 
         boolean authorized = roles.stream().anyMatch(role -> isAuthorized(role, scenarioCode));
@@ -171,7 +172,7 @@ public class RbacService {
             log.debug("Authorization failed: roles={}, scenario={}", roles, scenarioCode);
         }
 
-        return !authorized;
+        return authorized;
     }
 
     /**

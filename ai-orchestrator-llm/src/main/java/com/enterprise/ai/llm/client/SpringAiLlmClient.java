@@ -39,7 +39,17 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
 
     @Override
     public Mono<IntentResult> detectIntent(String userInput, String sessionContext) {
-        return Mono.fromCallable(() -> detectIntentBlocking(userInput, sessionContext));
+        return detectIntent(userInput, sessionContext, null, null);
+    }
+
+    @Override
+    public Mono<IntentResult> detectIntent(String userInput, String sessionContext, String lastUsedParamsJson) {
+        return detectIntent(userInput, sessionContext, lastUsedParamsJson, null);
+    }
+
+    @Override
+    public Mono<IntentResult> detectIntent(String userInput, String sessionContext, String lastUsedParamsJson, Set<String> allowedScenarios) {
+        return Mono.fromCallable(() -> detectIntentBlocking(userInput, sessionContext, lastUsedParamsJson, allowedScenarios));
     }
 
     @Override
@@ -113,9 +123,9 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
 
     @CircuitBreaker(name = "ollama", fallbackMethod = "detectIntentFallback")
     @Retry(name = "ollama")
-    private IntentResult detectIntentBlocking(String userInput, String sessionContext) {
+    private IntentResult detectIntentBlocking(String userInput, String sessionContext, String lastUsedParamsJson, Set<String> allowedScenarios) {
         try {
-            String prompt = promptBuilder.buildIntentDetectionPrompt(userInput, sessionContext);
+            String prompt = promptBuilder.buildIntentDetectionPrompt(userInput, sessionContext, lastUsedParamsJson, allowedScenarios);
 
             log.debug("Intent detection prompt:\n{}", prompt);
 
@@ -260,23 +270,148 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
         return createUnknownIntent();
     }
 
+    /**
+     * Fallback for follow-up question generation.
+     * Returns a properly structured JSON response that the frontend can parse.
+     */
     public String generateFollowUpFallback(String scenarioCode, List<String> missingParams, Throwable t) {
         log.warn("Fallback for generateFollowUp due to: {}", t.getMessage());
+        
+        String question;
         if (missingParams != null && !missingParams.isEmpty()) {
-            return "Please provide the following information: " + String.join(", ", missingParams);
+            String firstParam = missingParams.get(0);
+            // Generate user-friendly question based on parameter name
+            question = switch (firstParam.toLowerCase()) {
+                case "accountid", "account_id" -> "Which account would you like me to check? (e.g., ACC001)";
+                case "datefrom", "date_from", "startdate" -> "From which date would you like to see the data?";
+                case "dateto", "date_to", "enddate" -> "Until which date would you like to see the data?";
+                case "amount", "minamount", "maxamount" -> "What amount range are you looking for?";
+                case "transactiontype", "type" -> "What type of transactions - credits, debits, or all?";
+                default -> "Could you please provide the " + firstParam.replace("_", " ").replace("Id", " ID") + "?";
+            };
+        } else {
+            question = "Could you please provide more details about your request?";
         }
-        return "Could you please provide more details about your request?";
+        
+        // Return structured JSON response
+        try {
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("type", "FOLLOW_UP");
+            response.put("title", "");
+            response.put("confidence", 1.0);
+            
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("question", question);
+            payload.put("missingParams", missingParams != null ? missingParams : List.of());
+            response.put("payload", payload);
+            response.put("scenario", scenarioCode);
+            response.put("suggestedFollowUps", List.of());
+            
+            return objectMapper.writeValueAsString(response);
+        } catch (Exception e) {
+            // Last resort fallback - simple JSON
+            return "{\"type\":\"FOLLOW_UP\",\"payload\":{\"question\":\"" + question + "\"},\"scenario\":\"" + scenarioCode + "\"}";
+        }
     }
 
+    /**
+     * Fallback for response formatting.
+     * Returns a properly structured JSON response that the frontend can render.
+     */
     public String formatResponseFallback(String scenarioCode, ScenarioResult result, String userQuery, Throwable t) {
         log.warn("Fallback for formatResponse due to: {}", t.getMessage());
-        if (result != null && result.getData() != null) {
-            StringBuilder sb = new StringBuilder("Here is the result for your request:\n");
-            result.getData().forEach((key, value) ->
-                    sb.append("- ").append(key).append(": ").append(value).append("\n"));
-            return sb.toString();
+        
+        try {
+            Map<String, Object> response = new LinkedHashMap<>();
+            
+            if (result != null && result.getData() != null && !result.getData().isEmpty()) {
+                Map<String, Object> data = result.getData();
+                
+                // Determine response type based on data structure
+                if (data.containsKey("data") && data.get("data") instanceof List) {
+                    // Multiple rows - use TABLE
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> rows = (List<Map<String, Object>>) data.get("data");
+                    
+                    response.put("type", "TABLE");
+                    response.put("title", "Results 📊");
+                    
+                    if (!rows.isEmpty()) {
+                        List<String> columns = new ArrayList<>(rows.get(0).keySet());
+                        List<List<String>> tableRows = rows.stream()
+                                .map(row -> columns.stream()
+                                        .map(col -> String.valueOf(row.getOrDefault(col, "")))
+                                        .toList())
+                                .toList();
+                        
+                        Map<String, Object> payload = new LinkedHashMap<>();
+                        payload.put("columns", columns);
+                        payload.put("rows", tableRows);
+                        response.put("payload", payload);
+                    } else {
+                        response.put("type", "TEXT");
+                        response.put("payload", Map.of("message", "No data found for your query."));
+                    }
+                } else {
+                    // Key-value pairs - use KV
+                    response.put("type", "KV");
+                    response.put("title", getScenarioTitle(scenarioCode));
+                    response.put("payload", data);
+                }
+                
+                response.put("footer", "Data retrieved successfully");
+                response.put("suggestedFollowUps", getDefaultFollowUps(scenarioCode));
+            } else if (result != null && result.getErrorMessage() != null) {
+                // Error response
+                response.put("type", "ERROR");
+                response.put("payload", Map.of(
+                        "message", result.getErrorMessage(),
+                        "suggestions", List.of("Try again", "Check your input", "Contact support")
+                ));
+            } else {
+                // Success with no data
+                response.put("type", "TEXT");
+                response.put("payload", Map.of("message", "Your request has been processed successfully."));
+                response.put("suggestedFollowUps", getDefaultFollowUps(scenarioCode));
+            }
+            
+            response.put("confidence", 1.0);
+            return objectMapper.writeValueAsString(response);
+        } catch (Exception e) {
+            log.error("Error creating fallback response: {}", e.getMessage());
+            // Ultimate fallback - minimal TEXT response
+            return "{\"type\":\"TEXT\",\"payload\":{\"message\":\"Your request has been processed.\"},\"suggestedFollowUps\":[\"Check account balance\",\"View transactions\"]}";
         }
-        return "Your request has been processed successfully.";
+    }
+    
+    /**
+     * Get a user-friendly title for a scenario.
+     */
+    private String getScenarioTitle(String scenarioCode) {
+        return switch (scenarioCode.toUpperCase()) {
+            case "ACCOUNT_BALANCE" -> "Account Balance 💰";
+            case "TRANSACTION_HISTORY" -> "Transaction History 📊";
+            case "ACCOUNT_SUMMARY" -> "Account Summary 📋";
+            case "FUND_TRANSFER" -> "Transfer Details 💸";
+            case "CARD_DETAILS" -> "Card Information 💳";
+            case "LOAN_STATUS" -> "Loan Status 🏦";
+            case "SPENDING_ANALYSIS" -> "Spending Analysis 📈";
+            case "INVESTMENT_PORTFOLIO" -> "Investment Portfolio 📂";
+            default -> scenarioCode.replace("_", " ");
+        };
+    }
+    
+    /**
+     * Get default follow-up suggestions for a scenario.
+     */
+    private List<String> getDefaultFollowUps(String scenarioCode) {
+        return switch (scenarioCode.toUpperCase()) {
+            case "ACCOUNT_BALANCE" -> List.of("Show recent transactions", "Transfer funds", "View spending breakdown");
+            case "TRANSACTION_HISTORY" -> List.of("Filter by date", "Check balance", "Download statement");
+            case "ACCOUNT_SUMMARY" -> List.of("View transactions", "Check card details", "Transfer funds");
+            case "FUND_TRANSFER" -> List.of("Check transfer status", "View account balance", "Another transfer");
+            default -> List.of("Check account balance", "View transactions", "Help");
+        };
     }
 }
 
