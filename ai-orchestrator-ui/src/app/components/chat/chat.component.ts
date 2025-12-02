@@ -116,6 +116,11 @@ export class ChatComponent implements AfterViewChecked {
     };
     this.messages.push(userMessage);
 
+    // Only clear inputMessage if user typed it manually (not from suggestions)
+    if (!query) {
+      this.inputMessage = '';
+    }
+
     // Check if we have pending context (previous FOLLOW_UP)
     let enhancedQuery = message;
     if (this.pendingContext) {
@@ -134,7 +139,6 @@ export class ChatComponent implements AfterViewChecked {
       sessionId: this.sessionId || undefined
     };
 
-    this.inputMessage = '';
     this.isLoading = true;
 
     // Try streaming first

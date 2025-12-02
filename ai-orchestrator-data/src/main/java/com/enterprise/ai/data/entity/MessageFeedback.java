@@ -58,7 +58,8 @@ public class MessageFeedback {
     private String userQuery;
 
     /**
-     * The AI's response (truncated for storage)
+     * The AI's response (truncated to 4000 characters for storage).
+     * The FeedbackController automatically truncates longer responses.
      */
     @Column(name = "ai_response", length = 4000)
     private String aiResponse;
