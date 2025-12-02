@@ -5,6 +5,8 @@ import { AuthService } from '../../services/auth.service';
 import { User } from '../../models/auth.model';
 import { filter } from 'rxjs/operators';
 
+const ADMIN_ROUTE_PREFIX = '/admin';
+
 @Component({
   selector: 'app-header',
   standalone: true,
@@ -24,7 +26,7 @@ export class HeaderComponent implements OnInit {
     this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
     ).subscribe((event: any) => {
-      this.isOnAdminPage = event.url.startsWith('/admin');
+      this.isOnAdminPage = event.url.startsWith(ADMIN_ROUTE_PREFIX);
     });
   }
 
