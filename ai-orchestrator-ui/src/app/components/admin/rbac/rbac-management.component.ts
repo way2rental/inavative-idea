@@ -4,12 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../services/admin.service';
 import { RoleScenarioMapping, RbacMatrix } from '../../../models/admin.model';
-import { AdminLayoutComponent } from '../../shared/admin-layout/admin-layout.component';
 
 @Component({
   selector: 'app-rbac-management',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, AdminLayoutComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './rbac-management.component.html'
 })
 export class RbacManagementComponent implements OnInit {
@@ -97,7 +96,7 @@ export class RbacManagementComponent implements OnInit {
   refreshCache(): void {
     this.adminService.refreshRbacCache().subscribe({
       next: (response) => {
-        alert(response?.message || 'Cache refreshed successfully');
+        alert(response || 'Cache refreshed successfully');
         this.loadMatrix();
       },
       error: (err) => console.error('Failed to refresh cache:', err)

@@ -1,2 +1,8 @@
 // Admin Sidebar Styles
-
+:host {
+  display: block;
+  position: sticky;
+  top: 70px; /* Below header */
+  height: calc(100vh - 70px);
+  z-index: 40;
+}

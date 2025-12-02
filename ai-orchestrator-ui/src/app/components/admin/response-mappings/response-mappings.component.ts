@@ -4,12 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../services/admin.service';
 import { ResponseMapping, ResponseMappingForm, JsonPathTestRequest } from '../../../models/admin.model';
-import { AdminLayoutComponent } from '../../shared/admin-layout/admin-layout.component';
 
 @Component({
   selector: 'app-response-mappings',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, AdminLayoutComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './response-mappings.component.html'
 })
 export class ResponseMappingsComponent implements OnInit {

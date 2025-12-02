@@ -2,9 +2,18 @@
   <app-header></app-header>
 }
 
-<main class="app-main" [class.with-header]="showHeader">
-  <router-outlet></router-outlet>
-</main>
+<div class="app-container" [class.with-header]="showHeader">
+  @if (showAdminSidebar) {
+    <app-admin-sidebar
+      [collapsed]="sidebarCollapsed"
+      (collapsedChange)="onSidebarToggle($event)">
+    </app-admin-sidebar>
+  }
+
+  <main class="app-main" [class.with-sidebar]="showAdminSidebar" [class.sidebar-collapsed]="sidebarCollapsed">
+    <router-outlet></router-outlet>
+  </main>
+</div>
 
 <!-- Global Alert System -->
 <app-alert></app-alert>

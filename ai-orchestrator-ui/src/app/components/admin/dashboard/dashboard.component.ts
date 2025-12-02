@@ -25,13 +25,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isLoading = true;
   private refreshSubscription?: Subscription;
 
-  // Sidebar state
-  sidebarCollapsed = false;
-
-  toggleSidebar(): void {
-    this.sidebarCollapsed = !this.sidebarCollapsed;
-  }
-
   // Chart Data
   requestsChartData: ChartData<'line'> = {
     labels: ['12 AM', '4 AM', '8 AM', '12 PM', '4 PM', '8 PM'],
