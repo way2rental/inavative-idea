@@ -443,120 +443,120 @@ INSERT INTO ai_followup_groups (group_key, description, scenario_codes, question
 -- =====================================================================
 
 -- ACCOUNT_BALANCE response mappings
-INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
-('ACCOUNT_BALANCE', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 1),
-('ACCOUNT_BALANCE', 'DB_QUERY', 'account_name', 'accountName', '$.account_name', 'NONE', 2),
-('ACCOUNT_BALANCE', 'DB_QUERY', 'account_type', 'accountType', '$.account_type', 'NONE', 3),
-('ACCOUNT_BALANCE', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 4),
-('ACCOUNT_BALANCE', 'DB_QUERY', 'available_balance', 'availableBalance', '$.available_balance', 'NONE', 5),
-('ACCOUNT_BALANCE', 'DB_QUERY', 'current_balance', 'currentBalance', '$.current_balance', 'NONE', 6),
-('ACCOUNT_BALANCE', 'DB_QUERY', 'blocked_amount', 'blockedAmount', '$.blocked_amount', 'NONE', 7),
-('ACCOUNT_BALANCE', 'DB_QUERY', 'last_updated', 'lastUpdated', '$.last_updated', 'NONE', 8);
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order, active) VALUES
+('ACCOUNT_BALANCE', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 1, TRUE),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'account_name', 'accountName', '$.account_name', 'NONE', 2, TRUE),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'account_type', 'accountType', '$.account_type', 'NONE', 3, TRUE),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 4, TRUE),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'available_balance', 'availableBalance', '$.available_balance', 'NONE', 5, TRUE),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'current_balance', 'currentBalance', '$.current_balance', 'NONE', 6, TRUE),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'blocked_amount', 'blockedAmount', '$.blocked_amount', 'NONE', 7, TRUE),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'last_updated', 'lastUpdated', '$.last_updated', 'NONE', 8, TRUE);
 
 -- TRANSACTION_HISTORY response mappings
-INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
-('TRANSACTION_HISTORY', 'DB_QUERY', 'txn_id', 'transactionId', '$.txn_id', 'NONE', 1),
-('TRANSACTION_HISTORY', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 2),
-('TRANSACTION_HISTORY', 'DB_QUERY', 'txn_date', 'transactionDate', '$.txn_date', 'NONE', 3),
-('TRANSACTION_HISTORY', 'DB_QUERY', 'txn_type', 'transactionType', '$.txn_type', 'NONE', 4),
-('TRANSACTION_HISTORY', 'DB_QUERY', 'amount', 'amount', '$.amount', 'NONE', 5),
-('TRANSACTION_HISTORY', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 6),
-('TRANSACTION_HISTORY', 'DB_QUERY', 'description', 'description', '$.description', 'NONE', 7),
-('TRANSACTION_HISTORY', 'DB_QUERY', 'category', 'category', '$.category', 'NONE', 8),
-('TRANSACTION_HISTORY', 'DB_QUERY', 'balance_after', 'balanceAfter', '$.balance_after', 'NONE', 9),
-('TRANSACTION_HISTORY', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 10);
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order, active) VALUES
+('TRANSACTION_HISTORY', 'DB_QUERY', 'txn_id', 'transactionId', '$.txn_id', 'NONE', 1, TRUE),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 2, TRUE),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'txn_date', 'transactionDate', '$.txn_date', 'NONE', 3, TRUE),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'txn_type', 'transactionType', '$.txn_type', 'NONE', 4, TRUE),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'amount', 'amount', '$.amount', 'NONE', 5, TRUE),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 6, TRUE),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'description', 'description', '$.description', 'NONE', 7, TRUE),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'category', 'category', '$.category', 'NONE', 8, TRUE),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'balance_after', 'balanceAfter', '$.balance_after', 'NONE', 9, TRUE),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 10, TRUE);
 
 -- ACCOUNT_SUMMARY response mappings
-INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
-('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 1),
-('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_name', 'accountName', '$.account_name', 'NONE', 2),
-('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_type', 'accountType', '$.account_type', 'NONE', 3),
-('ACCOUNT_SUMMARY', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 4),
-('ACCOUNT_SUMMARY', 'DB_QUERY', 'available_balance', 'availableBalance', '$.available_balance', 'NONE', 5),
-('ACCOUNT_SUMMARY', 'DB_QUERY', 'current_balance', 'currentBalance', '$.current_balance', 'NONE', 6),
-('ACCOUNT_SUMMARY', 'DB_QUERY', 'opening_date', 'openingDate', '$.opening_date', 'NONE', 7),
-('ACCOUNT_SUMMARY', 'DB_QUERY', 'branch_code', 'branchCode', '$.branch_code', 'NONE', 8),
-('ACCOUNT_SUMMARY', 'DB_QUERY', 'ifsc_code', 'ifscCode', '$.ifsc_code', 'NONE', 9),
-('ACCOUNT_SUMMARY', 'DB_QUERY', 'recent_txn_count', 'recentTransactionCount', '$.recent_txn_count', 'NONE', 10);
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order, active) VALUES
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 1, TRUE),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_name', 'accountName', '$.account_name', 'NONE', 2, TRUE),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_type', 'accountType', '$.account_type', 'NONE', 3, TRUE),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 4, TRUE),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'available_balance', 'availableBalance', '$.available_balance', 'NONE', 5, TRUE),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'current_balance', 'currentBalance', '$.current_balance', 'NONE', 6, TRUE),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'opening_date', 'openingDate', '$.opening_date', 'NONE', 7, TRUE),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'branch_code', 'branchCode', '$.branch_code', 'NONE', 8, TRUE),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'ifsc_code', 'ifscCode', '$.ifsc_code', 'NONE', 9, TRUE),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'recent_txn_count', 'recentTransactionCount', '$.recent_txn_count', 'NONE', 10, TRUE);
 
 -- FUND_TRANSFER_STATUS response mappings
-INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
-('FUND_TRANSFER_STATUS', 'DB_QUERY', 'transfer_id', 'transferId', '$.transfer_id', 'NONE', 1),
-('FUND_TRANSFER_STATUS', 'DB_QUERY', 'from_account', 'fromAccount', '$.from_account', 'ACCOUNT', 2),
-('FUND_TRANSFER_STATUS', 'DB_QUERY', 'to_account', 'toAccount', '$.to_account', 'ACCOUNT', 3),
-('FUND_TRANSFER_STATUS', 'DB_QUERY', 'amount', 'amount', '$.amount', 'NONE', 4),
-('FUND_TRANSFER_STATUS', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 5),
-('FUND_TRANSFER_STATUS', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 6),
-('FUND_TRANSFER_STATUS', 'DB_QUERY', 'initiated_at', 'initiatedAt', '$.initiated_at', 'NONE', 7),
-('FUND_TRANSFER_STATUS', 'DB_QUERY', 'completed_at', 'completedAt', '$.completed_at', 'NONE', 8),
-('FUND_TRANSFER_STATUS', 'DB_QUERY', 'remarks', 'remarks', '$.remarks', 'NONE', 9),
-('FUND_TRANSFER_STATUS', 'DB_QUERY', 'failure_reason', 'failureReason', '$.failure_reason', 'NONE', 10);
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order, active) VALUES
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'transfer_id', 'transferId', '$.transfer_id', 'NONE', 1, TRUE),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'from_account', 'fromAccount', '$.from_account', 'ACCOUNT', 2, TRUE),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'to_account', 'toAccount', '$.to_account', 'ACCOUNT', 3, TRUE),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'amount', 'amount', '$.amount', 'NONE', 4, TRUE),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 5, TRUE),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 6, TRUE),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'initiated_at', 'initiatedAt', '$.initiated_at', 'NONE', 7, TRUE),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'completed_at', 'completedAt', '$.completed_at', 'NONE', 8, TRUE),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'remarks', 'remarks', '$.remarks', 'NONE', 9, TRUE),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'failure_reason', 'failureReason', '$.failure_reason', 'NONE', 10, TRUE);
 
 -- BILL_PAYMENT_HISTORY response mappings
-INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
-('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'payment_id', 'paymentId', '$.payment_id', 'NONE', 1),
-('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'biller_name', 'billerName', '$.biller_name', 'NONE', 2),
-('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'biller_category', 'billerCategory', '$.biller_category', 'NONE', 3),
-('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'amount', 'amount', '$.amount', 'NONE', 4),
-('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'payment_date', 'paymentDate', '$.payment_date', 'NONE', 5),
-('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 6),
-('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 7),
-('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'reference_number', 'referenceNumber', '$.reference_number', 'NONE', 8);
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order, active) VALUES
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'payment_id', 'paymentId', '$.payment_id', 'NONE', 1, TRUE),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'biller_name', 'billerName', '$.biller_name', 'NONE', 2, TRUE),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'biller_category', 'billerCategory', '$.biller_category', 'NONE', 3, TRUE),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'amount', 'amount', '$.amount', 'NONE', 4, TRUE),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'payment_date', 'paymentDate', '$.payment_date', 'NONE', 5, TRUE),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 6, TRUE),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 7, TRUE),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'reference_number', 'referenceNumber', '$.reference_number', 'NONE', 8, TRUE);
 
 -- CARD_DETAILS response mappings (with sensitive data masking)
-INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
-('CARD_DETAILS', 'DB_QUERY', 'card_id', 'cardId', '$.card_id', 'NONE', 1),
-('CARD_DETAILS', 'DB_QUERY', 'card_type', 'cardType', '$.card_type', 'NONE', 2),
-('CARD_DETAILS', 'DB_QUERY', 'card_number_masked', 'cardNumber', '$.card_number_masked', 'CARD', 3),
-('CARD_DETAILS', 'DB_QUERY', 'card_holder_name', 'cardHolderName', '$.card_holder_name', 'NONE', 4),
-('CARD_DETAILS', 'DB_QUERY', 'expiry_date', 'expiryDate', '$.expiry_date', 'NONE', 5),
-('CARD_DETAILS', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 6),
-('CARD_DETAILS', 'DB_QUERY', 'credit_limit', 'creditLimit', '$.credit_limit', 'NONE', 7),
-('CARD_DETAILS', 'DB_QUERY', 'available_credit', 'availableCredit', '$.available_credit', 'NONE', 8),
-('CARD_DETAILS', 'DB_QUERY', 'linked_account', 'linkedAccount', '$.linked_account', 'ACCOUNT', 9);
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order, active) VALUES
+('CARD_DETAILS', 'DB_QUERY', 'card_id', 'cardId', '$.card_id', 'NONE', 1, TRUE),
+('CARD_DETAILS', 'DB_QUERY', 'card_type', 'cardType', '$.card_type', 'NONE', 2, TRUE),
+('CARD_DETAILS', 'DB_QUERY', 'card_number_masked', 'cardNumber', '$.card_number_masked', 'CARD', 3, TRUE),
+('CARD_DETAILS', 'DB_QUERY', 'card_holder_name', 'cardHolderName', '$.card_holder_name', 'NONE', 4, TRUE),
+('CARD_DETAILS', 'DB_QUERY', 'expiry_date', 'expiryDate', '$.expiry_date', 'NONE', 5, TRUE),
+('CARD_DETAILS', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 6, TRUE),
+('CARD_DETAILS', 'DB_QUERY', 'credit_limit', 'creditLimit', '$.credit_limit', 'NONE', 7, TRUE),
+('CARD_DETAILS', 'DB_QUERY', 'available_credit', 'availableCredit', '$.available_credit', 'NONE', 8, TRUE),
+('CARD_DETAILS', 'DB_QUERY', 'linked_account', 'linkedAccount', '$.linked_account', 'ACCOUNT', 9, TRUE);
 
 -- LOAN_STATUS response mappings
-INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
-('LOAN_STATUS', 'DB_QUERY', 'loan_id', 'loanId', '$.loan_id', 'NONE', 1),
-('LOAN_STATUS', 'DB_QUERY', 'loan_type', 'loanType', '$.loan_type', 'NONE', 2),
-('LOAN_STATUS', 'DB_QUERY', 'principal_amount', 'principalAmount', '$.principal_amount', 'NONE', 3),
-('LOAN_STATUS', 'DB_QUERY', 'outstanding_balance', 'outstandingBalance', '$.outstanding_balance', 'NONE', 4),
-('LOAN_STATUS', 'DB_QUERY', 'interest_rate', 'interestRate', '$.interest_rate', 'NONE', 5),
-('LOAN_STATUS', 'DB_QUERY', 'emi_amount', 'emiAmount', '$.emi_amount', 'NONE', 6),
-('LOAN_STATUS', 'DB_QUERY', 'next_emi_date', 'nextEmiDate', '$.next_emi_date', 'NONE', 7),
-('LOAN_STATUS', 'DB_QUERY', 'loan_status', 'status', '$.loan_status', 'NONE', 8),
-('LOAN_STATUS', 'DB_QUERY', 'disbursement_date', 'disbursementDate', '$.disbursement_date', 'NONE', 9),
-('LOAN_STATUS', 'DB_QUERY', 'tenure_months', 'tenureMonths', '$.tenure_months', 'NONE', 10),
-('LOAN_STATUS', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 11);
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order, active) VALUES
+('LOAN_STATUS', 'DB_QUERY', 'loan_id', 'loanId', '$.loan_id', 'NONE', 1, TRUE),
+('LOAN_STATUS', 'DB_QUERY', 'loan_type', 'loanType', '$.loan_type', 'NONE', 2, TRUE),
+('LOAN_STATUS', 'DB_QUERY', 'principal_amount', 'principalAmount', '$.principal_amount', 'NONE', 3, TRUE),
+('LOAN_STATUS', 'DB_QUERY', 'outstanding_balance', 'outstandingBalance', '$.outstanding_balance', 'NONE', 4, TRUE),
+('LOAN_STATUS', 'DB_QUERY', 'interest_rate', 'interestRate', '$.interest_rate', 'NONE', 5, TRUE),
+('LOAN_STATUS', 'DB_QUERY', 'emi_amount', 'emiAmount', '$.emi_amount', 'NONE', 6, TRUE),
+('LOAN_STATUS', 'DB_QUERY', 'next_emi_date', 'nextEmiDate', '$.next_emi_date', 'NONE', 7, TRUE),
+('LOAN_STATUS', 'DB_QUERY', 'loan_status', 'status', '$.loan_status', 'NONE', 8, TRUE),
+('LOAN_STATUS', 'DB_QUERY', 'disbursement_date', 'disbursementDate', '$.disbursement_date', 'NONE', 9, TRUE),
+('LOAN_STATUS', 'DB_QUERY', 'tenure_months', 'tenureMonths', '$.tenure_months', 'NONE', 10, TRUE),
+('LOAN_STATUS', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 11, TRUE);
 
 -- FIXED_DEPOSIT_DETAILS response mappings
-INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
-('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'fd_id', 'fdId', '$.fd_id', 'NONE', 1),
-('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 2),
-('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'principal_amount', 'principalAmount', '$.principal_amount', 'NONE', 3),
-('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'interest_rate', 'interestRate', '$.interest_rate', 'NONE', 4),
-('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'maturity_date', 'maturityDate', '$.maturity_date', 'NONE', 5),
-('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'maturity_amount', 'maturityAmount', '$.maturity_amount', 'NONE', 6),
-('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'tenure_days', 'tenureDays', '$.tenure_days', 'NONE', 7),
-('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 8),
-('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'created_date', 'createdDate', '$.created_date', 'NONE', 9);
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order, active) VALUES
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'fd_id', 'fdId', '$.fd_id', 'NONE', 1, TRUE),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 2, TRUE),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'principal_amount', 'principalAmount', '$.principal_amount', 'NONE', 3, TRUE),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'interest_rate', 'interestRate', '$.interest_rate', 'NONE', 4, TRUE),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'maturity_date', 'maturityDate', '$.maturity_date', 'NONE', 5, TRUE),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'maturity_amount', 'maturityAmount', '$.maturity_amount', 'NONE', 6, TRUE),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'tenure_days', 'tenureDays', '$.tenure_days', 'NONE', 7, TRUE),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 8, TRUE),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'created_date', 'createdDate', '$.created_date', 'NONE', 9, TRUE);
 
 -- BENEFICIARY_LIST response mappings (with sensitive data masking)
-INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
-('BENEFICIARY_LIST', 'DB_QUERY', 'beneficiary_id', 'beneficiaryId', '$.beneficiary_id', 'NONE', 1),
-('BENEFICIARY_LIST', 'DB_QUERY', 'beneficiary_name', 'beneficiaryName', '$.beneficiary_name', 'NONE', 2),
-('BENEFICIARY_LIST', 'DB_QUERY', 'account_number', 'accountNumber', '$.account_number', 'ACCOUNT', 3),
-('BENEFICIARY_LIST', 'DB_QUERY', 'ifsc_code', 'ifscCode', '$.ifsc_code', 'NONE', 4),
-('BENEFICIARY_LIST', 'DB_QUERY', 'bank_name', 'bankName', '$.bank_name', 'NONE', 5),
-('BENEFICIARY_LIST', 'DB_QUERY', 'beneficiary_type', 'beneficiaryType', '$.beneficiary_type', 'NONE', 6),
-('BENEFICIARY_LIST', 'DB_QUERY', 'nickname', 'nickname', '$.nickname', 'NONE', 7),
-('BENEFICIARY_LIST', 'DB_QUERY', 'added_date', 'addedDate', '$.added_date', 'NONE', 8),
-('BENEFICIARY_LIST', 'DB_QUERY', 'verified', 'verified', '$.verified', 'NONE', 9),
-('BENEFICIARY_LIST', 'DB_QUERY', 'account_id', 'ownerAccountId', '$.account_id', 'ACCOUNT', 10);
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order, active) VALUES
+('BENEFICIARY_LIST', 'DB_QUERY', 'beneficiary_id', 'beneficiaryId', '$.beneficiary_id', 'NONE', 1, TRUE),
+('BENEFICIARY_LIST', 'DB_QUERY', 'beneficiary_name', 'beneficiaryName', '$.beneficiary_name', 'NONE', 2, TRUE),
+('BENEFICIARY_LIST', 'DB_QUERY', 'account_number', 'accountNumber', '$.account_number', 'ACCOUNT', 3, TRUE),
+('BENEFICIARY_LIST', 'DB_QUERY', 'ifsc_code', 'ifscCode', '$.ifsc_code', 'NONE', 4, TRUE),
+('BENEFICIARY_LIST', 'DB_QUERY', 'bank_name', 'bankName', '$.bank_name', 'NONE', 5, TRUE),
+('BENEFICIARY_LIST', 'DB_QUERY', 'beneficiary_type', 'beneficiaryType', '$.beneficiary_type', 'NONE', 6, TRUE),
+('BENEFICIARY_LIST', 'DB_QUERY', 'nickname', 'nickname', '$.nickname', 'NONE', 7, TRUE),
+('BENEFICIARY_LIST', 'DB_QUERY', 'added_date', 'addedDate', '$.added_date', 'NONE', 8, TRUE),
+('BENEFICIARY_LIST', 'DB_QUERY', 'verified', 'verified', '$.verified', 'NONE', 9, TRUE),
+('BENEFICIARY_LIST', 'DB_QUERY', 'account_id', 'ownerAccountId', '$.account_id', 'ACCOUNT', 10, TRUE);
 
 -- SPENDING_ANALYSIS response mappings
-INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
-('SPENDING_ANALYSIS', 'DB_QUERY', 'category', 'category', '$.category', 'NONE', 1),
-('SPENDING_ANALYSIS', 'DB_QUERY', 'total_spent', 'totalSpent', '$.total_spent', 'NONE', 2),
-('SPENDING_ANALYSIS', 'DB_QUERY', 'transaction_count', 'transactionCount', '$.transaction_count', 'NONE', 3),
-('SPENDING_ANALYSIS', 'DB_QUERY', 'avg_transaction', 'averageTransaction', '$.avg_transaction', 'NONE', 4);
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order, active) VALUES
+('SPENDING_ANALYSIS', 'DB_QUERY', 'category', 'category', '$.category', 'NONE', 1, TRUE),
+('SPENDING_ANALYSIS', 'DB_QUERY', 'total_spent', 'totalSpent', '$.total_spent', 'NONE', 2, TRUE),
+('SPENDING_ANALYSIS', 'DB_QUERY', 'transaction_count', 'transactionCount', '$.transaction_count', 'NONE', 3, TRUE),
+('SPENDING_ANALYSIS', 'DB_QUERY', 'avg_transaction', 'averageTransaction', '$.avg_transaction', 'NONE', 4, TRUE);

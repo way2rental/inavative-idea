@@ -125,7 +125,7 @@ public class QueryExecutor implements DynamicExecutor {
             // Add user context parameters for RLS filters (always)
             if (RequestContextHolder.getContext() != null) {
                 sqlParams.put("userId", RequestContextHolder.getContext().getUserId());
-                sqlParams.put("orgId", RequestContextHolder.getContext().getTenantId());
+                sqlParams.put("corpCode", RequestContextHolder.getContext().getTenantId());
             }
 
             log.info("Executing DB_QUERY for scenario {} with params: {}", scenarioCode, sqlParams.keySet());

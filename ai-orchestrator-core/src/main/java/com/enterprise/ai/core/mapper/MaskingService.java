@@ -35,6 +35,8 @@ public class MaskingService {
             return stringValue;
         }
 
+        // TODO think and make them dynamic so that new masking types can be added via config using patterns
+        // For now, hardcoded types as per spec
         try {
             return switch (maskingType.toUpperCase()) {
                 case "ACCOUNT" -> maskAccount(stringValue);
@@ -159,5 +161,10 @@ public class MaskingService {
         }
         
         return "NONE";
+    }
+
+    public static void main(String[] args) {
+        MaskingService maskingService = new MaskingService();
+        System.out.println(maskingService.maskAccount("123412342345"));
     }
 }
