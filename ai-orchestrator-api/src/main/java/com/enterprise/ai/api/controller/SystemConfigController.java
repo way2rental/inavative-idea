@@ -112,11 +112,13 @@ public class SystemConfigController {
 
     @PostMapping
     @Operation(summary = "Create new configuration")
-    public ResponseEntity<ConfigDTO> createConfig(@RequestBody ConfigFormDTO form) {
+    public ResponseEntity<?> createConfig(@RequestBody ConfigFormDTO form) {
         log.info("Creating new configuration: {}", form.configKey);
         
         if (configService.getConfig(form.configKey).isPresent()) {
-            return ResponseEntity.badRequest().build();
+            log.warn("Configuration key already exists: {}", form.configKey);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Configuration key '" + form.configKey + "' already exists"));
         }
 
         SystemConfig config = SystemConfig.builder()

@@ -74,7 +74,8 @@ export class SystemConfigComponent implements OnInit {
         this.categories = categories;
       },
       error: () => {
-        console.error('Failed to load categories');
+        // Categories are non-critical, silently fallback to empty
+        this.categories = [];
       }
     });
   }

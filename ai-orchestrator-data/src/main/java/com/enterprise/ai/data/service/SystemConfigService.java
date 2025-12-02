@@ -29,7 +29,9 @@ public class SystemConfigService {
     // In-memory cache for fast access
     private final Map<String, SystemConfig> configCache = new ConcurrentHashMap<>();
     private volatile long lastRefreshTime = 0;
-    private static final long CACHE_TTL_MS = 300000; // 5 minutes
+    // Bootstrap cache TTL - used only until the service initializes and reads from DB
+    // After init, CACHE_TTL_SECONDS from DB is used for prompt/scenario caching
+    private static final long BOOTSTRAP_CACHE_TTL_MS = 300000; // 5 minutes
 
     // ===================== CONFIG KEYS =====================
     // These are the configuration keys used throughout the application
@@ -149,7 +151,7 @@ public class SystemConfigService {
      * Check if cache needs refresh and refresh if needed.
      */
     private void checkCacheRefresh() {
-        if (System.currentTimeMillis() - lastRefreshTime > CACHE_TTL_MS) {
+        if (System.currentTimeMillis() - lastRefreshTime > BOOTSTRAP_CACHE_TTL_MS) {
             refreshCache();
         }
     }
