@@ -21,6 +21,11 @@ export interface Scenario {
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
+  // Multi-filter engine fields
+  filterDefinitions?: string;
+  securityFilters?: string;
+  maxResults?: number;
+  defaultSort?: string;
 }
 
 export interface ScenarioFormData {
@@ -41,6 +46,11 @@ export interface ScenarioFormData {
   optionalParams?: string;
   llmPromptTemplate?: string;
   active: boolean;
+  // Multi-filter engine fields
+  filterDefinitions?: string;
+  securityFilters?: string;
+  maxResults?: number;
+  defaultSort?: string;
 }
 
 export interface AuditLog {
@@ -74,7 +84,9 @@ export interface UrlWhitelist {
   description: string;
   allowedMethods: string;
   active: boolean;
+  addedBy?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface ScenarioTestRequest {

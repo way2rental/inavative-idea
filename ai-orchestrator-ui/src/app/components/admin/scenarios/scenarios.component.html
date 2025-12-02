@@ -323,9 +323,41 @@
           </div>
         }
 
+        <!-- Multi-Filter Engine Config -->
+        @if (selectedScenario.filterDefinitions || selectedScenario.securityFilters) {
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">Multi-Filter Engine Configuration</h3>
+            <div class="bg-gradient-to-br from-cyan-50 to-teal-50 border-l-4 border-cyan-500 rounded-lg p-4 space-y-3">
+              @if (selectedScenario.filterDefinitions) {
+                <div>
+                  <label class="text-gray-500 text-sm">Filter Definitions</label>
+                  <pre class="text-sm text-gray-800 font-mono whitespace-pre-wrap overflow-x-auto mt-1">{{ selectedScenario.filterDefinitions }}</pre>
+                </div>
+              }
+              @if (selectedScenario.securityFilters) {
+                <div>
+                  <label class="text-gray-500 text-sm">Security Filters (RLS)</label>
+                  <pre class="text-sm text-gray-800 font-mono whitespace-pre-wrap overflow-x-auto mt-1">{{ selectedScenario.securityFilters }}</pre>
+                </div>
+              }
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="text-gray-500 text-sm">Max Results</label>
+                  <p class="text-gray-900">{{ selectedScenario.maxResults || 100 }}</p>
+                </div>
+                <div>
+                  <label class="text-gray-500 text-sm">Default Sort</label>
+                  <p class="text-gray-900 font-mono text-sm">{{ selectedScenario.defaultSort || 'Not set' }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
         <!-- Action Buttons -->
         <div class="flex items-center justify-end gap-3 pt-4 border-t">
           <button (click)="closeDetails()" class="btn-secondary">Close</button>
+          <button (click)="openEditModal(selectedScenario)" class="btn-secondary">Edit</button>
           <button (click)="testScenario(selectedScenario); closeDetails()" class="btn-axis">
             Test Scenario
           </button>
@@ -335,6 +367,156 @@
   </div>
 }
 
-<!-- Create/Edit Modal (existing modal code remains the same) -->
-<!-- ... existing modal code ... -->
+<!-- Create/Edit Modal -->
+@if (showModal) {
+  <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" (click)="closeModal()">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden" (click)="$event.stopPropagation()">
+      <div class="bg-gradient-to-r from-axis-burgundy to-axis-maroon px-6 py-4 flex items-center justify-between">
+        <h2 class="text-xl font-bold text-white">{{ isEditing ? 'Edit Scenario' : 'Create New Scenario' }}</h2>
+        <button (click)="closeModal()" class="text-white/80 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+        <form class="space-y-6">
+          <!-- Basic Info -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Scenario Code</label>
+              <input type="text" [(ngModel)]="formData.scenarioCode" name="scenarioCode"
+                class="input-axis" placeholder="e.g., TXN_STATUS" [disabled]="isEditing">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Execution Type</label>
+              <select [(ngModel)]="formData.executionType" name="executionType" class="input-axis">
+                <option value="DB_QUERY">Database Query</option>
+                <option value="HTTP_CALL">HTTP Call</option>
+                <option value="FILE_READ">File Read</option>
+                <option value="KAFKA_CONSUME">Kafka Consume</option>
+                <option value="COMPOSITE">Composite</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+            <textarea [(ngModel)]="formData.description" name="description" rows="2"
+              class="input-axis" placeholder="Brief description of this scenario..."></textarea>
+          </div>
+
+          <!-- DB Query Section -->
+          @if (formData.executionType === 'DB_QUERY') {
+            <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-4">
+              <h4 class="font-medium text-blue-700">Database Query Configuration</h4>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">SQL Query</label>
+                <textarea [(ngModel)]="formData.sqlQuery" name="sqlQuery" rows="4"
+                  class="input-axis font-mono text-sm" placeholder="SELECT * FROM transactions WHERE account_id = :accountId"></textarea>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Max Results</label>
+                  <input type="number" [(ngModel)]="formData.maxResults" name="maxResults"
+                    class="input-axis" min="1" max="1000">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Default Sort</label>
+                  <input type="text" [(ngModel)]="formData.defaultSort" name="defaultSort"
+                    class="input-axis font-mono text-sm" placeholder="transaction_date DESC">
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- HTTP Call Section -->
+          @if (formData.executionType === 'HTTP_CALL') {
+            <div class="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-4">
+              <h4 class="font-medium text-purple-700">HTTP Call Configuration</h4>
+              <div class="grid grid-cols-4 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Method</label>
+                  <select [(ngModel)]="formData.httpMethod" name="httpMethod" class="input-axis">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                  </select>
+                </div>
+                <div class="col-span-3">
+                  <label class="block text-sm font-medium text-gray-700 mb-2">URL</label>
+                  <input type="text" [(ngModel)]="formData.httpUrl" name="httpUrl"
+                    class="input-axis font-mono text-sm" placeholder="/api/v1/data/{id}">
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Filter Engine Configuration -->
+          <div class="p-4 bg-cyan-50 border border-cyan-200 rounded-lg space-y-4">
+            <h4 class="font-medium text-cyan-700">Multi-Filter Engine Configuration</h4>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Filter Definitions (JSON)</label>
+              <textarea [(ngModel)]="formData.filterDefinitions" name="filterDefinitions" rows="4"
+                class="input-axis font-mono text-sm" placeholder='[{"name": "accountId", "displayName": "Account ID", "type": "STRING", "dbColumn": "account_id", "operator": "=", "mandatory": true}]'></textarea>
+              <p class="text-gray-400 text-xs mt-1">JSON array of filter definitions for dynamic WHERE clause generation</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Security Filters (RLS - JSON)</label>
+              <textarea [(ngModel)]="formData.securityFilters" name="securityFilters" rows="2"
+                class="input-axis font-mono text-sm" placeholder='{"userLevel": {"dbColumn": "user_id", "contextKey": "userId"}}'></textarea>
+              <p class="text-gray-400 text-xs mt-1">Row-level security filters applied automatically</p>
+            </div>
+          </div>
+
+          <!-- Mappings -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Request Mapping (JSON)</label>
+              <textarea [(ngModel)]="formData.requestMapping" name="requestMapping" rows="3"
+                class="input-axis font-mono text-sm" placeholder='{"accountId": "$.params.accountId"}'></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Response Mapping (JSON)</label>
+              <textarea [(ngModel)]="formData.responseMapping" name="responseMapping" rows="3"
+                class="input-axis font-mono text-sm" placeholder='{"balance": "$.data.balance"}'></textarea>
+            </div>
+          </div>
+
+          <!-- Parameters -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Required Parameters</label>
+              <input type="text" [(ngModel)]="formData.requiredParams" name="requiredParams"
+                class="input-axis" placeholder="accountId, fromDate">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Timeout (ms)</label>
+              <input type="number" [(ngModel)]="formData.timeoutMs" name="timeoutMs"
+                class="input-axis" min="100" max="60000">
+            </div>
+          </div>
+
+          <!-- LLM Prompt -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">LLM Prompt Template</label>
+            <textarea [(ngModel)]="formData.llmPromptTemplate" name="llmPromptTemplate" rows="4"
+              class="input-axis" placeholder="You are an AI assistant helping users query account information..."></textarea>
+          </div>
+
+          <!-- Active Status -->
+          <div class="flex items-center gap-2">
+            <input type="checkbox" [(ngModel)]="formData.active" name="active" id="modalActive" class="rounded border-gray-300 text-axis-burgundy focus:ring-axis-burgundy">
+            <label for="modalActive" class="text-sm text-gray-700">Active</label>
+          </div>
+        </form>
+      </div>
+
+      <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+        <button (click)="closeModal()" class="btn-secondary">Cancel</button>
+        <button (click)="saveScenario()" class="btn-axis">{{ isEditing ? 'Update' : 'Create' }} Scenario</button>
+      </div>
+    </div>
+  </div>
+}
 

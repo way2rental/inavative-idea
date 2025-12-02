@@ -70,7 +70,12 @@ export class ScenariosComponent implements OnInit {
       responseMapping: '',
       timeoutMs: 5000,
       executorBean: '',
-      active: true
+      active: true,
+      // Multi-filter engine fields
+      filterDefinitions: '',
+      securityFilters: '',
+      maxResults: 100,
+      defaultSort: ''
     };
   }
 
@@ -101,7 +106,12 @@ export class ScenariosComponent implements OnInit {
       responseMapping: scenario.responseMapping || '',
       timeoutMs: scenario.timeoutMs || 5000,
       executorBean: scenario.executorBean || '',
-      active: scenario.active
+      active: scenario.active,
+      // Multi-filter engine fields
+      filterDefinitions: scenario.filterDefinitions || '',
+      securityFilters: scenario.securityFilters || '',
+      maxResults: scenario.maxResults || 100,
+      defaultSort: scenario.defaultSort || ''
     };
     this.showModal = true;
   }
