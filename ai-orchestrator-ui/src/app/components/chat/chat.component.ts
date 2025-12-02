@@ -70,7 +70,10 @@ export class ChatComponent implements AfterViewChecked {
   constructor(
     private apiService: ApiService,
     private authService: AuthService
-  ) {}
+  ) {
+    // Load chat history on initialization
+    this.loadChatHistory();
+  }
 
   ngAfterViewChecked(): void {
     this.scrollToBottom();
@@ -417,6 +420,9 @@ export class ChatComponent implements AfterViewChecked {
         if (!hasReceivedDone) {
           console.warn('[SSE] Stream completed without receiving done event');
         }
+
+        // Save chat history after each complete message
+        this.saveChatHistory();
       }
     });
   }
@@ -462,6 +468,9 @@ export class ChatComponent implements AfterViewChecked {
   clearChat(): void {
     this.messages = [];
     this.sessionId = null;
+    // Clear local storage chat history
+    localStorage.removeItem('chatHistory');
+    localStorage.removeItem('chatSessionId');
   }
 
   onKeyPress(event: KeyboardEvent): void {
@@ -469,6 +478,135 @@ export class ChatComponent implements AfterViewChecked {
       event.preventDefault();
       this.sendMessage();
     }
+  }
+
+  /**
+   * Copy message content to clipboard
+   */
+  copyToClipboard(message: ChatMessage): void {
+    let textToCopy = '';
+    
+    if (message.structured) {
+      // Extract text from structured response
+      const payload = message.structured.payload;
+      if (message.structured.type === 'TEXT') {
+        textToCopy = payload.message || '';
+      } else if (message.structured.type === 'TABLE') {
+        // Format table as text
+        const columns = payload.columns || [];
+        const rows = payload.rows || [];
+        textToCopy = columns.join('\t') + '\n' + rows.map((r: string[]) => r.join('\t')).join('\n');
+      } else if (message.structured.type === 'KV') {
+        textToCopy = Object.entries(payload).map(([k, v]) => `${k}: ${v}`).join('\n');
+      } else if (message.structured.type === 'BULLET') {
+        textToCopy = (payload.items || []).map((item: string) => `• ${item}`).join('\n');
+      } else {
+        textToCopy = JSON.stringify(payload, null, 2);
+      }
+      
+      if (message.structured.title) {
+        textToCopy = message.structured.title + '\n\n' + textToCopy;
+      }
+    } else {
+      textToCopy = message.content || '';
+    }
+    
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      // Show a brief toast notification (could be enhanced with a proper toast service)
+      console.log('Copied to clipboard');
+    });
+  }
+
+  /**
+   * React to a message (like/dislike)
+   */
+  reactToMessage(message: ChatMessage, reaction: 'like' | 'dislike'): void {
+    if (message.reaction === reaction) {
+      message.reaction = null; // Toggle off
+    } else {
+      message.reaction = reaction;
+    }
+    // In a real app, you'd send this feedback to the backend for model improvement
+    console.log('Feedback recorded:', reaction, 'for message at', message.timestamp);
+  }
+
+  /**
+   * Regenerate the last assistant response
+   */
+  regenerateResponse(): void {
+    // Find the last user message
+    const lastUserMessageIndex = [...this.messages].reverse().findIndex(m => m.role === 'user');
+    if (lastUserMessageIndex === -1) return;
+    
+    const actualIndex = this.messages.length - 1 - lastUserMessageIndex;
+    const userMessage = this.messages[actualIndex];
+    
+    // Remove all messages after the user message
+    this.messages = this.messages.slice(0, actualIndex + 1);
+    
+    // Resend the message
+    const request: ChatRequest = {
+      userId: this.authService.getCurrentUser()?.username || 'anonymous',
+      query: userMessage.content || '',
+      sessionId: this.sessionId || undefined
+    };
+    
+    this.isLoading = true;
+    this.streamMessage(request);
+  }
+
+  /**
+   * Save chat history to localStorage
+   */
+  private saveChatHistory(): void {
+    if (this.messages.length > 0) {
+      const historyData = {
+        messages: this.messages.map(m => ({
+          role: m.role,
+          content: m.content,
+          structured: m.structured,
+          timestamp: m.timestamp,
+          reaction: m.reaction
+        })),
+        sessionId: this.sessionId
+      };
+      localStorage.setItem('chatHistory', JSON.stringify(historyData));
+      if (this.sessionId) {
+        localStorage.setItem('chatSessionId', this.sessionId);
+      }
+    }
+  }
+
+  /**
+   * Load chat history from localStorage
+   */
+  private loadChatHistory(): void {
+    const saved = localStorage.getItem('chatHistory');
+    const savedSessionId = localStorage.getItem('chatSessionId');
+    
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        this.messages = data.messages.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp)
+        }));
+        this.sessionId = savedSessionId || data.sessionId || null;
+      } catch (e) {
+        console.error('Failed to load chat history:', e);
+      }
+    }
+  }
+
+  /**
+   * Get suggested follow-up questions from the last response
+   */
+  getSuggestedFollowUps(): string[] {
+    const lastAssistantMessage = [...this.messages].reverse().find(m => m.role === 'assistant' && m.structured);
+    if (lastAssistantMessage?.structured?.suggestedFollowUps) {
+      return lastAssistantMessage.structured.suggestedFollowUps;
+    }
+    return [];
   }
 
   getCurrentUser(): string {

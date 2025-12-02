@@ -216,8 +216,16 @@ public class DynamicPromptBuilder {
                   "title": "Optional",
                   "confidence": 1.0,
                   "payload": {},
-                  "footer": "Optional"
+                  "footer": "Optional",
+                  "suggestedFollowUps": ["Question 1?", "Question 2?", "Question 3?"]
                 }
+                
+                IMPORTANT - SUGGESTED FOLLOW-UPS:
+                - ALWAYS include 2-4 "suggestedFollowUps" - natural follow-up questions the user might ask next
+                - Make them contextually relevant to the current response
+                - Examples for account balance: ["Show transaction history", "Check spending analysis", "Compare with last month"]
+                - Examples for transaction history: ["Filter by date range", "Export transactions", "Show account summary"]
+                - Keep each suggestion under 6 words
                 
                 Rules:
                 - If data is single info → use KV
@@ -241,7 +249,8 @@ public class DynamicPromptBuilder {
                       ["2024-01-15", "Salary", "5000.00"],
                       ["2024-01-14", "Shopping", "-150.00"]
                     ]
-                  }
+                  },
+                  "suggestedFollowUps": ["Filter by date", "Show account balance", "Export to PDF"]
                 }
                 
                 CRITICAL FIELD NAMES:

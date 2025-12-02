@@ -58,6 +58,8 @@ export interface StructuredResponse {
   footer?: string;
   sessionId?: string;
   scenario?: string;
+  /** Suggested follow-up questions for ChatGPT-like experience */
+  suggestedFollowUps?: string[];
 }
 
 /**
@@ -138,6 +140,10 @@ export interface ChatMessage {
     params: { [key: string]: any };
     missingParams: string[];
   };
+  // Message feedback/reactions
+  reaction?: 'like' | 'dislike' | null;
+  // Message ID for regeneration
+  messageId?: string;
 }
 
 // Legacy support: Follow-up event payload
