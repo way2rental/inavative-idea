@@ -738,7 +738,7 @@ public class ReactiveChatService {
                 log.info("Stored last used params for session {}: {}", sessionId, params);
             }
         } catch (Exception e) {
-            log.error("Failed to store last used params: {}", e.getMessage());
+            log.error("Failed to store last used params for session {}", sessionId, e);
         }
     }
 

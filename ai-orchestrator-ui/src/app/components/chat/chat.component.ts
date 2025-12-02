@@ -521,13 +521,72 @@ export class ChatComponent implements AfterViewChecked {
    * React to a message (like/dislike)
    */
   reactToMessage(message: ChatMessage, reaction: 'like' | 'dislike'): void {
+    const previousReaction = message.reaction;
+    
     if (message.reaction === reaction) {
       message.reaction = null; // Toggle off
     } else {
       message.reaction = reaction;
     }
-    // In a real app, you'd send this feedback to the backend for model improvement
-    console.log('Feedback recorded:', reaction, 'for message at', message.timestamp);
+    
+    // Only send to backend if we're setting a reaction (not removing)
+    if (message.reaction) {
+      // Find the user message that triggered this response
+      const messageIndex = this.messages.indexOf(message);
+      const userMessage = messageIndex > 0 ? this.messages[messageIndex - 1] : null;
+      
+      // Extract response text for storage
+      let aiResponse = '';
+      if (message.structured) {
+        if (message.structured.type === 'TEXT') {
+          aiResponse = message.structured.payload?.message || '';
+        } else {
+          aiResponse = JSON.stringify(message.structured.payload).substring(0, 500);
+        }
+      } else {
+        aiResponse = message.content || '';
+      }
+
+      // Send feedback to backend
+      this.apiService.submitFeedback({
+        sessionId: this.sessionId || '',
+        userId: this.authService.getCurrentUser()?.username || 'anonymous',
+        feedbackType: message.reaction,
+        scenarioCode: message.structured?.scenario || '',
+        userQuery: userMessage?.content || '',
+        aiResponse: aiResponse.substring(0, 4000)
+      }).subscribe({
+        next: () => {
+          console.log('Feedback submitted successfully');
+          this.showToast(reaction === 'like' ? '👍 Thanks for the feedback!' : '👎 Thanks, we\'ll improve!');
+        },
+        error: (err) => {
+          console.error('Failed to submit feedback:', err);
+          // Revert on error
+          message.reaction = previousReaction;
+        }
+      });
+    }
+    
+    // Save to local history
+    this.saveChatHistory();
+  }
+
+  /**
+   * Show a temporary toast notification
+   */
+  private showToast(message: string): void {
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-20 right-10 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Remove after 2 seconds
+    setTimeout(() => {
+      toast.classList.add('opacity-0', 'transition-opacity');
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
   }
 
   /**

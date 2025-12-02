@@ -4,6 +4,40 @@ import { Observable, of, Subject } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ChatRequest, ChatResponse } from '../models/chat.model';
 
+export interface FeedbackRequest {
+  sessionId: string;
+  messageId?: number;
+  userId: string;
+  feedbackType: 'like' | 'dislike';
+  comment?: string;
+  scenarioCode?: string;
+  userQuery?: string;
+  aiResponse?: string;
+}
+
+export interface FeedbackStats {
+  totalFeedback: number;
+  totalLikes: number;
+  totalDislikes: number;
+  satisfactionRate: number;
+  weeklyLikes: number;
+  weeklyDislikes: number;
+  scenarioBreakdown: { [scenario: string]: { [type: string]: number } };
+}
+
+export interface MessageFeedback {
+  id: number;
+  sessionId: string;
+  messageId: number;
+  userId: string;
+  feedbackType: string;
+  comment: string;
+  scenarioCode: string;
+  userQuery: string;
+  aiResponse: string;
+  createdAt: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -19,6 +53,51 @@ export class ApiService {
   chatV2(request: ChatRequest): Observable<ChatResponse> {
     return this.http.post<ChatResponse>(`${this.baseUrl}/v2/chat`, request);
   }
+
+  // ============================================
+  // FEEDBACK API
+  // ============================================
+
+  /**
+   * Submit feedback for a message (like/dislike)
+   */
+  submitFeedback(request: FeedbackRequest): Observable<any> {
+    return this.http.post(`${this.baseUrl}/feedback`, request);
+  }
+
+  /**
+   * Get feedback statistics (Admin only)
+   */
+  getFeedbackStats(): Observable<FeedbackStats> {
+    return this.http.get<FeedbackStats>(`${this.baseUrl}/feedback/stats`);
+  }
+
+  /**
+   * Get recent negative feedback (Admin only)
+   */
+  getNegativeFeedback(limit: number = 50): Observable<MessageFeedback[]> {
+    return this.http.get<MessageFeedback[]>(`${this.baseUrl}/feedback/negative?limit=${limit}`);
+  }
+
+  /**
+   * Get all feedback with optional filters (Admin only)
+   */
+  getAllFeedback(filters?: { feedbackType?: string; scenarioCode?: string; userId?: string }): Observable<MessageFeedback[]> {
+    let url = `${this.baseUrl}/feedback`;
+    if (filters) {
+      const params = new URLSearchParams();
+      if (filters.feedbackType) params.append('feedbackType', filters.feedbackType);
+      if (filters.scenarioCode) params.append('scenarioCode', filters.scenarioCode);
+      if (filters.userId) params.append('userId', filters.userId);
+      const queryString = params.toString();
+      if (queryString) url += `?${queryString}`;
+    }
+    return this.http.get<MessageFeedback[]>(url);
+  }
+
+  // ============================================
+  // CHAT STREAMING
+  // ============================================
 
   chatStream(request: ChatRequest): Observable<{ event: string; data: string }> {
     const subject = new Subject<{ event: string; data: string }>();
