@@ -305,11 +305,10 @@ public class RbacAdminController {
 
         // Add default roles if no mappings exist
         Set<String> roles = new HashSet<>(mappedRoles);
-        if (roles.isEmpty()) {
-            roles.add("ADMIN");
-            roles.add("USER");
-            roles.add("OPERATOR");
-        }
+        roles.add("ADMIN");
+        roles.add("USER");
+        roles.add("OPERATOR");
+
         List<String> roleList = new ArrayList<>(roles);
         roleList.sort(String::compareTo);
 

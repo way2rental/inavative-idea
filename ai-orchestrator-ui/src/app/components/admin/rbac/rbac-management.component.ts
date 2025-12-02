@@ -16,7 +16,6 @@ export class RbacManagementComponent implements OnInit {
   isLoading = true;
   viewMode: 'matrix' | 'list' = 'matrix';
 
-  // Bulk assign
   showBulkModal = false;
   selectedRole = '';
   selectedScenarios: Set<string> = new Set();
