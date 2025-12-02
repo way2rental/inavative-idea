@@ -174,10 +174,10 @@
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Rule Expression (SpEL format)</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Rule Expression</label>
               <textarea [(ngModel)]="formData.ruleExpression" name="ruleExpression" rows="3"
                 class="input-axis font-mono text-sm" placeholder="#{query.length() < 1000}"></textarea>
-              <p class="text-gray-400 text-xs mt-1">Use SpEL expressions. Variables: query, userId, role, scenarioCode</p>
+              <p class="text-gray-400 text-xs mt-1">SpEL-style expressions (demo). Variables: query, userId, role, scenarioCode. Full SpEL integration coming soon.</p>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
