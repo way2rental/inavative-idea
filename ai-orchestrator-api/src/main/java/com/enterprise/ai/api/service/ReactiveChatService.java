@@ -353,7 +353,8 @@ public class ReactiveChatService {
                         response.put("payload", payload);
                         response.put("scenario", scenarioCode); // For context tracking
 
-                        return "\n" + objectMapper.writeValueAsString(response);
+                        // Use [RESPONSE] marker so frontend detects this as structured response
+                        return "[RESPONSE]" + objectMapper.writeValueAsString(response);
                     } catch (Exception e) {
                         log.error("Failed to build structured follow-up: {}", e.getMessage());
                         return generateSimpleMissingParamMessageAsJson(scenarioCode, missingParams, question);
@@ -392,11 +393,12 @@ public class ReactiveChatService {
             response.put("payload", payload);
             response.put("scenario", scenarioCode);
 
-            return "\n" + objectMapper.writeValueAsString(response);
+            // Use [RESPONSE] marker so frontend detects this as structured response
+            return "[RESPONSE]" + objectMapper.writeValueAsString(response);
         } catch (Exception e) {
             log.error("Failed to create fallback JSON: {}", e.getMessage());
-            // Last resort: minimal valid JSON with simple question
-            return "\n{\"type\":\"FOLLOW_UP\",\"title\":\"\",\"payload\":{\"question\":\"" + question + "\",\"missingParams\":[]},\"scenario\":\"" + scenarioCode + "\"}";
+            // Last resort: minimal valid JSON with simple question - also with [RESPONSE] marker
+            return "[RESPONSE]{\"type\":\"FOLLOW_UP\",\"title\":\"\",\"payload\":{\"question\":\"" + question + "\",\"missingParams\":[]},\"scenario\":\"" + scenarioCode + "\"}";
         }
     }
 
