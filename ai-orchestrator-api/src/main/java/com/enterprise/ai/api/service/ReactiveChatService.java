@@ -180,13 +180,18 @@ public class ReactiveChatService {
         String sessionId = getOrCreateSessionSync(request);
         saveMessageSync(sessionId, "user", request.getQuery());
         String sessionContext = getSessionContextSync(sessionId);
+        log.info("Processing chat for session: {}", sessionId);
 
         // Check for pending follow-up context (user is answering a previous question)
         ChatSession session = sessionRepository.findBySessionId(sessionId).orElse(null);
         if (session != null && session.hasPendingFollowUp()) {
             log.info("Found pending follow-up context: scenario={}, missingParams={}",
                     session.getPendingScenario(), session.getPendingParams());
-            return processPendingFollowUp(request, session, sessionContext, userRoles, executionId);
+            // Prepend session ID to pending follow-up response
+            return Flux.concat(
+                    Flux.just("[SESSION]" + sessionId),
+                    processPendingFollowUp(request, session, sessionContext, userRoles, executionId)
+            );
         }
 
         // Cache the intent detection to avoid re-execution
@@ -199,6 +204,8 @@ public class ReactiveChatService {
 
         // Now build the response flux with detailed progress indicators
         return Flux.concat(
+                // Session ID event for frontend to capture
+                Flux.just("[SESSION]" + sessionId),
                 // Stage 1: Initial analysis
                 Flux.just("[PROGRESS]🔍 Analyzing your request...\n"),
 

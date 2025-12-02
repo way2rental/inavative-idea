@@ -171,6 +171,12 @@ export class ChatComponent implements AfterViewChecked {
             assistantMessage.isLoading = true;
             break;
 
+          case 'session':
+            // Session ID received - store it for subsequent requests
+            this.sessionId = chunk;
+            console.log('[SSE] Session ID captured:', this.sessionId);
+            break;
+
           case 'progress':
             // Progress/status message (Phase 1 per spec)
             const progressMessage = chunk.trim();
