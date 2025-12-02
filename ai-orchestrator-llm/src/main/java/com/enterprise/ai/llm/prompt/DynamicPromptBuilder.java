@@ -314,12 +314,18 @@ public class DynamicPromptBuilder {
 
         for (AiScenario scenario : scenarios) {
             context.append("📌 ").append(scenario.getScenarioCode()).append("\n");
+            context.append("   Name: ").append(scenario.getScenarioName() != null ? scenario.getScenarioName() : scenario.getScenarioCode()).append("\n");
             context.append("   Description: ").append(scenario.getDescription() != null ? scenario.getDescription() : "No description").append("\n");
             
-            // Add example trigger phrases for better matching
+            // Add trigger phrases from database (NO HARDCODING)
             context.append("   Trigger phrases: ");
-            String triggerPhrases = getTriggerPhrases(scenario.getScenarioCode());
+            String triggerPhrases = getTriggerPhrases(scenario);
             context.append(triggerPhrases).append("\n");
+            
+            // Add example queries if available
+            if (scenario.getExampleQueries() != null && !scenario.getExampleQueries().isBlank()) {
+                context.append("   Example queries: ").append(scenario.getExampleQueries()).append("\n");
+            }
             
             // Parse and display filter definitions if available
             if (scenario.usesFilterEngine() && scenario.getFilterDefinitions() != null) {
@@ -378,22 +384,16 @@ public class DynamicPromptBuilder {
     }
 
     /**
-     * Get trigger phrases for a scenario to help AI match user intent.
+     * Get trigger phrases for a scenario from database.
+     * NO HARDCODING - all trigger phrases come from the scenario entity.
      */
-    private String getTriggerPhrases(String scenarioCode) {
-        return switch (scenarioCode.toUpperCase()) {
-            case "ACCOUNT_BALANCE" -> "\"balance\", \"how much\", \"check balance\", \"available balance\"";
-            case "TRANSACTION_HISTORY" -> "\"transactions\", \"history\", \"recent transactions\", \"show transactions\"";
-            case "FUND_TRANSFER" -> "\"transfer\", \"send money\", \"move funds\", \"pay to\"";
-            case "BILL_PAYMENT" -> "\"pay bill\", \"utility payment\", \"bill\", \"payment\"";
-            case "ACCOUNT_SUMMARY" -> "\"summary\", \"account details\", \"overview\", \"account info\"";
-            case "CARD_DETAILS" -> "\"card\", \"credit card\", \"debit card\", \"card info\"";
-            case "LOAN_STATUS" -> "\"loan\", \"loan status\", \"emi\", \"loan details\"";
-            case "SPENDING_ANALYSIS" -> "\"spending\", \"expenses\", \"analyze spending\", \"where did I spend\"";
-            case "INVESTMENT_PORTFOLIO" -> "\"investments\", \"portfolio\", \"mutual funds\", \"stocks\"";
-            case "PAYMENT_HISTORY" -> "\"payments\", \"payment history\", \"past payments\"";
-            default -> "\"" + scenarioCode.toLowerCase().replace("_", " ") + "\"";
-        };
+    private String getTriggerPhrases(AiScenario scenario) {
+        // Use trigger phrases from database if available
+        if (scenario.hasTriggerPhrases()) {
+            return scenario.getTriggerPhrases();
+        }
+        // Fallback: generate from scenario code
+        return "\"" + scenario.getScenarioCode().toLowerCase().replace("_", " ") + "\"";
     }
 
     /**

@@ -11,16 +11,17 @@ export interface Scenario {
   requestMapping?: string;
   responseMapping?: string;
   timeoutMs?: number;
-  executorBean?: string;
-  securityLevel: string;
   requiredParams: string[];
-  optionalParams?: string[];
   llmPromptTemplate?: string;
-  promptVersion: number;
-  promptHistory?: string;
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
+  // AI Intent Detection fields (NO HARDCODING)
+  triggerPhrases?: string;
+  exampleQueries?: string;
+  category?: string;
+  displayOrder?: number;
+  icon?: string;
   // Multi-filter engine fields
   filterDefinitions?: string;
   securityFilters?: string;
@@ -40,12 +41,15 @@ export interface ScenarioFormData {
   requestMapping?: string;
   responseMapping?: string;
   timeoutMs?: number;
-  executorBean?: string;
-  securityLevel: string;
   requiredParams: string;
-  optionalParams?: string;
   llmPromptTemplate?: string;
   active: boolean;
+  // AI Intent Detection fields (NO HARDCODING)
+  triggerPhrases?: string;
+  exampleQueries?: string;
+  category?: string;
+  displayOrder?: number;
+  icon?: string;
   // Multi-filter engine fields
   filterDefinitions?: string;
   securityFilters?: string;
