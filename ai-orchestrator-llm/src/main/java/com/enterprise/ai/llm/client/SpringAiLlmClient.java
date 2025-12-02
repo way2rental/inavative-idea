@@ -39,12 +39,17 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
 
     @Override
     public Mono<IntentResult> detectIntent(String userInput, String sessionContext) {
-        return detectIntent(userInput, sessionContext, null);
+        return detectIntent(userInput, sessionContext, null, null);
     }
 
     @Override
     public Mono<IntentResult> detectIntent(String userInput, String sessionContext, String lastUsedParamsJson) {
-        return Mono.fromCallable(() -> detectIntentBlocking(userInput, sessionContext, lastUsedParamsJson));
+        return detectIntent(userInput, sessionContext, lastUsedParamsJson, null);
+    }
+
+    @Override
+    public Mono<IntentResult> detectIntent(String userInput, String sessionContext, String lastUsedParamsJson, Set<String> allowedScenarios) {
+        return Mono.fromCallable(() -> detectIntentBlocking(userInput, sessionContext, lastUsedParamsJson, allowedScenarios));
     }
 
     @Override
@@ -118,9 +123,9 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
 
     @CircuitBreaker(name = "ollama", fallbackMethod = "detectIntentFallback")
     @Retry(name = "ollama")
-    private IntentResult detectIntentBlocking(String userInput, String sessionContext, String lastUsedParamsJson) {
+    private IntentResult detectIntentBlocking(String userInput, String sessionContext, String lastUsedParamsJson, Set<String> allowedScenarios) {
         try {
-            String prompt = promptBuilder.buildIntentDetectionPrompt(userInput, sessionContext, lastUsedParamsJson);
+            String prompt = promptBuilder.buildIntentDetectionPrompt(userInput, sessionContext, lastUsedParamsJson, allowedScenarios);
 
             log.debug("Intent detection prompt:\n{}", prompt);
 

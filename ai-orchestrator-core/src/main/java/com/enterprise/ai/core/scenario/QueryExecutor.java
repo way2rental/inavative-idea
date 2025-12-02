@@ -5,6 +5,7 @@ import com.enterprise.ai.common.dto.ScenarioRequest;
 import com.enterprise.ai.common.dto.ScenarioResult;
 import com.enterprise.ai.common.enums.ExecutionType;
 import com.enterprise.ai.common.exception.SecurityViolationException;
+import com.enterprise.ai.core.filter.FilterEngine;
 import com.enterprise.ai.core.mapper.ResponseMappingService;
 import com.enterprise.ai.core.datasource.DataSourceRegistryService;
 import com.enterprise.ai.core.mapper.JsonPathResponseMapper;
@@ -35,6 +36,7 @@ import java.util.*;
  * - Named parameter binding from request_mapping
  * - Response shaping via response_mapping
  * - Configurable timeout
+ * - FilterEngine integration for dynamic SQL generation
  */
 @Slf4j
 @Component
@@ -52,6 +54,7 @@ public class QueryExecutor implements DynamicExecutor {
     private final AiResponseMappingRepository responseMappingRepository;
     private final ObjectMapper objectMapper;
     private final ResponseMappingService responseMappingService;
+    private final FilterEngine filterEngine;
 
     @Override
     public boolean supports(String executionType) {
@@ -64,21 +67,62 @@ public class QueryExecutor implements DynamicExecutor {
         String scenarioCode = scenario.getScenarioCode();
 
         try {
-            // Validate SQL is SELECT only
+            // Get the base SQL query
             String sqlQuery = scenario.getSqlQuery();
+            
+            // Validate SQL is SELECT only
             readOnlyEnforcement.validateSqlQuery(sqlQuery);
 
-            // MANDATORY: Apply Row-Level Security filters
-            String securedSql = rowLevelSecurityService.applyRowLevelSecurity(
-                    sqlQuery,
-                    RequestContextHolder.getContext()
-            );
-            log.debug("Row-Level Security applied. Original: {}, Secured: {}", sqlQuery, securedSql);
-
-            // Build parameters from request_mapping
-            Map<String, Object> sqlParams = buildSqlParameters(request, scenario);
+            // Build parameters - use FilterEngine if scenario has filter definitions
+            Map<String, Object> sqlParams;
+            String finalSql;
             
-            // Add user context parameters for RLS filters
+            if (scenario.usesFilterEngine()) {
+                log.debug("Using FilterEngine for scenario: {}", scenarioCode);
+                
+                // Build filters from extracted parameters
+                FilterEngine.FilterResult filterResult = filterEngine.buildFilters(scenario, request.getParams());
+                
+                // Check for missing mandatory filters
+                if (filterResult.hasMissingParams()) {
+                    log.warn("Missing mandatory filters for {}: {}", scenarioCode, filterResult.missingMandatory());
+                    return ScenarioResult.builder()
+                            .scenario(scenarioCode)
+                            .success(false)
+                            .errorMessage("Missing required information: " + String.join(", ", filterResult.missingMandatory()))
+                            .data(Map.of("missingParams", filterResult.missingMandatory()))
+                            .build();
+                }
+                
+                // Check for validation errors
+                if (!filterResult.validationErrors().isEmpty()) {
+                    log.warn("Validation errors for {}: {}", scenarioCode, filterResult.validationErrors());
+                    return ScenarioResult.builder()
+                            .scenario(scenarioCode)
+                            .success(false)
+                            .errorMessage("Invalid input: " + String.join("; ", filterResult.validationErrors()))
+                            .data(Map.of("validationErrors", filterResult.validationErrors()))
+                            .build();
+                }
+                
+                // Build dynamic query with filters
+                finalSql = filterEngine.buildDynamicQuery(scenario, filterResult);
+                sqlParams = new HashMap<>(filterResult.parameters());
+                
+                log.debug("FilterEngine generated SQL: {}", finalSql);
+            } else {
+                // Legacy behavior - build parameters from request_mapping
+                sqlParams = buildSqlParameters(request, scenario);
+                
+                // MANDATORY: Apply Row-Level Security filters
+                finalSql = rowLevelSecurityService.applyRowLevelSecurity(
+                        sqlQuery,
+                        RequestContextHolder.getContext()
+                );
+                log.debug("Row-Level Security applied. Original: {}, Secured: {}", sqlQuery, finalSql);
+            }
+            
+            // Add user context parameters for RLS filters (always)
             if (RequestContextHolder.getContext() != null) {
                 sqlParams.put("userId", RequestContextHolder.getContext().getUserId());
                 sqlParams.put("orgId", RequestContextHolder.getContext().getTenantId());
@@ -87,13 +131,14 @@ public class QueryExecutor implements DynamicExecutor {
             log.info("Executing DB_QUERY for scenario {} with params: {}", scenarioCode, sqlParams.keySet());
 
             // Execute query with secured SQL and timeout
-            List<Map<String, Object>> rawResults = jdbcTemplate.queryForList(securedSql, sqlParams);
+            List<Map<String, Object>> rawResults = jdbcTemplate.queryForList(finalSql, sqlParams);
             
             // Limit result size to prevent memory exhaustion
-            if (rawResults.size() > MAX_RESULT_SIZE) {
+            int maxResults = scenario.getMaxResults() != null ? scenario.getMaxResults() : MAX_RESULT_SIZE;
+            if (rawResults.size() > maxResults) {
                 log.warn("Query returned {} rows, truncating to {} for scenario {}", 
-                        rawResults.size(), MAX_RESULT_SIZE, scenarioCode);
-                rawResults = rawResults.subList(0, MAX_RESULT_SIZE);
+                        rawResults.size(), maxResults, scenarioCode);
+                rawResults = rawResults.subList(0, maxResults);
             }
 
             Map<String, Object> aiReadyData;
@@ -125,12 +170,12 @@ public class QueryExecutor implements DynamicExecutor {
                     .data(Map.of("error", "Access denied"))
                     .build();
         } catch (Exception e) {
-            log.error("DB_QUERY execution failed for {}: {}", scenarioCode, e.getMessage());
+            log.error("DB_QUERY execution failed for {}: {}", scenarioCode, e.getMessage(), e);
             return ScenarioResult.builder()
                     .scenario(scenarioCode)
                     .success(false)
                     .errorMessage("Database query failed. Please try again.")
-                    .data(Map.of("error", "Query execution error"))
+                    .data(Map.of("error", "Query execution error", "details", e.getMessage()))
                     .build();
         }
     }

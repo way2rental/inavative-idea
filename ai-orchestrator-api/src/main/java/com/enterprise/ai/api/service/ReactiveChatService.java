@@ -200,9 +200,15 @@ public class ReactiveChatService {
             log.debug("Using last used params for context: {}", lastUsedParamsJson);
         }
 
+        // Get user's allowed scenarios for RBAC-filtered intent detection
+        // This ensures the LLM only suggests scenarios the user can access
+        Set<String> allowedScenarios = getAllowedScenariosForRoles(userRoles);
+        log.debug("User allowed scenarios (RBAC): {}", allowedScenarios);
+
         // Cache the intent detection to avoid re-execution
         // Pass lastUsedParamsJson so LLM can resolve references like "same account"
-        Mono<IntentResult> intentMono = llmClient.detectIntent(request.getQuery(), sessionContext, lastUsedParamsJson)
+        // Pass allowedScenarios so LLM only suggests scenarios the user can access
+        Mono<IntentResult> intentMono = llmClient.detectIntent(request.getQuery(), sessionContext, lastUsedParamsJson, allowedScenarios)
                 .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
                 .doOnSuccess(intent -> log.info("Intent detected for streaming: scenario={}, confidence={}",
                         intent.getScenario(), intent.getConfidence()))
@@ -1010,6 +1016,20 @@ public class ReactiveChatService {
                 .toList();
         log.debug("Extracted roles from authentication: {}", roles);
         return roles;
+    }
+
+    /**
+     * Get all scenarios allowed for the given roles.
+     * Used for RBAC-filtered intent detection - only show scenarios the user can access.
+     */
+    private Set<String> getAllowedScenariosForRoles(List<String> roles) {
+        Set<String> allowedScenarios = new HashSet<>();
+        for (String role : roles) {
+            allowedScenarios.addAll(rbacService.getAllowedScenarios(role));
+        }
+        // Always allow UNKNOWN for conversational responses
+        allowedScenarios.add("UNKNOWN");
+        return allowedScenarios;
     }
 
     private void logAuditAsync(String executionId, String userId, String scenarioCode,

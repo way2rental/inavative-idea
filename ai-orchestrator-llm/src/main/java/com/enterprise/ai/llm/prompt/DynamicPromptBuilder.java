@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -45,7 +46,7 @@ public class DynamicPromptBuilder {
      * Uses caching to avoid performance issues with 200+ scenarios.
      */
     public String buildIntentDetectionPrompt(String userInput, String sessionContext) {
-        return buildIntentDetectionPrompt(userInput, sessionContext, null);
+        return buildIntentDetectionPrompt(userInput, sessionContext, null, null);
     }
 
     /**
@@ -53,101 +54,186 @@ public class DynamicPromptBuilder {
      * Makes the AI understand context like a real chat assistant.
      */
     public String buildIntentDetectionPrompt(String userInput, String sessionContext, String lastUsedParamsJson) {
+        return buildIntentDetectionPrompt(userInput, sessionContext, lastUsedParamsJson, null);
+    }
+
+    /**
+     * Build conversational intent detection prompt with RBAC filtering.
+     * Only shows scenarios the user's roles can access.
+     * 
+     * @param userInput The user's message
+     * @param sessionContext Previous conversation history
+     * @param lastUsedParamsJson Recently used parameters (for context resolution)
+     * @param allowedScenarios Set of scenario codes the user can access (null = show all)
+     */
+    public String buildIntentDetectionPrompt(String userInput, String sessionContext, String lastUsedParamsJson, Set<String> allowedScenarios) {
         StringBuilder prompt = new StringBuilder();
         
         // System personality and role
         prompt.append("""
-            You are AHA (AI Helpdesk Assistant), a friendly and professional corporate banking assistant.
-            You work for Axis Bank and help customers with their banking needs.
+            ═══════════════════════════════════════════════════════════════════════════════
+            YOU ARE AHA (AI Helpdesk Assistant) - AXIS BANK'S CORPORATE BANKING ASSISTANT
+            ═══════════════════════════════════════════════════════════════════════════════
             
-            YOUR PERSONALITY:
-            - Friendly, warm, and professional
-            - You remember what the customer asked before
-            - You understand context and references like "same account", "that one", "the previous"
-            - You extract information naturally from conversation
-            - You ask clarifying questions politely when needed
+            YOUR CORE IDENTITY:
+            - You are a friendly, professional banking assistant
+            - You work for Axis Bank Corporate Banking
+            - You help business customers with their banking needs
+            - You are polite, efficient, and always helpful
+            
+            YOUR PERSONALITY TRAITS:
+            ✨ Warm and welcoming (but professional)
+            ✨ Patient with unclear requests
+            ✨ Proactive in suggesting relevant services
+            ✨ Remembers context from previous messages
+            ✨ Uses occasional emojis (👋 💰 📊 ✅) but not excessively
+            
+            YOUR CAPABILITIES:
+            - Understand natural language banking requests
+            - Extract relevant parameters from conversational text
+            - Remember context from conversation history
+            - Resolve references like "same account", "that transaction", "previous one"
+            - Ask friendly clarifying questions when needed
             
             """);
         
-        // Available capabilities
-        prompt.append("BANKING SERVICES YOU CAN HELP WITH:\n\n");
-        prompt.append(getScenarioContextWithFilters());
+        // Available capabilities (filtered by RBAC if provided)
+        prompt.append("═══════════════════════════════════════════════════════════════════════════════\n");
+        prompt.append("BANKING SERVICES YOU CAN HELP WITH:\n");
+        prompt.append("═══════════════════════════════════════════════════════════════════════════════\n\n");
+        prompt.append(getScenarioContextWithFilters(allowedScenarios));
         
         // Conversation history (critical for context)
-        prompt.append("\n═══════════════════════════════════════════════════════════════\n");
-        prompt.append("CONVERSATION HISTORY (Read this to understand what happened before):\n");
-        prompt.append("═══════════════════════════════════════════════════════════════\n");
+        prompt.append("\n═══════════════════════════════════════════════════════════════════════════════\n");
+        prompt.append("CONVERSATION HISTORY (Read this carefully to understand context):\n");
+        prompt.append("═══════════════════════════════════════════════════════════════════════════════\n");
         if (sessionContext != null && !sessionContext.isBlank()) {
             prompt.append(sessionContext);
         } else {
-            prompt.append("(This is the start of a new conversation)");
+            prompt.append("(This is the start of a new conversation - greet the customer warmly)");
         }
         prompt.append("\n\n");
 
         // Recently used parameters for reference resolution
         if (lastUsedParamsJson != null && !lastUsedParamsJson.isEmpty()) {
-            prompt.append("═══════════════════════════════════════════════════════════════\n");
+            prompt.append("═══════════════════════════════════════════════════════════════════════════════\n");
             prompt.append("RECENT CONTEXT (Use these to understand references):\n");
-            prompt.append("═══════════════════════════════════════════════════════════════\n");
+            prompt.append("═══════════════════════════════════════════════════════════════════════════════\n");
             prompt.append("The customer recently worked with: ").append(lastUsedParamsJson).append("\n");
             prompt.append("""
                 
-                REFERENCE RESOLUTION RULES:
-                - "same account" / "that account" / "this one" → Use accountId from above
-                - "for the same" / "again" / "also" → Reuse relevant params from above
-                - "last month" / "previous" → Calculate relative dates
+                REFERENCE RESOLUTION RULES (VERY IMPORTANT):
+                ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                When the customer says:
+                • "same account" / "that account" / "this one" → Use accountId from above
+                • "for the same" / "again" / "also" → Reuse relevant params from above
+                • "the previous" / "that one" / "it" → Use most relevant param from above
+                • "last month" / "previous week" → Calculate relative dates
+                
+                EXAMPLE:
+                If recent context shows {"accountId": "ACC001"} and user says 
+                "show transactions for the same account" → use accountId: "ACC001"
                 
                 """);
         }
         
         // Current user message
-        prompt.append("═══════════════════════════════════════════════════════════════\n");
+        prompt.append("═══════════════════════════════════════════════════════════════════════════════\n");
         prompt.append("CUSTOMER'S CURRENT MESSAGE:\n");
-        prompt.append("═══════════════════════════════════════════════════════════════\n");
+        prompt.append("═══════════════════════════════════════════════════════════════════════════════\n");
         prompt.append("\"").append(userInput).append("\"\n\n");
         
         // Instructions for intent extraction
         prompt.append("""
-            YOUR TASK:
-            Analyze the customer's message and extract their intent.
+            ═══════════════════════════════════════════════════════════════════════════════
+            YOUR TASK: ANALYZE AND EXTRACT INTENT
+            ═══════════════════════════════════════════════════════════════════════════════
             
-            CRITICAL UNDERSTANDING RULES:
-            1. READ THE CONVERSATION HISTORY - If you previously asked for something and the customer 
-               just gave a value (like "ACC001" or "12345"), that's the answer to your question!
+            STEP 1: READ THE CONVERSATION HISTORY
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            If you previously asked for something (like an account ID) and the customer 
+            just gave a value (like "ACC001"), that's the answer to your question!
             
-            2. UNDERSTAND REFERENCES - When customer says "same", "that", "this one", "the previous",
-               look at RECENT CONTEXT and use those values.
+            Example:
+            - Previous: "Could you tell me which account?"
+            - Current: "ACC001"
+            - Intent: The account ID they were asked for, NOT a new query
             
-            3. NATURAL EXTRACTION - Extract values naturally mentioned:
-               - "show balance for ACC001" → accountId: "ACC001"
-               - "transactions from last week" → dateFrom: (calculate), dateTo: (calculate)
-               - "transfers over 5000" → minAmount: 5000
+            STEP 2: UNDERSTAND REFERENCES
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            When customer says "same", "that", "this one", "the previous" - look at 
+            RECENT CONTEXT above and use those values.
             
-            4. PARTIAL MATCHES - If customer says "transactions", match to TRANSACTION_HISTORY.
-               If they say "balance", match to ACCOUNT_BALANCE.
+            STEP 3: EXTRACT PARAMETERS NATURALLY
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Look for values mentioned in the message:
+            • "show balance for ACC001" → accountId: "ACC001"
+            • "transactions from last week" → dateFrom: (calculate), dateTo: (calculate)
+            • "transfers over 5000" → minAmount: 5000
+            • "show debit transactions" → transactionType: "DEBIT"
             
-            5. CASUAL CONVERSATION - If customer just says "hi", "hello", "thanks", use UNKNOWN
-               and respond conversationally.
+            STEP 4: MATCH TO SCENARIO
+            ━━━━━━━━━━━━━━━━━━━━━━━━━
+            Match the customer's intent to one of the BANKING SERVICES listed above.
+            • "transactions" → TRANSACTION_HISTORY
+            • "balance" → ACCOUNT_BALANCE
+            • "transfer money" → FUND_TRANSFER
+            • "pay bill" → BILL_PAYMENT
             
-            RESPOND WITH THIS JSON ONLY (no extra text):
+            STEP 5: HANDLE CASUAL CONVERSATION
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            If customer just says "hi", "hello", "thanks", "bye" → use UNKNOWN scenario
+            and respond conversationally.
+            
+            ═══════════════════════════════════════════════════════════════════════════════
+            RESPONSE FORMAT (Return ONLY this JSON, nothing else):
+            ═══════════════════════════════════════════════════════════════════════════════
+            
             {
               "scenario": "SCENARIO_CODE or UNKNOWN",
               "confidence": 0.0 to 1.0,
-              "params": {"extracted": "values"},
+              "params": {"extracted": "values", "from": "message"},
               "missingParams": ["params", "still", "needed"],
               "reasoning": "Brief explanation of your understanding"
             }
             
+            ═══════════════════════════════════════════════════════════════════════════════
             EXAMPLES:
+            ═══════════════════════════════════════════════════════════════════════════════
             
-            After asking "What's your account ID?" and user says "ACC001":
+            EXAMPLE 1: Follow-up answer
+            Previous: "What's your account ID?"
+            Current: "ACC001"
+            Response:
             {"scenario": "ACCOUNT_BALANCE", "confidence": 0.95, "params": {"accountId": "ACC001"}, "missingParams": [], "reasoning": "User provided the account ID I asked for"}
             
-            User says "show me transactions for the same account" (recent context has ACC001):
+            EXAMPLE 2: Reference resolution
+            Recent context: {"accountId": "ACC001"}
+            Current: "show me transactions for the same account"
+            Response:
             {"scenario": "TRANSACTION_HISTORY", "confidence": 0.9, "params": {"accountId": "ACC001"}, "missingParams": [], "reasoning": "User wants transactions, using same account from context"}
             
-            User says "hello":
+            EXAMPLE 3: Complete request
+            Current: "show my balance for account 12345"
+            Response:
+            {"scenario": "ACCOUNT_BALANCE", "confidence": 0.95, "params": {"accountId": "12345"}, "missingParams": [], "reasoning": "User wants to check balance for specific account"}
+            
+            EXAMPLE 4: Missing required parameter
+            Current: "show my transactions"
+            Response:
+            {"scenario": "TRANSACTION_HISTORY", "confidence": 0.85, "params": {}, "missingParams": ["accountId"], "reasoning": "User wants transactions but didn't specify which account"}
+            
+            EXAMPLE 5: Greeting
+            Current: "hello"
+            Response:
             {"scenario": "UNKNOWN", "confidence": 0.1, "params": {}, "missingParams": [], "reasoning": "Greeting, will respond conversationally"}
+            
+            EXAMPLE 6: Multiple filters
+            Current: "show debit transactions over 1000 from last month"
+            Response:
+            {"scenario": "TRANSACTION_HISTORY", "confidence": 0.9, "params": {"transactionType": "DEBIT", "minAmount": 1000, "dateFrom": "2024-10-01", "dateTo": "2024-10-31"}, "missingParams": ["accountId"], "reasoning": "User wants filtered transactions but didn't specify account"}
+            
+            NOW ANALYZE THE CUSTOMER'S CURRENT MESSAGE AND RESPOND WITH JSON ONLY.
             """);
 
         return prompt.toString();
@@ -158,11 +244,24 @@ public class DynamicPromptBuilder {
      * Includes mandatory/optional filters for smarter parameter extraction.
      */
     private String getScenarioContextWithFilters() {
+        return getScenarioContextWithFilters(null);
+    }
+
+    /**
+     * Get scenario context filtered by allowed scenarios (RBAC).
+     * If allowedScenarios is null, returns all active scenarios.
+     */
+    private String getScenarioContextWithFilters(Set<String> allowedScenarios) {
+        // Don't use cache if we have role-based filtering
+        if (allowedScenarios != null && !allowedScenarios.isEmpty()) {
+            return buildScenarioContextWithFilters(allowedScenarios);
+        }
+        
         long now = System.currentTimeMillis();
         if (cachedIntentPromptContext == null || (now - cacheTimestamp) > CACHE_TTL_MS) {
             synchronized (this) {
                 if (cachedIntentPromptContext == null || (now - cacheTimestamp) > CACHE_TTL_MS) {
-                    cachedIntentPromptContext = buildScenarioContextWithFilters();
+                    cachedIntentPromptContext = buildScenarioContextWithFilters(null);
                     cacheTimestamp = now;
                     log.debug("Rebuilt scenario context cache with {} scenarios", 
                             configCacheService.getActiveScenarios().size());
@@ -174,8 +273,9 @@ public class DynamicPromptBuilder {
 
     /**
      * Build detailed scenario context with filter information.
+     * @param allowedScenarios If provided, only include these scenarios (RBAC filtering)
      */
-    private String buildScenarioContextWithFilters() {
+    private String buildScenarioContextWithFilters(Set<String> allowedScenarios) {
         StringBuilder context = new StringBuilder();
         List<AiScenario> scenarios = configCacheService.getActiveScenarios();
 
@@ -184,9 +284,26 @@ public class DynamicPromptBuilder {
             return "No services configured.\n";
         }
 
+        // Filter by allowed scenarios if provided (normalize to uppercase once)
+        if (allowedScenarios != null && !allowedScenarios.isEmpty()) {
+            Set<String> normalizedAllowed = allowedScenarios.stream()
+                    .map(String::toUpperCase)
+                    .collect(Collectors.toSet());
+            scenarios = scenarios.stream()
+                    .filter(s -> normalizedAllowed.contains(s.getScenarioCode().toUpperCase()))
+                    .toList();
+            log.debug("Filtered scenarios by RBAC: {} of {} scenarios allowed", 
+                    scenarios.size(), configCacheService.getActiveScenarios().size());
+        }
+
         for (AiScenario scenario : scenarios) {
             context.append("📌 ").append(scenario.getScenarioCode()).append("\n");
             context.append("   Description: ").append(scenario.getDescription() != null ? scenario.getDescription() : "No description").append("\n");
+            
+            // Add example trigger phrases for better matching
+            context.append("   Trigger phrases: ");
+            String triggerPhrases = getTriggerPhrases(scenario.getScenarioCode());
+            context.append(triggerPhrases).append("\n");
             
             // Parse and display filter definitions if available
             if (scenario.usesFilterEngine() && scenario.getFilterDefinitions() != null) {
@@ -205,12 +322,13 @@ public class DynamicPromptBuilder {
                         boolean mandatory = Boolean.TRUE.equals(filter.get("mandatory"));
                         List<String> enumValues = (List<String>) filter.get("enumValues");
                         
-                        StringBuilder filterInfo = new StringBuilder(displayName);
+                        StringBuilder filterInfo = new StringBuilder(name);
+                        filterInfo.append(" (").append(displayName).append(")");
                         if (description != null) {
                             filterInfo.append(" - ").append(description);
                         }
                         if (enumValues != null && !enumValues.isEmpty()) {
-                            filterInfo.append(" [").append(String.join("/", enumValues)).append("]");
+                            filterInfo.append(" [allowed values: ").append(String.join(", ", enumValues)).append("]");
                         }
                         
                         if (mandatory) {
@@ -221,10 +339,10 @@ public class DynamicPromptBuilder {
                     }
                     
                     if (!required.isEmpty()) {
-                        context.append("   ⚠️ REQUIRED: ").append(String.join(", ", required)).append("\n");
+                        context.append("   ⚠️ REQUIRED parameters: ").append(String.join("; ", required)).append("\n");
                     }
                     if (!optional.isEmpty()) {
-                        context.append("   📝 Optional filters: ").append(String.join(", ", optional)).append("\n");
+                        context.append("   📝 Optional filters: ").append(String.join("; ", optional)).append("\n");
                     }
                 } catch (Exception e) {
                     log.warn("Failed to parse filter definitions for {}: {}", scenario.getScenarioCode(), e.getMessage());
@@ -244,17 +362,36 @@ public class DynamicPromptBuilder {
     }
 
     /**
+     * Get trigger phrases for a scenario to help AI match user intent.
+     */
+    private String getTriggerPhrases(String scenarioCode) {
+        return switch (scenarioCode.toUpperCase()) {
+            case "ACCOUNT_BALANCE" -> "\"balance\", \"how much\", \"check balance\", \"available balance\"";
+            case "TRANSACTION_HISTORY" -> "\"transactions\", \"history\", \"recent transactions\", \"show transactions\"";
+            case "FUND_TRANSFER" -> "\"transfer\", \"send money\", \"move funds\", \"pay to\"";
+            case "BILL_PAYMENT" -> "\"pay bill\", \"utility payment\", \"bill\", \"payment\"";
+            case "ACCOUNT_SUMMARY" -> "\"summary\", \"account details\", \"overview\", \"account info\"";
+            case "CARD_DETAILS" -> "\"card\", \"credit card\", \"debit card\", \"card info\"";
+            case "LOAN_STATUS" -> "\"loan\", \"loan status\", \"emi\", \"loan details\"";
+            case "SPENDING_ANALYSIS" -> "\"spending\", \"expenses\", \"analyze spending\", \"where did I spend\"";
+            case "INVESTMENT_PORTFOLIO" -> "\"investments\", \"portfolio\", \"mutual funds\", \"stocks\"";
+            case "PAYMENT_HISTORY" -> "\"payments\", \"payment history\", \"past payments\"";
+            default -> "\"" + scenarioCode.toLowerCase().replace("_", " ") + "\"";
+        };
+    }
+
+    /**
      * Get cached scenario context or rebuild if expired (legacy method).
      */
     private String getScenarioContext() {
-        return getScenarioContextWithFilters();
+        return getScenarioContextWithFilters(null);
     }
 
     /**
      * Build scenario context from active scenarios (legacy method for backward compat).
      */
     private String buildScenarioContext() {
-        return buildScenarioContextWithFilters();
+        return buildScenarioContextWithFilters(null);
     }
 
     /**

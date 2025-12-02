@@ -6,6 +6,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Reactive LLM client interface for non-blocking Ollama interactions.
@@ -33,6 +34,18 @@ public interface ReactiveLlmClient {
      * @return Mono of IntentResult
      */
     Mono<IntentResult> detectIntent(String userInput, String sessionContext, String lastUsedParamsJson);
+
+    /**
+     * Detect intent with RBAC filtering - only shows scenarios the user can access.
+     * This is the preferred method for production use.
+     *
+     * @param userInput user's query
+     * @param sessionContext previous conversation context
+     * @param lastUsedParamsJson JSON of last used params for reference resolution
+     * @param allowedScenarios Set of scenario codes the user's roles can access
+     * @return Mono of IntentResult
+     */
+    Mono<IntentResult> detectIntent(String userInput, String sessionContext, String lastUsedParamsJson, Set<String> allowedScenarios);
 
     /**
      * Two-stage intent detection: First detect category, then exact scenario.
