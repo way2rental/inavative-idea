@@ -60,7 +60,8 @@ CREATE TABLE IF NOT EXISTS ai_scenarios (
 );
 
 -- Intent Configurations (training phrases for AI)
-CREATE TABLE IF NOT EXISTS ai_intent_configs (
+-- Entity: IntentConfig uses table name "ai_intents"
+CREATE TABLE IF NOT EXISTS ai_intents (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     intent_code VARCHAR(100) NOT NULL UNIQUE,
     scenario_code VARCHAR(100) NOT NULL,
@@ -105,7 +106,8 @@ CREATE TABLE IF NOT EXISTS ai_policy_rules (
 );
 
 -- Follow-up Question Groups
-CREATE TABLE IF NOT EXISTS ai_follow_up_groups (
+-- Entity: FollowUpGroup uses table name "ai_followup_groups"
+CREATE TABLE IF NOT EXISTS ai_followup_groups (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     group_code VARCHAR(100) NOT NULL UNIQUE,
     group_name VARCHAR(255),
@@ -116,22 +118,23 @@ CREATE TABLE IF NOT EXISTS ai_follow_up_groups (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Response Mappings
+-- Response Mappings (maps DB columns to AI-friendly structured output with masking)
 CREATE TABLE IF NOT EXISTS ai_response_mappings (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     scenario_code VARCHAR(100) NOT NULL,
-    field_name VARCHAR(100) NOT NULL,
-    source_path VARCHAR(255),
-    display_name VARCHAR(255),
-    format_type VARCHAR(50),
-    format_pattern VARCHAR(255),
+    source_type VARCHAR(50) DEFAULT 'DB_QUERY',
+    source_field VARCHAR(255),
+    target_field VARCHAR(255) NOT NULL,
+    json_path VARCHAR(255) NOT NULL,
+    masking_type VARCHAR(50) DEFAULT 'NONE',
     display_order INT DEFAULT 0,
     active BOOLEAN DEFAULT TRUE,
-    UNIQUE KEY uk_scenario_field (scenario_code, field_name)
+    UNIQUE KEY uk_scenario_field (scenario_code, target_field)
 );
 
 -- HTTP URL Whitelist (security)
-CREATE TABLE IF NOT EXISTS ai_http_whitelist (
+-- Entity: HttpUrlWhitelist uses table name "http_url_whitelist"
+CREATE TABLE IF NOT EXISTS http_url_whitelist (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     url_pattern VARCHAR(500) NOT NULL,
     method VARCHAR(10) DEFAULT 'GET',
@@ -143,7 +146,8 @@ CREATE TABLE IF NOT EXISTS ai_http_whitelist (
 );
 
 -- Role-Scenario Mapping (RBAC)
-CREATE TABLE IF NOT EXISTS ai_role_scenario_map (
+-- Entity: RoleScenarioMap uses table name "role_scenario_map"
+CREATE TABLE IF NOT EXISTS role_scenario_map (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     role_name VARCHAR(100) NOT NULL,
     scenario_code VARCHAR(100) NOT NULL,
@@ -156,33 +160,41 @@ CREATE TABLE IF NOT EXISTS ai_role_scenario_map (
 -- =====================================================================
 
 -- Chat Sessions
-CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+-- Entity: ChatSession uses table name "chat_sessions"
+CREATE TABLE IF NOT EXISTS chat_sessions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     session_id VARCHAR(100) NOT NULL UNIQUE,
     user_id VARCHAR(100) NOT NULL,
     status VARCHAR(20) DEFAULT 'ACTIVE',
     context TEXT,
+    collected_params JSON,
+    pending_params JSON,
+    pending_scenario VARCHAR(100),
     last_used_params JSON,
+    last_activity_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP,
     expires_at TIMESTAMP
 );
 
 -- Chat Messages
-CREATE TABLE IF NOT EXISTS ai_chat_messages (
+-- Entity: ChatMessage uses table name "chat_messages"
+CREATE TABLE IF NOT EXISTS chat_messages (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     session_id VARCHAR(100) NOT NULL,
     role VARCHAR(20) NOT NULL,
     content TEXT,
     scenario_code VARCHAR(100),
     params JSON,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_session (session_id),
     INDEX idx_created (created_at)
 );
 
 -- Message Feedback
-CREATE TABLE IF NOT EXISTS ai_message_feedback (
+-- Entity: MessageFeedback uses table name "message_feedback"
+CREATE TABLE IF NOT EXISTS message_feedback (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     message_id BIGINT NOT NULL,
     session_id VARCHAR(100),
@@ -196,6 +208,7 @@ CREATE TABLE IF NOT EXISTS ai_message_feedback (
 -- Audit Logs
 CREATE TABLE IF NOT EXISTS ai_audit_logs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    execution_id VARCHAR(100),
     session_id VARCHAR(100),
     user_id VARCHAR(100),
     scenario_code VARCHAR(100),
@@ -203,7 +216,10 @@ CREATE TABLE IF NOT EXISTS ai_audit_logs (
     raw_result_json JSON,
     execution_time_ms BIGINT,
     success BOOLEAN DEFAULT TRUE,
+    error_message TEXT,
     error_details TEXT,
+    request_time TIMESTAMP,
+    response_time TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user (user_id),
     INDEX idx_scenario (scenario_code),
@@ -211,7 +227,8 @@ CREATE TABLE IF NOT EXISTS ai_audit_logs (
 );
 
 -- Scenario Test Results
-CREATE TABLE IF NOT EXISTS ai_scenario_test_results (
+-- Entity: ScenarioTestResult uses table name "scenario_test_results"
+CREATE TABLE IF NOT EXISTS scenario_test_results (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     scenario_code VARCHAR(100) NOT NULL,
     test_params JSON NOT NULL,
@@ -258,6 +275,7 @@ INSERT INTO ai_system_config (config_key, config_value, category, description, d
 
 -- =====================================================================
 -- SAMPLE DATA - 10 TEST AI SCENARIOS (QUERY_EXECUTOR)
+-- FilterEngine handles WHERE clause generation - base SQL should not have WHERE
 -- =====================================================================
 
 INSERT INTO ai_scenarios (
@@ -266,11 +284,11 @@ INSERT INTO ai_scenarios (
     filter_definitions, max_results, default_sort, active
 ) VALUES 
 
--- 1. Account Balance
+-- 1. Account Balance (FilterEngine generates WHERE clause)
 ('ACCOUNT_BALANCE', 'Check Account Balance', 
  'View current balance and available funds for a bank account',
  'DB_QUERY',
- 'SELECT account_id, account_name, account_type, currency, available_balance, current_balance, blocked_amount, last_updated FROM accounts WHERE account_id = :accountId',
+ 'SELECT account_id, account_name, account_type, currency, available_balance, current_balance, blocked_amount, last_updated FROM accounts',
  '["accountId"]',
  '["balance", "check balance", "account balance", "how much money", "available funds", "show balance", "my balance"]',
  '["What is my account balance?", "Show balance for ACC001", "How much money do I have?", "Check my available balance"]',
@@ -278,11 +296,11 @@ INSERT INTO ai_scenarios (
  '[{"name":"accountId","displayName":"Account ID","description":"Bank account number starting with ACC","type":"STRING","dbColumn":"account_id","operator":"=","mandatory":true,"validationPattern":"^ACC[0-9]+$","validationError":"Account ID must start with ACC followed by numbers"}]',
  1, 'last_updated DESC', TRUE),
 
--- 2. Transaction History
+-- 2. Transaction History (Multiple filters supported via FilterEngine)
 ('TRANSACTION_HISTORY', 'Transaction History',
  'View transaction history with filters for date, amount, and type',
  'DB_QUERY',
- 'SELECT txn_id, account_id, txn_date, txn_type, amount, currency, description, balance_after, status FROM transactions WHERE 1=1',
+ 'SELECT txn_id, account_id, txn_date, txn_type, amount, currency, description, category, balance_after, status FROM transactions',
  '["accountId"]',
  '["transactions", "transaction history", "recent transactions", "show transactions", "txn history", "my transactions", "payment history"]',
  '["Show my recent transactions", "Transaction history for ACC001", "Show transactions from last week", "List all debit transactions"]',
@@ -290,23 +308,23 @@ INSERT INTO ai_scenarios (
  '[{"name":"accountId","displayName":"Account ID","type":"STRING","dbColumn":"account_id","operator":"=","mandatory":true},{"name":"dateFrom","displayName":"From Date","type":"DATE","dbColumn":"txn_date","operator":">=","mandatory":false},{"name":"dateTo","displayName":"To Date","type":"DATE","dbColumn":"txn_date","operator":"<=","mandatory":false},{"name":"txnType","displayName":"Transaction Type","type":"ENUM","dbColumn":"txn_type","operator":"=","mandatory":false,"enumValues":["CREDIT","DEBIT","TRANSFER"]},{"name":"minAmount","displayName":"Minimum Amount","type":"DECIMAL","dbColumn":"amount","operator":">=","mandatory":false},{"name":"maxAmount","displayName":"Maximum Amount","type":"DECIMAL","dbColumn":"amount","operator":"<=","mandatory":false}]',
  50, 'txn_date DESC', TRUE),
 
--- 3. Account Summary
+-- 3. Account Summary (with subquery, filter applied to main table alias)
 ('ACCOUNT_SUMMARY', 'Account Summary',
  'Get comprehensive account summary including balance, recent activity, and account details',
  'DB_QUERY',
- 'SELECT a.account_id, a.account_name, a.account_type, a.currency, a.available_balance, a.current_balance, a.opening_date, a.branch_code, a.ifsc_code, (SELECT COUNT(*) FROM transactions t WHERE t.account_id = a.account_id AND t.txn_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as recent_txn_count FROM accounts a WHERE a.account_id = :accountId',
+ 'SELECT a.account_id, a.account_name, a.account_type, a.currency, a.available_balance, a.current_balance, a.opening_date, a.branch_code, a.ifsc_code, (SELECT COUNT(*) FROM transactions t WHERE t.account_id = a.account_id AND t.txn_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as recent_txn_count FROM accounts a',
  '["accountId"]',
  '["account summary", "account details", "account info", "account overview", "my account", "show account"]',
  '["Show my account summary", "Account details for ACC001", "Give me account overview"]',
  'Account', 'file-text',
- '[{"name":"accountId","displayName":"Account ID","type":"STRING","dbColumn":"account_id","operator":"=","mandatory":true}]',
+ '[{"name":"accountId","displayName":"Account ID","type":"STRING","dbColumn":"a.account_id","operator":"=","mandatory":true}]',
  1, NULL, TRUE),
 
--- 4. Fund Transfer Status
+-- 4. Fund Transfer Status (OR conditions handled by FilterEngine)
 ('FUND_TRANSFER_STATUS', 'Fund Transfer Status',
  'Check the status of a fund transfer using transfer reference number',
  'DB_QUERY',
- 'SELECT transfer_id, from_account, to_account, amount, currency, status, initiated_at, completed_at, remarks, failure_reason FROM fund_transfers WHERE transfer_id = :transferId OR from_account = :accountId',
+ 'SELECT transfer_id, from_account, to_account, amount, currency, status, initiated_at, completed_at, remarks, failure_reason FROM fund_transfers',
  '[]',
  '["transfer status", "fund transfer", "check transfer", "payment status", "money transfer status"]',
  '["Check transfer status TXF001", "Status of my last transfer", "Did my transfer go through?"]',
@@ -318,7 +336,7 @@ INSERT INTO ai_scenarios (
 ('BILL_PAYMENT_HISTORY', 'Bill Payment History',
  'View history of bill payments including utilities, insurance, and subscriptions',
  'DB_QUERY',
- 'SELECT payment_id, biller_name, biller_category, amount, payment_date, status, account_id, reference_number FROM bill_payments WHERE account_id = :accountId',
+ 'SELECT payment_id, biller_name, biller_category, amount, payment_date, status, account_id, reference_number FROM bill_payments',
  '["accountId"]',
  '["bill payments", "bill history", "payment history", "utility payments", "paid bills"]',
  '["Show my bill payments", "Bill payment history for last month", "List all utility payments"]',
@@ -330,7 +348,7 @@ INSERT INTO ai_scenarios (
 ('CARD_DETAILS', 'Card Details',
  'View debit and credit card information linked to account',
  'DB_QUERY',
- 'SELECT card_id, card_type, card_number_masked, card_holder_name, expiry_date, status, credit_limit, available_credit, linked_account FROM cards WHERE linked_account = :accountId OR card_id = :cardId',
+ 'SELECT card_id, card_type, card_number_masked, card_holder_name, expiry_date, status, credit_limit, available_credit, linked_account FROM cards',
  '[]',
  '["card details", "my cards", "credit card", "debit card", "card info", "show cards"]',
  '["Show my card details", "Credit card information", "What cards are linked to my account?"]',
@@ -342,7 +360,7 @@ INSERT INTO ai_scenarios (
 ('LOAN_STATUS', 'Loan Status',
  'Check loan details, EMI schedule, and outstanding balance',
  'DB_QUERY',
- 'SELECT loan_id, loan_type, principal_amount, outstanding_balance, interest_rate, emi_amount, next_emi_date, loan_status, disbursement_date, tenure_months, account_id FROM loans WHERE account_id = :accountId OR loan_id = :loanId',
+ 'SELECT loan_id, loan_type, principal_amount, outstanding_balance, interest_rate, emi_amount, next_emi_date, loan_status, disbursement_date, tenure_months, account_id FROM loans',
  '[]',
  '["loan status", "my loan", "loan details", "emi details", "outstanding loan", "loan balance"]',
  '["Show my loan status", "What is my outstanding loan balance?", "When is my next EMI due?"]',
@@ -354,7 +372,7 @@ INSERT INTO ai_scenarios (
 ('FIXED_DEPOSIT_DETAILS', 'Fixed Deposit Details',
  'View fixed deposit accounts, maturity dates, and interest earned',
  'DB_QUERY',
- 'SELECT fd_id, account_id, principal_amount, interest_rate, maturity_date, maturity_amount, tenure_days, status, created_date FROM fixed_deposits WHERE account_id = :accountId',
+ 'SELECT fd_id, account_id, principal_amount, interest_rate, maturity_date, maturity_amount, tenure_days, status, created_date FROM fixed_deposits',
  '["accountId"]',
  '["fixed deposit", "fd details", "my fd", "fd status", "term deposit", "fd maturity"]',
  '["Show my fixed deposits", "When does my FD mature?", "FD interest rate"]',
@@ -366,7 +384,7 @@ INSERT INTO ai_scenarios (
 ('BENEFICIARY_LIST', 'Beneficiary List',
  'View saved beneficiaries for fund transfers',
  'DB_QUERY',
- 'SELECT beneficiary_id, beneficiary_name, account_number, ifsc_code, bank_name, beneficiary_type, nickname, added_date, verified, account_id FROM beneficiaries WHERE account_id = :accountId',
+ 'SELECT beneficiary_id, beneficiary_name, account_number, ifsc_code, bank_name, beneficiary_type, nickname, added_date, verified, account_id FROM beneficiaries',
  '["accountId"]',
  '["beneficiaries", "payee list", "saved accounts", "transfer contacts", "my beneficiaries"]',
  '["Show my beneficiaries", "List saved payees", "Who can I transfer money to?"]',
@@ -374,23 +392,26 @@ INSERT INTO ai_scenarios (
  '[{"name":"accountId","displayName":"Account ID","type":"STRING","dbColumn":"account_id","operator":"=","mandatory":true},{"name":"beneficiaryType","displayName":"Beneficiary Type","type":"ENUM","dbColumn":"beneficiary_type","operator":"=","mandatory":false,"enumValues":["INTERNAL","EXTERNAL","INTERNATIONAL"]}]',
  50, 'beneficiary_name ASC', TRUE),
 
--- 10. Spending Analysis
+-- 10. Spending Analysis (GROUP BY query with filters before GROUP BY)
 ('SPENDING_ANALYSIS', 'Spending Analysis',
  'Analyze spending patterns by category and time period',
  'DB_QUERY',
- 'SELECT category, SUM(amount) as total_spent, COUNT(*) as transaction_count, AVG(amount) as avg_transaction FROM transactions WHERE account_id = :accountId AND txn_type = ''DEBIT'' AND txn_date >= :dateFrom GROUP BY category ORDER BY total_spent DESC',
+ 'SELECT category, SUM(amount) as total_spent, COUNT(*) as transaction_count, AVG(amount) as avg_transaction FROM transactions WHERE txn_type = ''DEBIT''',
  '["accountId", "dateFrom"]',
  '["spending analysis", "where did I spend", "spending breakdown", "expense analysis", "spending pattern", "analyze spending"]',
  '["Analyze my spending", "Where did I spend money last month?", "Spending breakdown by category"]',
  'Analytics', 'chart-pie',
  '[{"name":"accountId","displayName":"Account ID","type":"STRING","dbColumn":"account_id","operator":"=","mandatory":true},{"name":"dateFrom","displayName":"From Date","type":"DATE","dbColumn":"txn_date","operator":">=","mandatory":true},{"name":"dateTo","displayName":"To Date","type":"DATE","dbColumn":"txn_date","operator":"<=","mandatory":false}]',
- 20, 'total_spent DESC', TRUE);
+ 20, NULL, TRUE);
+
+-- Update SPENDING_ANALYSIS to add GROUP BY (FilterEngine adds filters before GROUP BY)
+UPDATE ai_scenarios SET sql_query = 'SELECT category, SUM(amount) as total_spent, COUNT(*) as transaction_count, AVG(amount) as avg_transaction FROM transactions WHERE txn_type = ''DEBIT'' GROUP BY category' WHERE scenario_code = 'SPENDING_ANALYSIS';
 
 -- =====================================================================
 -- SAMPLE DATA - INTENT CONFIGS
 -- =====================================================================
 
-INSERT INTO ai_intent_configs (intent_code, scenario_code, training_phrases, confidence_threshold, active) VALUES
+INSERT INTO ai_intents (intent_code, scenario_code, training_phrases, confidence_threshold, active) VALUES
 ('INTENT_BALANCE', 'ACCOUNT_BALANCE', '["check balance", "account balance", "how much money", "available balance", "show balance", "my balance", "what is my balance", "balance enquiry"]', 0.85, TRUE),
 ('INTENT_TRANSACTIONS', 'TRANSACTION_HISTORY', '["show transactions", "transaction history", "recent transactions", "my transactions", "list transactions", "transaction list"]', 0.85, TRUE),
 ('INTENT_SUMMARY', 'ACCOUNT_SUMMARY', '["account summary", "account details", "account info", "my account", "account overview"]', 0.85, TRUE),
@@ -406,7 +427,7 @@ INSERT INTO ai_intent_configs (intent_code, scenario_code, training_phrases, con
 -- SAMPLE DATA - RBAC (Role-Scenario Mapping)
 -- =====================================================================
 
-INSERT INTO ai_role_scenario_map (role_name, scenario_code) VALUES
+INSERT INTO role_scenario_map (role_name, scenario_code) VALUES
 -- USER role can access basic queries
 ('USER', 'ACCOUNT_BALANCE'),
 ('USER', 'TRANSACTION_HISTORY'),
@@ -612,3 +633,127 @@ INSERT INTO bill_payments (payment_id, account_id, biller_name, biller_category,
 ('BILL001', 'ACC001', 'Mumbai Electricity', 'ELECTRICITY', 2500.00, DATE_SUB(NOW(), INTERVAL 5 DAY), 'SUCCESS', 'ELEC202412001'),
 ('BILL002', 'ACC001', 'Airtel Mobile', 'TELECOM', 599.00, DATE_SUB(NOW(), INTERVAL 10 DAY), 'SUCCESS', 'TEL202412001'),
 ('BILL003', 'ACC001', 'Netflix Subscription', 'SUBSCRIPTION', 649.00, DATE_SUB(NOW(), INTERVAL 15 DAY), 'SUCCESS', 'SUB202412001');
+
+-- =====================================================================
+-- SAMPLE DATA - RESPONSE MAPPINGS (Required for AI response formatting)
+-- Maps DB columns to AI-friendly structured output with masking
+-- =====================================================================
+
+-- ACCOUNT_BALANCE response mappings
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+('ACCOUNT_BALANCE', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 1),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'account_name', 'accountName', '$.account_name', 'NONE', 2),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'account_type', 'accountType', '$.account_type', 'NONE', 3),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 4),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'available_balance', 'availableBalance', '$.available_balance', 'NONE', 5),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'current_balance', 'currentBalance', '$.current_balance', 'NONE', 6),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'blocked_amount', 'blockedAmount', '$.blocked_amount', 'NONE', 7),
+('ACCOUNT_BALANCE', 'DB_QUERY', 'last_updated', 'lastUpdated', '$.last_updated', 'NONE', 8);
+
+-- TRANSACTION_HISTORY response mappings
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+('TRANSACTION_HISTORY', 'DB_QUERY', 'txn_id', 'transactionId', '$.txn_id', 'NONE', 1),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 2),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'txn_date', 'transactionDate', '$.txn_date', 'NONE', 3),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'txn_type', 'transactionType', '$.txn_type', 'NONE', 4),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'amount', 'amount', '$.amount', 'NONE', 5),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 6),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'description', 'description', '$.description', 'NONE', 7),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'category', 'category', '$.category', 'NONE', 8),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'balance_after', 'balanceAfter', '$.balance_after', 'NONE', 9),
+('TRANSACTION_HISTORY', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 10);
+
+-- ACCOUNT_SUMMARY response mappings
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 1),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_name', 'accountName', '$.account_name', 'NONE', 2),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'account_type', 'accountType', '$.account_type', 'NONE', 3),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 4),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'available_balance', 'availableBalance', '$.available_balance', 'NONE', 5),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'current_balance', 'currentBalance', '$.current_balance', 'NONE', 6),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'opening_date', 'openingDate', '$.opening_date', 'NONE', 7),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'branch_code', 'branchCode', '$.branch_code', 'NONE', 8),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'ifsc_code', 'ifscCode', '$.ifsc_code', 'NONE', 9),
+('ACCOUNT_SUMMARY', 'DB_QUERY', 'recent_txn_count', 'recentTransactionCount', '$.recent_txn_count', 'NONE', 10);
+
+-- FUND_TRANSFER_STATUS response mappings
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'transfer_id', 'transferId', '$.transfer_id', 'NONE', 1),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'from_account', 'fromAccount', '$.from_account', 'ACCOUNT', 2),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'to_account', 'toAccount', '$.to_account', 'ACCOUNT', 3),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'amount', 'amount', '$.amount', 'NONE', 4),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'currency', 'currency', '$.currency', 'NONE', 5),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 6),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'initiated_at', 'initiatedAt', '$.initiated_at', 'NONE', 7),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'completed_at', 'completedAt', '$.completed_at', 'NONE', 8),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'remarks', 'remarks', '$.remarks', 'NONE', 9),
+('FUND_TRANSFER_STATUS', 'DB_QUERY', 'failure_reason', 'failureReason', '$.failure_reason', 'NONE', 10);
+
+-- BILL_PAYMENT_HISTORY response mappings
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'payment_id', 'paymentId', '$.payment_id', 'NONE', 1),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'biller_name', 'billerName', '$.biller_name', 'NONE', 2),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'biller_category', 'billerCategory', '$.biller_category', 'NONE', 3),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'amount', 'amount', '$.amount', 'NONE', 4),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'payment_date', 'paymentDate', '$.payment_date', 'NONE', 5),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 6),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 7),
+('BILL_PAYMENT_HISTORY', 'DB_QUERY', 'reference_number', 'referenceNumber', '$.reference_number', 'NONE', 8);
+
+-- CARD_DETAILS response mappings (with sensitive data masking)
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+('CARD_DETAILS', 'DB_QUERY', 'card_id', 'cardId', '$.card_id', 'NONE', 1),
+('CARD_DETAILS', 'DB_QUERY', 'card_type', 'cardType', '$.card_type', 'NONE', 2),
+('CARD_DETAILS', 'DB_QUERY', 'card_number_masked', 'cardNumber', '$.card_number_masked', 'CARD', 3),
+('CARD_DETAILS', 'DB_QUERY', 'card_holder_name', 'cardHolderName', '$.card_holder_name', 'NONE', 4),
+('CARD_DETAILS', 'DB_QUERY', 'expiry_date', 'expiryDate', '$.expiry_date', 'NONE', 5),
+('CARD_DETAILS', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 6),
+('CARD_DETAILS', 'DB_QUERY', 'credit_limit', 'creditLimit', '$.credit_limit', 'NONE', 7),
+('CARD_DETAILS', 'DB_QUERY', 'available_credit', 'availableCredit', '$.available_credit', 'NONE', 8),
+('CARD_DETAILS', 'DB_QUERY', 'linked_account', 'linkedAccount', '$.linked_account', 'ACCOUNT', 9);
+
+-- LOAN_STATUS response mappings
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+('LOAN_STATUS', 'DB_QUERY', 'loan_id', 'loanId', '$.loan_id', 'NONE', 1),
+('LOAN_STATUS', 'DB_QUERY', 'loan_type', 'loanType', '$.loan_type', 'NONE', 2),
+('LOAN_STATUS', 'DB_QUERY', 'principal_amount', 'principalAmount', '$.principal_amount', 'NONE', 3),
+('LOAN_STATUS', 'DB_QUERY', 'outstanding_balance', 'outstandingBalance', '$.outstanding_balance', 'NONE', 4),
+('LOAN_STATUS', 'DB_QUERY', 'interest_rate', 'interestRate', '$.interest_rate', 'NONE', 5),
+('LOAN_STATUS', 'DB_QUERY', 'emi_amount', 'emiAmount', '$.emi_amount', 'NONE', 6),
+('LOAN_STATUS', 'DB_QUERY', 'next_emi_date', 'nextEmiDate', '$.next_emi_date', 'NONE', 7),
+('LOAN_STATUS', 'DB_QUERY', 'loan_status', 'status', '$.loan_status', 'NONE', 8),
+('LOAN_STATUS', 'DB_QUERY', 'disbursement_date', 'disbursementDate', '$.disbursement_date', 'NONE', 9),
+('LOAN_STATUS', 'DB_QUERY', 'tenure_months', 'tenureMonths', '$.tenure_months', 'NONE', 10),
+('LOAN_STATUS', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 11);
+
+-- FIXED_DEPOSIT_DETAILS response mappings
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'fd_id', 'fdId', '$.fd_id', 'NONE', 1),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'account_id', 'accountId', '$.account_id', 'ACCOUNT', 2),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'principal_amount', 'principalAmount', '$.principal_amount', 'NONE', 3),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'interest_rate', 'interestRate', '$.interest_rate', 'NONE', 4),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'maturity_date', 'maturityDate', '$.maturity_date', 'NONE', 5),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'maturity_amount', 'maturityAmount', '$.maturity_amount', 'NONE', 6),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'tenure_days', 'tenureDays', '$.tenure_days', 'NONE', 7),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'status', 'status', '$.status', 'NONE', 8),
+('FIXED_DEPOSIT_DETAILS', 'DB_QUERY', 'created_date', 'createdDate', '$.created_date', 'NONE', 9);
+
+-- BENEFICIARY_LIST response mappings (with sensitive data masking)
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+('BENEFICIARY_LIST', 'DB_QUERY', 'beneficiary_id', 'beneficiaryId', '$.beneficiary_id', 'NONE', 1),
+('BENEFICIARY_LIST', 'DB_QUERY', 'beneficiary_name', 'beneficiaryName', '$.beneficiary_name', 'NONE', 2),
+('BENEFICIARY_LIST', 'DB_QUERY', 'account_number', 'accountNumber', '$.account_number', 'ACCOUNT', 3),
+('BENEFICIARY_LIST', 'DB_QUERY', 'ifsc_code', 'ifscCode', '$.ifsc_code', 'NONE', 4),
+('BENEFICIARY_LIST', 'DB_QUERY', 'bank_name', 'bankName', '$.bank_name', 'NONE', 5),
+('BENEFICIARY_LIST', 'DB_QUERY', 'beneficiary_type', 'beneficiaryType', '$.beneficiary_type', 'NONE', 6),
+('BENEFICIARY_LIST', 'DB_QUERY', 'nickname', 'nickname', '$.nickname', 'NONE', 7),
+('BENEFICIARY_LIST', 'DB_QUERY', 'added_date', 'addedDate', '$.added_date', 'NONE', 8),
+('BENEFICIARY_LIST', 'DB_QUERY', 'verified', 'verified', '$.verified', 'NONE', 9),
+('BENEFICIARY_LIST', 'DB_QUERY', 'account_id', 'ownerAccountId', '$.account_id', 'ACCOUNT', 10);
+
+-- SPENDING_ANALYSIS response mappings
+INSERT INTO ai_response_mappings (scenario_code, source_type, source_field, target_field, json_path, masking_type, display_order) VALUES
+('SPENDING_ANALYSIS', 'DB_QUERY', 'category', 'category', '$.category', 'NONE', 1),
+('SPENDING_ANALYSIS', 'DB_QUERY', 'total_spent', 'totalSpent', '$.total_spent', 'NONE', 2),
+('SPENDING_ANALYSIS', 'DB_QUERY', 'transaction_count', 'transactionCount', '$.transaction_count', 'NONE', 3),
+('SPENDING_ANALYSIS', 'DB_QUERY', 'avg_transaction', 'averageTransaction', '$.avg_transaction', 'NONE', 4);

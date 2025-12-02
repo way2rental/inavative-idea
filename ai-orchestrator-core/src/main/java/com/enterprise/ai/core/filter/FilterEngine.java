@@ -188,35 +188,66 @@ public class FilterEngine {
             throw new IllegalStateException("No base SQL query configured for scenario: " + scenario.getScenarioCode());
         }
 
-        StringBuilder query = new StringBuilder(baseQuery.trim());
-
-        // Add WHERE clause if we have filters
+        String upperQuery = baseQuery.toUpperCase();
         String whereClauses = filterResult.whereClauses();
+        
+        // Handle GROUP BY queries - insert filters before GROUP BY
+        int groupByIndex = upperQuery.indexOf(" GROUP BY ");
+        int orderByIndex = upperQuery.indexOf(" ORDER BY ");
+        int limitIndex = upperQuery.indexOf(" LIMIT ");
+        
+        StringBuilder query = new StringBuilder();
+        
         if (whereClauses != null && !whereClauses.isEmpty()) {
-            // Check if base query already has WHERE
-            String upperQuery = baseQuery.toUpperCase();
-            if (upperQuery.contains(" WHERE ")) {
-                query.append(" AND ").append(whereClauses);
+            if (groupByIndex > 0) {
+                // Query has GROUP BY - insert filters before it
+                String beforeGroupBy = baseQuery.substring(0, groupByIndex);
+                String afterGroupBy = baseQuery.substring(groupByIndex);
+                
+                if (upperQuery.contains(" WHERE ")) {
+                    query.append(beforeGroupBy).append(" AND ").append(whereClauses).append(afterGroupBy);
+                } else {
+                    query.append(beforeGroupBy).append(" WHERE ").append(whereClauses).append(afterGroupBy);
+                }
+            } else if (orderByIndex > 0 && !upperQuery.contains(" WHERE ")) {
+                // Query has ORDER BY but no WHERE - insert filters before ORDER BY
+                String beforeOrderBy = baseQuery.substring(0, orderByIndex);
+                String afterOrderBy = baseQuery.substring(orderByIndex);
+                query.append(beforeOrderBy).append(" WHERE ").append(whereClauses).append(afterOrderBy);
+            } else if (limitIndex > 0 && !upperQuery.contains(" WHERE ")) {
+                // Query has LIMIT but no WHERE - insert filters before LIMIT
+                String beforeLimit = baseQuery.substring(0, limitIndex);
+                String afterLimit = baseQuery.substring(limitIndex);
+                query.append(beforeLimit).append(" WHERE ").append(whereClauses).append(afterLimit);
+            } else if (upperQuery.contains(" WHERE ")) {
+                // Query already has WHERE - append with AND
+                query.append(baseQuery).append(" AND ").append(whereClauses);
             } else {
-                query.append(" WHERE ").append(whereClauses);
+                // Simple query - append WHERE
+                query.append(baseQuery).append(" WHERE ").append(whereClauses);
             }
+        } else {
+            query.append(baseQuery);
         }
 
-        // Add default sort if configured
+        String resultQuery = query.toString();
+        String upperResult = resultQuery.toUpperCase();
+
+        // Add default sort if configured and not already present
         if (scenario.getDefaultSort() != null && !scenario.getDefaultSort().isBlank()) {
-            if (!baseQuery.toUpperCase().contains(" ORDER BY ")) {
-                query.append(" ORDER BY ").append(scenario.getDefaultSort());
+            if (!upperResult.contains(" ORDER BY ")) {
+                resultQuery = resultQuery + " ORDER BY " + scenario.getDefaultSort();
             }
         }
 
-        // Add limit if configured
+        // Add limit if configured and not already present
         if (scenario.getMaxResults() != null && scenario.getMaxResults() > 0) {
-            if (!baseQuery.toUpperCase().contains(" LIMIT ")) {
-                query.append(" LIMIT ").append(scenario.getMaxResults());
+            if (!upperResult.contains(" LIMIT ")) {
+                resultQuery = resultQuery + " LIMIT " + scenario.getMaxResults();
             }
         }
 
-        return query.toString();
+        return resultQuery;
     }
 
     /**
