@@ -44,7 +44,7 @@ public class DynamicPromptBuilder {
         prompt.append("Available scenarios and their descriptions:\n\n");
         prompt.append(scenarioContext);
         
-        prompt.append("\nSession context: ")
+        prompt.append("\nSession context (IMPORTANT - read this to understand conversation history):\n")
                 .append(sessionContext != null ? sessionContext : "No previous context")
                 .append("\n\n");
         
@@ -59,6 +59,8 @@ public class DynamicPromptBuilder {
 
         prompt.append("IMPORTANT:\n");
         prompt.append("- Return ONLY valid JSON, no markdown or extra text\n");
+        prompt.append("- Read the session context CAREFULLY - if the assistant previously asked for a parameter (like accountId), and the user's current message looks like a value/answer, extract it as that parameter\n");
+        prompt.append("- If user provides just a value like 'ACC001' or '12345' after being asked for an ID, that IS the parameter value\n");
         prompt.append("- Match user input to the closest scenario from the list above\n");
         prompt.append("- Extract any parameter values mentioned by the user\n");
         prompt.append("- If no scenario matches well, use UNKNOWN with low confidence\n\n");
