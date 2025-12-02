@@ -1,10 +1,10 @@
 package com.enterprise.ai.core.sse;
 
 import com.enterprise.ai.common.dto.StructuredChatResponse;
+import com.enterprise.ai.data.service.SystemConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Builder;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
@@ -35,31 +35,40 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * - NEVER leave frontend in loading state
  * - NEVER expose technical error details to user
  * 
- * Stream duration limit: 120 seconds
+ * All error messages and timeouts are configurable via SystemConfigService.
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SsePublisherService {
 
     private final ObjectMapper objectMapper;
+    private final SystemConfigService systemConfigService;
 
-    private static final Duration MAX_STREAM_DURATION = Duration.ofSeconds(120);
-    private static final String DEFAULT_ERROR_MESSAGE = "I apologize, but I encountered an issue processing your request. Please try again.";
-    private static final String TIMEOUT_MESSAGE = "Your request is taking longer than expected. Please try again with a simpler query.";
+    public SsePublisherService(ObjectMapper objectMapper, SystemConfigService systemConfigService) {
+        this.objectMapper = objectMapper;
+        this.systemConfigService = systemConfigService;
+    }
+
+    /**
+     * Get max stream duration from configuration.
+     */
+    private Duration getMaxStreamDuration() {
+        long seconds = systemConfigService.getLong(SystemConfigService.MAX_STREAM_DURATION_SECONDS, 120);
+        return Duration.ofSeconds(seconds);
+    }
 
     /**
      * Get user-safe error message from exception.
      * CHUNK 3: Never expose technical error details to frontend.
      * 
      * @param e The exception that occurred
-     * @return User-friendly error message
+     * @return User-friendly error message from configuration
      */
     public String getUserSafeErrorMessage(Throwable e) {
         if (e instanceof java.util.concurrent.TimeoutException) {
-            return TIMEOUT_MESSAGE;
+            return systemConfigService.getTimeoutErrorMessage();
         }
-        return DEFAULT_ERROR_MESSAGE;
+        return systemConfigService.getGenericErrorMessage();
     }
 
     /**
@@ -70,11 +79,12 @@ public class SsePublisherService {
      * 2. Append tokens token-by-token for ChatGPT-like experience
      * 3. ALWAYS emit 'done' event at end (even on error)
      * 4. On error, emit 'error' event with user-safe message
-     * 5. Timeout after 120 seconds with user-friendly message
+     * 5. Timeout after configured duration with user-friendly message
      */
     public Flux<ServerSentEvent<String>> streamTokens(Flux<String> tokenFlux, String sessionId) {
         AtomicBoolean hasEmittedStart = new AtomicBoolean(false);
         AtomicBoolean hasCompleted = new AtomicBoolean(false);
+        Duration maxDuration = getMaxStreamDuration();
         
         return Flux.concat(
                 // 1. ALWAYS emit start event first
@@ -82,7 +92,7 @@ public class SsePublisherService {
                 
                 // 2. Stream tokens as message events
                 tokenFlux
-                        .timeout(MAX_STREAM_DURATION)
+                        .timeout(maxDuration)
                         .map(token -> createMessageEvent(token))
                         .doOnNext(event -> hasEmittedStart.set(true))
                         .doOnComplete(() -> hasCompleted.set(true))
@@ -118,7 +128,7 @@ public class SsePublisherService {
         return Flux.concat(
                 Flux.just(createStartEvent("Processing your request...")),
                 contentMono
-                        .timeout(MAX_STREAM_DURATION)
+                        .timeout(getMaxStreamDuration())
                         .map(content -> createMessageEvent(content))
                         .flux()
                         .onErrorResume(e -> {
@@ -342,7 +352,7 @@ public class SsePublisherService {
         Flux<ServerSentEvent<String>> doneFlux = Flux.just(createDoneEvent());
         
         return Flux.concat(startFlux, statusFlux, responseFlux, doneFlux)
-                .timeout(MAX_STREAM_DURATION)
+                .timeout(getMaxStreamDuration())
                 .onErrorResume(e -> {
                     log.error("SSE structured response error for session {}: {}", sessionId, e.getMessage());
                     return Flux.concat(
@@ -383,7 +393,7 @@ public class SsePublisherService {
                 
                 // Final structured response
                 finalResponseMono
-                        .timeout(MAX_STREAM_DURATION)
+                        .timeout(getMaxStreamDuration())
                         .map(this::createStructuredResponseEvent)
                         .flux()
                         .doOnComplete(() -> hasCompleted.set(true))

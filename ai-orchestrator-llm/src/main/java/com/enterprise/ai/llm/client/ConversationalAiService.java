@@ -1,5 +1,6 @@
 package com.enterprise.ai.llm.client;
 
+import com.enterprise.ai.data.service.SystemConfigService;
 import com.enterprise.ai.llm.prompt.DynamicPromptBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -9,6 +10,8 @@ import reactor.core.publisher.Mono;
 /**
  * Conversational AI Service for handling unknown/unclear user requests.
  * Uses GPT to engage in natural conversation and understand user needs.
+ * 
+ * All branding and configuration values come from SystemConfigService - NO hardcoded values.
  */
 @Slf4j
 @Service
@@ -16,10 +19,13 @@ public class ConversationalAiService {
 
     private final ChatClient chatClient;
     private final DynamicPromptBuilder promptBuilder;
+    private final SystemConfigService systemConfigService;
 
-    public ConversationalAiService(ChatClient chatClient, DynamicPromptBuilder promptBuilder) {
+    public ConversationalAiService(ChatClient chatClient, DynamicPromptBuilder promptBuilder, 
+                                   SystemConfigService systemConfigService) {
         this.chatClient = chatClient;
         this.promptBuilder = promptBuilder;
+        this.systemConfigService = systemConfigService;
     }
 
     /**
@@ -52,8 +58,12 @@ public class ConversationalAiService {
 
     /**
      * Build a conversational prompt that guides the AI to be helpful and friendly.
+     * Uses configurable branding from database.
      */
     private String buildConversationalPrompt(String userQuery, String userId) {
+        String assistantName = systemConfigService.getAssistantName();
+        String orgName = systemConfigService.getOrgName();
+        
         // Build a minimal intent detection prompt to get scenario list, then extract scenarios
         String fullPrompt = promptBuilder.buildIntentDetectionPrompt("", "");
 
@@ -68,7 +78,7 @@ public class ConversationalAiService {
         }
 
         return String.format("""
-                You are Aha - an intelligent, friendly AI assistant for Axis Bank Corporate Banking.
+                You are %s - an intelligent, friendly AI assistant for %s.
                 
                 A user said: "%s"
                 
@@ -98,7 +108,7 @@ public class ConversationalAiService {
                 Just let me know what you'd like to do!"
                 
                 Now generate a friendly, conversational response:
-                """, userQuery, scenarioContext);
+                """, assistantName, orgName, userQuery, scenarioContext);
     }
 
     /**
