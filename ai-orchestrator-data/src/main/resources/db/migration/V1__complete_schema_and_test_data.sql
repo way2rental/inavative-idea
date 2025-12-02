@@ -1,245 +1,11 @@
 -- =====================================================================
--- AI Orchestrator - Complete Database Schema
--- Version 1.0.0 - Fresh Start for SaaS Deployment
+-- AI Orchestrator - Test Data for SaaS Deployment
+-- Version 1.0.0 - INSERT ONLY (JPA handles table creation)
 -- =====================================================================
--- This migration creates all tables needed for the AI Orchestrator.
 -- NO HARDCODED VALUES - all configuration comes from database.
+-- Tables are auto-created by JPA/Hibernate from entity annotations.
+-- This file only contains INSERT statements for test data.
 -- =====================================================================
-
--- =====================================================================
--- CORE TABLES
--- =====================================================================
-
--- System Configuration (replaces all hardcoded values)
-CREATE TABLE IF NOT EXISTS ai_system_config (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    config_key VARCHAR(100) NOT NULL UNIQUE,
-    config_value TEXT,
-    json_value JSON,
-    category VARCHAR(50),
-    description VARCHAR(500),
-    default_value VARCHAR(500),
-    value_type VARCHAR(20) DEFAULT 'STRING',
-    editable BOOLEAN DEFAULT TRUE,
-    visible BOOLEAN DEFAULT TRUE,
-    tenant_id VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP
-);
-
--- AI Scenarios (main entity - all AI capabilities)
-CREATE TABLE IF NOT EXISTS ai_scenarios (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    scenario_code VARCHAR(100) NOT NULL UNIQUE,
-    scenario_name VARCHAR(255),
-    description VARCHAR(500),
-    execution_type VARCHAR(50) DEFAULT 'DB_QUERY',
-    http_method VARCHAR(10),
-    http_url VARCHAR(500),
-    http_headers TEXT,
-    sql_query TEXT,
-    request_mapping JSON,
-    response_mapping JSON,
-    timeout_ms INT DEFAULT 5000,
-    required_params JSON,
-    llm_prompt_template TEXT,
-    active BOOLEAN DEFAULT TRUE,
-    -- AI Intent Detection fields (NO HARDCODING)
-    trigger_phrases JSON,
-    example_queries JSON,
-    category VARCHAR(100),
-    display_order INT DEFAULT 0,
-    icon VARCHAR(50),
-    -- Multi-filter engine fields
-    filter_definitions JSON,
-    security_filters JSON,
-    max_results INT DEFAULT 100,
-    default_sort VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP
-);
-
--- Intent Configurations (training phrases for AI)
--- Entity: IntentConfig uses table name "ai_intents"
-CREATE TABLE IF NOT EXISTS ai_intents (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    intent_code VARCHAR(100) NOT NULL UNIQUE,
-    scenario_code VARCHAR(100) NOT NULL,
-    training_phrases JSON,
-    confidence_threshold DECIMAL(3,2) DEFAULT 0.85,
-    active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Prompt Templates (versioned prompts for AI)
-CREATE TABLE IF NOT EXISTS ai_prompt_templates (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    prompt_key VARCHAR(100) NOT NULL UNIQUE,
-    category VARCHAR(50),
-    system_prompt TEXT,
-    user_template TEXT,
-    response_format VARCHAR(50),
-    temperature DECIMAL(3,2) DEFAULT 0.7,
-    max_tokens INT DEFAULT 1024,
-    version INT DEFAULT 1,
-    enabled BOOLEAN DEFAULT TRUE,
-    version_history JSON,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP
-);
-
--- Policy Rules (business rules for AI behavior)
-CREATE TABLE IF NOT EXISTS ai_policy_rules (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    policy_key VARCHAR(100) NOT NULL UNIQUE,
-    policy_name VARCHAR(255),
-    description TEXT,
-    rule_expression TEXT,
-    on_fail VARCHAR(50) DEFAULT 'BLOCK',
-    failure_message TEXT,
-    applicable_scenarios JSON,
-    applicable_roles JSON,
-    priority INT DEFAULT 0,
-    active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP
-);
-
--- Follow-up Question Groups
--- Entity: FollowUpGroup uses table name "ai_followup_groups"
-CREATE TABLE IF NOT EXISTS ai_followup_groups (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    group_code VARCHAR(100) NOT NULL UNIQUE,
-    group_name VARCHAR(255),
-    scenario_codes JSON,
-    questions JSON,
-    question_order JSON,
-    active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Response Mappings (maps DB columns to AI-friendly structured output with masking)
-CREATE TABLE IF NOT EXISTS ai_response_mappings (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    scenario_code VARCHAR(100) NOT NULL,
-    source_type VARCHAR(50) DEFAULT 'DB_QUERY',
-    source_field VARCHAR(255),
-    target_field VARCHAR(255) NOT NULL,
-    json_path VARCHAR(255) NOT NULL,
-    masking_type VARCHAR(50) DEFAULT 'NONE',
-    display_order INT DEFAULT 0,
-    active BOOLEAN DEFAULT TRUE,
-    UNIQUE KEY uk_scenario_field (scenario_code, target_field)
-);
-
--- HTTP URL Whitelist (security)
--- Entity: HttpUrlWhitelist uses table name "http_url_whitelist"
-CREATE TABLE IF NOT EXISTS http_url_whitelist (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    url_pattern VARCHAR(500) NOT NULL,
-    method VARCHAR(10) DEFAULT 'GET',
-    description VARCHAR(500),
-    added_by VARCHAR(100),
-    active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP
-);
-
--- Role-Scenario Mapping (RBAC)
--- Entity: RoleScenarioMap uses table name "role_scenario_map"
-CREATE TABLE IF NOT EXISTS role_scenario_map (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    role_name VARCHAR(100) NOT NULL,
-    scenario_code VARCHAR(100) NOT NULL,
-    granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_role_scenario (role_name, scenario_code)
-);
-
--- =====================================================================
--- SESSION & AUDIT TABLES
--- =====================================================================
-
--- Chat Sessions
--- Entity: ChatSession uses table name "chat_sessions"
-CREATE TABLE IF NOT EXISTS chat_sessions (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    session_id VARCHAR(100) NOT NULL UNIQUE,
-    user_id VARCHAR(100) NOT NULL,
-    status VARCHAR(20) DEFAULT 'ACTIVE',
-    context TEXT,
-    collected_params JSON,
-    pending_params JSON,
-    pending_scenario VARCHAR(100),
-    last_used_params JSON,
-    last_activity_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP,
-    expires_at TIMESTAMP
-);
-
--- Chat Messages
--- Entity: ChatMessage uses table name "chat_messages"
-CREATE TABLE IF NOT EXISTS chat_messages (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    session_id VARCHAR(100) NOT NULL,
-    role VARCHAR(20) NOT NULL,
-    content TEXT,
-    scenario_code VARCHAR(100),
-    params JSON,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_session (session_id),
-    INDEX idx_created (created_at)
-);
-
--- Message Feedback
--- Entity: MessageFeedback uses table name "message_feedback"
-CREATE TABLE IF NOT EXISTS message_feedback (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    message_id BIGINT NOT NULL,
-    session_id VARCHAR(100),
-    user_id VARCHAR(100),
-    rating INT,
-    feedback_type VARCHAR(50),
-    feedback_text TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Audit Logs
-CREATE TABLE IF NOT EXISTS ai_audit_logs (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    execution_id VARCHAR(100),
-    session_id VARCHAR(100),
-    user_id VARCHAR(100),
-    scenario_code VARCHAR(100),
-    raw_intent_json JSON,
-    raw_result_json JSON,
-    execution_time_ms BIGINT,
-    success BOOLEAN DEFAULT TRUE,
-    error_message TEXT,
-    error_details TEXT,
-    request_time TIMESTAMP,
-    response_time TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_user (user_id),
-    INDEX idx_scenario (scenario_code),
-    INDEX idx_created (created_at)
-);
-
--- Scenario Test Results
--- Entity: ScenarioTestResult uses table name "scenario_test_results"
-CREATE TABLE IF NOT EXISTS scenario_test_results (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    scenario_code VARCHAR(100) NOT NULL,
-    test_params JSON NOT NULL,
-    request_built JSON,
-    response_result JSON,
-    execution_time_ms BIGINT,
-    success BOOLEAN DEFAULT FALSE,
-    error_message TEXT,
-    tested_by VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
 -- =====================================================================
 -- SAMPLE DATA - SYSTEM CONFIG
@@ -408,20 +174,20 @@ INSERT INTO ai_scenarios (
 UPDATE ai_scenarios SET sql_query = 'SELECT category, SUM(amount) as total_spent, COUNT(*) as transaction_count, AVG(amount) as avg_transaction FROM transactions WHERE txn_type = ''DEBIT'' GROUP BY category' WHERE scenario_code = 'SPENDING_ANALYSIS';
 
 -- =====================================================================
--- SAMPLE DATA - INTENT CONFIGS
+-- SAMPLE DATA - INTENT CONFIGS (uses intent_key per IntentConfig entity)
 -- =====================================================================
 
-INSERT INTO ai_intents (intent_code, scenario_code, training_phrases, confidence_threshold, active) VALUES
-('INTENT_BALANCE', 'ACCOUNT_BALANCE', '["check balance", "account balance", "how much money", "available balance", "show balance", "my balance", "what is my balance", "balance enquiry"]', 0.85, TRUE),
-('INTENT_TRANSACTIONS', 'TRANSACTION_HISTORY', '["show transactions", "transaction history", "recent transactions", "my transactions", "list transactions", "transaction list"]', 0.85, TRUE),
-('INTENT_SUMMARY', 'ACCOUNT_SUMMARY', '["account summary", "account details", "account info", "my account", "account overview"]', 0.85, TRUE),
-('INTENT_TRANSFER_STATUS', 'FUND_TRANSFER_STATUS', '["transfer status", "payment status", "check transfer", "did transfer go through"]', 0.85, TRUE),
-('INTENT_BILLS', 'BILL_PAYMENT_HISTORY', '["bill payments", "utility bills", "paid bills", "bill history"]', 0.85, TRUE),
-('INTENT_CARDS', 'CARD_DETAILS', '["card details", "my cards", "credit card", "debit card", "card info"]', 0.85, TRUE),
-('INTENT_LOANS', 'LOAN_STATUS', '["loan status", "my loan", "emi details", "loan balance", "outstanding loan"]', 0.85, TRUE),
-('INTENT_FD', 'FIXED_DEPOSIT_DETAILS', '["fixed deposit", "fd details", "my fd", "term deposit"]', 0.85, TRUE),
-('INTENT_BENEFICIARIES', 'BENEFICIARY_LIST', '["beneficiaries", "payee list", "saved accounts", "transfer contacts"]', 0.85, TRUE),
-('INTENT_SPENDING', 'SPENDING_ANALYSIS', '["spending analysis", "expense analysis", "spending pattern", "where did I spend"]', 0.85, TRUE);
+INSERT INTO ai_intents (intent_key, intent_name, scenario_code, training_phrases, confidence_threshold, category, active) VALUES
+('INTENT_BALANCE', 'Account Balance Intent', 'ACCOUNT_BALANCE', '["check balance", "account balance", "how much money", "available balance", "show balance", "my balance", "what is my balance", "balance enquiry"]', 0.85, 'Account', TRUE),
+('INTENT_TRANSACTIONS', 'Transaction History Intent', 'TRANSACTION_HISTORY', '["show transactions", "transaction history", "recent transactions", "my transactions", "list transactions", "transaction list"]', 0.85, 'Transaction', TRUE),
+('INTENT_SUMMARY', 'Account Summary Intent', 'ACCOUNT_SUMMARY', '["account summary", "account details", "account info", "my account", "account overview"]', 0.85, 'Account', TRUE),
+('INTENT_TRANSFER_STATUS', 'Transfer Status Intent', 'FUND_TRANSFER_STATUS', '["transfer status", "payment status", "check transfer", "did transfer go through"]', 0.85, 'Payment', TRUE),
+('INTENT_BILLS', 'Bill Payment Intent', 'BILL_PAYMENT_HISTORY', '["bill payments", "utility bills", "paid bills", "bill history"]', 0.85, 'Payment', TRUE),
+('INTENT_CARDS', 'Card Details Intent', 'CARD_DETAILS', '["card details", "my cards", "credit card", "debit card", "card info"]', 0.85, 'Card', TRUE),
+('INTENT_LOANS', 'Loan Status Intent', 'LOAN_STATUS', '["loan status", "my loan", "emi details", "loan balance", "outstanding loan"]', 0.85, 'Loan', TRUE),
+('INTENT_FD', 'Fixed Deposit Intent', 'FIXED_DEPOSIT_DETAILS', '["fixed deposit", "fd details", "my fd", "term deposit"]', 0.85, 'Investment', TRUE),
+('INTENT_BENEFICIARIES', 'Beneficiary List Intent', 'BENEFICIARY_LIST', '["beneficiaries", "payee list", "saved accounts", "transfer contacts"]', 0.85, 'Payment', TRUE),
+('INTENT_SPENDING', 'Spending Analysis Intent', 'SPENDING_ANALYSIS', '["spending analysis", "expense analysis", "spending pattern", "where did I spend"]', 0.85, 'Analytics', TRUE);
 
 -- =====================================================================
 -- SAMPLE DATA - RBAC (Role-Scenario Mapping)
@@ -474,6 +240,23 @@ INSERT INTO ai_prompt_templates (prompt_key, category, system_prompt, user_templ
 ('RESPONSE_FORMATTING', 'CORE', 'You are a friendly banking assistant. Format the data into a clear, helpful response.', 'Format this data for the user:\n{{data}}\n\nUser asked: {{query}}', 'STRUCTURED', 0.7, 1024, 1, TRUE),
 ('CLARIFICATION', 'CORE', 'You are a helpful assistant. Ask a clarifying question to understand the user better.', 'User intent is unclear. Possible matches: {{options}}\n\nAsk a friendly clarifying question.', 'TEXT', 0.7, 256, 1, TRUE),
 ('FOLLOW_UP', 'CORE', 'You are asking for missing information in a friendly way.', 'Missing parameters: {{missingParams}}\n\nAsk for this information naturally.', 'TEXT', 0.7, 256, 1, TRUE);
+
+-- =====================================================================
+-- SAMPLE DATA - POLICY RULES
+-- =====================================================================
+
+INSERT INTO ai_policy_rules (policy_key, policy_name, description, rule_expression, on_fail, failure_message, applicable_scenarios, applicable_roles, priority, active) VALUES
+('QUERY_LENGTH_LIMIT', 'Query Length Limit', 'Limit user query length for safety', '#{query.length() <= 1000}', 'BLOCK', 'Your query is too long. Please keep it under 1000 characters.', NULL, NULL, 100, TRUE),
+('RATE_LIMIT', 'Rate Limit Policy', 'Prevent excessive queries per minute', '#{requestCount <= 60}', 'WARN', 'You are making too many requests. Please slow down.', NULL, NULL, 90, TRUE),
+('HIGH_VALUE_TRANSFER_ADMIN', 'High Value Transfer Restriction', 'High value transfers require admin role', '#{amount <= 100000 || user.hasRole("ADMIN")}', 'BLOCK', 'Transfers over 1 lakh require admin approval.', '["FUND_TRANSFER_STATUS"]', NULL, 80, TRUE);
+
+-- =====================================================================
+-- SAMPLE DATA - HTTP URL WHITELIST
+-- =====================================================================
+
+INSERT INTO http_url_whitelist (url_pattern, allowed_methods, description, added_by, active) VALUES
+('https://api.example.com/v1/*', 'GET', 'Example Bank External API', 'system', TRUE),
+('https://internal.bank.com/api/*', 'GET,POST', 'Internal Bank Services', 'system', TRUE);
 
 -- =====================================================================
 -- SAMPLE BUSINESS DATA TABLES (for testing scenarios)
@@ -633,6 +416,26 @@ INSERT INTO bill_payments (payment_id, account_id, biller_name, biller_category,
 ('BILL001', 'ACC001', 'Mumbai Electricity', 'ELECTRICITY', 2500.00, DATE_SUB(NOW(), INTERVAL 5 DAY), 'SUCCESS', 'ELEC202412001'),
 ('BILL002', 'ACC001', 'Airtel Mobile', 'TELECOM', 599.00, DATE_SUB(NOW(), INTERVAL 10 DAY), 'SUCCESS', 'TEL202412001'),
 ('BILL003', 'ACC001', 'Netflix Subscription', 'SUBSCRIPTION', 649.00, DATE_SUB(NOW(), INTERVAL 15 DAY), 'SUCCESS', 'SUB202412001');
+
+-- Sample Fund Transfers
+INSERT INTO fund_transfers (transfer_id, from_account, to_account, amount, currency, status, initiated_at, completed_at, remarks) VALUES
+('TXF001', 'ACC001', 'ACC002', 10000.00, 'INR', 'SUCCESS', DATE_SUB(NOW(), INTERVAL 7 DAY), DATE_SUB(NOW(), INTERVAL 7 DAY), 'Monthly transfer'),
+('TXF002', 'ACC001', '1234567890', 25000.00, 'INR', 'SUCCESS', DATE_SUB(NOW(), INTERVAL 14 DAY), DATE_SUB(NOW(), INTERVAL 14 DAY), 'Payment to Jane'),
+('TXF003', 'ACC001', '0987654321', 50000.00, 'INR', 'PENDING', DATE_SUB(NOW(), INTERVAL 1 DAY), NULL, 'Payment to ABC Company');
+
+-- =====================================================================
+-- SAMPLE DATA - FOLLOW-UP GROUPS (uses group_key per FollowUpGroup entity)
+-- =====================================================================
+
+INSERT INTO ai_followup_groups (group_key, description, scenario_codes, questions, question_order, active) VALUES
+('ACCOUNT_FOLLOWUPS', 'Follow-up questions for account-related scenarios', 
+ '["ACCOUNT_BALANCE", "ACCOUNT_SUMMARY", "TRANSACTION_HISTORY"]',
+ '[{"key":"viewTransactions","question":"Would you like to see recent transactions?","type":"BOOLEAN"},{"key":"viewCards","question":"Would you like to see cards linked to this account?","type":"BOOLEAN"}]',
+ '["viewTransactions", "viewCards"]', TRUE),
+('PAYMENT_FOLLOWUPS', 'Follow-up questions for payment scenarios',
+ '["FUND_TRANSFER_STATUS", "BILL_PAYMENT_HISTORY"]',
+ '[{"key":"viewMore","question":"Would you like to see more payment details?","type":"BOOLEAN"},{"key":"repeatPayment","question":"Would you like to make another payment?","type":"BOOLEAN"}]',
+ '["viewMore", "repeatPayment"]', TRUE);
 
 -- =====================================================================
 -- SAMPLE DATA - RESPONSE MAPPINGS (Required for AI response formatting)
