@@ -95,7 +95,7 @@ export class RbacManagementComponent implements OnInit {
   refreshCache(): void {
     this.adminService.refreshRbacCache().subscribe({
       next: (response) => {
-        alert(response || 'Cache refreshed successfully');
+        alert(response);
         this.loadMatrix();
       },
       error: (err) => console.error('Failed to refresh cache:', err)
