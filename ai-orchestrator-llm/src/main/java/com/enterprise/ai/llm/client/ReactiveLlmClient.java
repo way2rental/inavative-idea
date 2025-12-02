@@ -24,6 +24,17 @@ public interface ReactiveLlmClient {
     Mono<IntentResult> detectIntent(String userInput, String sessionContext);
 
     /**
+     * Detect intent from user input with last used params context (non-blocking).
+     * This enables resolution of references like "same account", "that account".
+     *
+     * @param userInput user's query
+     * @param sessionContext previous conversation context
+     * @param lastUsedParamsJson JSON of last used params for reference resolution
+     * @return Mono of IntentResult
+     */
+    Mono<IntentResult> detectIntent(String userInput, String sessionContext, String lastUsedParamsJson);
+
+    /**
      * Two-stage intent detection: First detect category, then exact scenario.
      * Optimized for 150+ scenarios where single-stage detection is too slow.
      *

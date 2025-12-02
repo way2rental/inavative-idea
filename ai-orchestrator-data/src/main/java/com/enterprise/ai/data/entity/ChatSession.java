@@ -57,6 +57,14 @@ public class ChatSession {
     @Column(name = "collected_params", length = 2000)
     private String collectedParams;
 
+    /**
+     * Last used parameters (JSON format) from the most recent successful scenario execution.
+     * This enables context resolution like "same account" or "that account".
+     * Example: {"accountId": "ACC001"}
+     */
+    @Column(name = "last_used_params", length = 2000)
+    private String lastUsedParams;
+
     @PrePersist
     protected void onCreate() {
         createdAt = Instant.now();

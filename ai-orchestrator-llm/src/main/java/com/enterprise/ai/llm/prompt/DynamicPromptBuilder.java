@@ -35,6 +35,15 @@ public class DynamicPromptBuilder {
      * Uses caching to avoid performance issues with 200+ scenarios.
      */
     public String buildIntentDetectionPrompt(String userInput, String sessionContext) {
+        return buildIntentDetectionPrompt(userInput, sessionContext, null);
+    }
+
+    /**
+     * Build intent detection prompt with all available scenarios from DB.
+     * Uses caching to avoid performance issues with 200+ scenarios.
+     * Includes last used params for context resolution.
+     */
+    public String buildIntentDetectionPrompt(String userInput, String sessionContext, String lastUsedParamsJson) {
         StringBuilder prompt = new StringBuilder();
         
         // Use cached scenario context (rebuilt every 5 mins or on cache refresh)
@@ -47,6 +56,12 @@ public class DynamicPromptBuilder {
         prompt.append("\nSession context (IMPORTANT - read this to understand conversation history):\n")
                 .append(sessionContext != null ? sessionContext : "No previous context")
                 .append("\n\n");
+
+        // Add last used params context for reference resolution
+        if (lastUsedParamsJson != null && !lastUsedParamsJson.isEmpty()) {
+            prompt.append("RECENTLY USED PARAMETERS (use these to resolve references like 'same account', 'that account', 'the same one'):\n");
+            prompt.append(lastUsedParamsJson).append("\n\n");
+        }
         
         prompt.append("User message: \"").append(userInput).append("\"\n\n");
         
@@ -57,12 +72,14 @@ public class DynamicPromptBuilder {
         prompt.append("- missingParams: Required parameters that are missing\n");
         prompt.append("- reasoning: Brief explanation\n\n");
 
-        prompt.append("IMPORTANT:\n");
+        prompt.append("IMPORTANT CONTEXT RULES:\n");
         prompt.append("- Return ONLY valid JSON, no markdown or extra text\n");
         prompt.append("- Read the session context CAREFULLY - if the assistant previously asked for a parameter (like accountId), and the user's current message looks like a value/answer, extract it as that parameter\n");
         prompt.append("- If user provides just a value like 'ACC001' or '12345' after being asked for an ID, that IS the parameter value\n");
         prompt.append("- Match user input to the closest scenario from the list above\n");
         prompt.append("- Extract any parameter values mentioned by the user\n");
+        prompt.append("- **CRITICAL**: If user says 'same account', 'that account', 'this one', 'for the same', use the accountId from RECENTLY USED PARAMETERS\n");
+        prompt.append("- **CRITICAL**: If a reference like 'same' or 'that' is used and we have recent params, REUSE them - don't mark as missing\n");
         prompt.append("- If no scenario matches well, use UNKNOWN with low confidence\n\n");
 
         prompt.append("Example JSON format:\n");

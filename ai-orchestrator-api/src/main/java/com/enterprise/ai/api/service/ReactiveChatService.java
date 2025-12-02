@@ -194,8 +194,15 @@ public class ReactiveChatService {
             );
         }
 
+        // Get last used params for context resolution (e.g., "same account", "that account")
+        String lastUsedParamsJson = session != null ? session.getLastUsedParams() : null;
+        if (lastUsedParamsJson != null && !lastUsedParamsJson.isEmpty()) {
+            log.debug("Using last used params for context: {}", lastUsedParamsJson);
+        }
+
         // Cache the intent detection to avoid re-execution
-        Mono<IntentResult> intentMono = llmClient.detectIntent(request.getQuery(), sessionContext)
+        // Pass lastUsedParamsJson so LLM can resolve references like "same account"
+        Mono<IntentResult> intentMono = llmClient.detectIntent(request.getQuery(), sessionContext, lastUsedParamsJson)
                 .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
                 .doOnSuccess(intent -> log.info("Intent detected for streaming: scenario={}, confidence={}",
                         intent.getScenario(), intent.getConfidence()))
@@ -296,6 +303,8 @@ public class ReactiveChatService {
                                                                 Instant requestTime = Instant.now();
                                                                 logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
                                                                         requestTime, Instant.now(), true, null, intent, result);
+                                                                // Store last used params for future context resolution
+                                                                storeLastUsedParams(sessionId, intent.getParams());
                                                             })
                                                             .doOnError(e -> {
                                                                 log.error("Scenario execution failed: {}", e.getMessage());
@@ -713,6 +722,27 @@ public class ReactiveChatService {
     }
 
     /**
+     * Store last used params after successful scenario execution.
+     * This enables context resolution like "same account", "that account".
+     */
+    private void storeLastUsedParams(String sessionId, Map<String, Object> params) {
+        if (params == null || params.isEmpty()) {
+            return;
+        }
+        try {
+            Optional<ChatSession> sessionOpt = sessionRepository.findBySessionId(sessionId);
+            if (sessionOpt.isPresent()) {
+                ChatSession session = sessionOpt.get();
+                session.setLastUsedParams(objectMapper.writeValueAsString(params));
+                sessionRepository.save(session);
+                log.info("Stored last used params for session {}: {}", sessionId, params);
+            }
+        } catch (Exception e) {
+            log.error("Failed to store last used params: {}", e.getMessage());
+        }
+    }
+
+    /**
      * Clear pending follow-up state from the session.
      * Called after successfully completing the pending scenario.
      */
@@ -829,6 +859,9 @@ public class ReactiveChatService {
                                     .userId(request.getUserId())
                                     .build();
 
+                            // Store combined params for future context resolution before execution
+                            final Map<String, Object> finalCombinedParams = combinedParams;
+
                             return Flux.concat(
                                     Flux.just("[PROGRESS]✅ Got it!\n"),
                                     Flux.just("[PROGRESS]🔐 Verifying permissions...\n"),
@@ -838,6 +871,8 @@ public class ReactiveChatService {
                                             .timeout(Duration.ofMillis(maxDbTimeoutMs))
                                             .flatMapMany(result -> {
                                                 log.debug("Pending scenario executed successfully");
+                                                // Store last used params for context resolution
+                                                storeLastUsedParams(session.getSessionId(), finalCombinedParams);
                                                 return Flux.concat(
                                                         Flux.just("[PROGRESS]✅ Data retrieved\n"),
                                                         Flux.just("[PROGRESS]📝 Preparing your response...\n"),
