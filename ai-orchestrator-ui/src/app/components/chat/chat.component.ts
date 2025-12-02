@@ -426,7 +426,7 @@ export class ChatComponent implements AfterViewChecked {
         }
 
         // Save chat history after each complete message
-        this.saveChatHistory();
+//         this.saveChatHistory();
       }
     });
   }
@@ -489,7 +489,7 @@ export class ChatComponent implements AfterViewChecked {
    */
   copyToClipboard(message: ChatMessage): void {
     let textToCopy = '';
-    
+
     if (message.structured) {
       // Extract text from structured response
       const payload = message.structured.payload;
@@ -507,14 +507,14 @@ export class ChatComponent implements AfterViewChecked {
       } else {
         textToCopy = JSON.stringify(payload, null, 2);
       }
-      
+
       if (message.structured.title) {
         textToCopy = message.structured.title + '\n\n' + textToCopy;
       }
     } else {
       textToCopy = message.content || '';
     }
-    
+
     navigator.clipboard.writeText(textToCopy).then(() => {
       // Show a brief toast notification (could be enhanced with a proper toast service)
       console.log('Copied to clipboard');
@@ -526,19 +526,19 @@ export class ChatComponent implements AfterViewChecked {
    */
   reactToMessage(message: ChatMessage, reaction: 'like' | 'dislike'): void {
     const previousReaction = message.reaction;
-    
+
     if (message.reaction === reaction) {
       message.reaction = null; // Toggle off
     } else {
       message.reaction = reaction;
     }
-    
+
     // Only send to backend if we're setting a reaction (not removing)
     if (message.reaction) {
       // Find the user message that triggered this response
       const messageIndex = this.messages.indexOf(message);
       const userMessage = messageIndex > 0 ? this.messages[messageIndex - 1] : null;
-      
+
       // Extract response text for storage
       let aiResponse = '';
       if (message.structured) {
@@ -571,7 +571,7 @@ export class ChatComponent implements AfterViewChecked {
         }
       });
     }
-    
+
     // Save to local history
     this.saveChatHistory();
   }
@@ -585,7 +585,7 @@ export class ChatComponent implements AfterViewChecked {
     toast.className = 'fixed bottom-20 right-10 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in';
     toast.textContent = message;
     document.body.appendChild(toast);
-    
+
     // Remove after 2 seconds
     setTimeout(() => {
       toast.classList.add('opacity-0', 'transition-opacity');
@@ -600,20 +600,20 @@ export class ChatComponent implements AfterViewChecked {
     // Find the last user message
     const lastUserMessageIndex = [...this.messages].reverse().findIndex(m => m.role === 'user');
     if (lastUserMessageIndex === -1) return;
-    
+
     const actualIndex = this.messages.length - 1 - lastUserMessageIndex;
     const userMessage = this.messages[actualIndex];
-    
+
     // Remove all messages after the user message
     this.messages = this.messages.slice(0, actualIndex + 1);
-    
+
     // Resend the message
     const request: ChatRequest = {
       userId: this.authService.getCurrentUser()?.username || 'anonymous',
       query: userMessage.content || '',
       sessionId: this.sessionId || undefined
     };
-    
+
     this.isLoading = true;
     this.streamMessage(request);
   }
@@ -646,7 +646,7 @@ export class ChatComponent implements AfterViewChecked {
   private loadChatHistory(): void {
     const saved = localStorage.getItem('chatHistory');
     const savedSessionId = localStorage.getItem('chatSessionId');
-    
+
     if (saved) {
       try {
         const data = JSON.parse(saved);

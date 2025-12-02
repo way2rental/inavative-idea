@@ -38,6 +38,31 @@ export interface MessageFeedback {
   createdAt: string;
 }
 
+export interface ChatSessionDetail {
+  id: number;
+  sessionId: string;
+  userId: string;
+  createdAt: string;
+  lastActivityAt: string;
+  pendingScenario?: string;
+  pendingParams?: string;
+  messages: ChatMessageDetail[];
+}
+
+export interface ChatMessageDetail {
+  id: number;
+  sessionId: string;
+  role: string;
+  content: string;
+  timestamp: string;
+}
+
+export interface FeedbackDetail extends MessageFeedback {
+  sessionDetail?: ChatSessionDetail;
+  messageDetail?: ChatMessageDetail;
+  conversationHistory?: ChatMessageDetail[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -93,6 +118,27 @@ export class ApiService {
       if (queryString) url += `?${queryString}`;
     }
     return this.http.get<MessageFeedback[]>(url);
+  }
+
+  /**
+   * Get detailed feedback with session and conversation history (Admin only)
+   */
+  getFeedbackDetail(feedbackId: number): Observable<FeedbackDetail> {
+    return this.http.get<FeedbackDetail>(`${this.baseUrl}/feedback/${feedbackId}/details`);
+  }
+
+  /**
+   * Get session details including all messages (Admin only)
+   */
+  getSessionDetail(sessionId: string): Observable<ChatSessionDetail> {
+    return this.http.get<ChatSessionDetail>(`${this.baseUrl}/sessions/${sessionId}`);
+  }
+
+  /**
+   * Get conversation history for a session (Admin only)
+   */
+  getSessionMessages(sessionId: string): Observable<ChatMessageDetail[]> {
+    return this.http.get<ChatMessageDetail[]>(`${this.baseUrl}/sessions/${sessionId}/messages`);
   }
 
   // ============================================
