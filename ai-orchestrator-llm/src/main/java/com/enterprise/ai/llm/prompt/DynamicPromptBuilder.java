@@ -167,6 +167,7 @@ public class DynamicPromptBuilder {
         prompt.append("Scenario: ").append(scenarioCode).append("\n");
         prompt.append("Missing parameters: ").append(String.join(", ", missingParams)).append("\n\n");
         prompt.append("Generate a SHORT, FRIENDLY question (under 25 words) to ask for the missing information.");
+        prompt.append("Add Missing parameters as proper formatted in json missingParams field.");
         appendStatic(prompt);
         return prompt.toString();
     }

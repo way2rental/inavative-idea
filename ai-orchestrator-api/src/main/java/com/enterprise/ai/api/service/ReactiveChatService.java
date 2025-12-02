@@ -333,32 +333,8 @@ public class ReactiveChatService {
     private Flux<String> generateMissingParamMessage(String scenarioCode, List<String> missingParams, String userQuery) {
         return llmClient.generateFollowUpQuestion(scenarioCode, missingParams)
                 .map(question -> {
-                    // Build structured FOLLOW_UP response - SIMPLE VERSION
-                    try {
-                        // Format missing params for tracking (not display)
-                        List<String> formattedParams = missingParams.stream()
-                                .map(param -> capitalize(param.replace("_", " ")))
-                                .toList();
-
-                        // Build clean, simple JSON - ONLY the question for display
-                        Map<String, Object> response = new LinkedHashMap<>();
-                        response.put("type", "FOLLOW_UP");
-                        response.put("title", ""); // No title, keeps it clean
-                        response.put("confidence", 1.0);
-
-                        Map<String, Object> payload = new LinkedHashMap<>();
-                        // ONLY the question - no extra text
-                        payload.put("question", question);
-                        payload.put("missingParams", formattedParams); // For context tracking, not display
-                        response.put("payload", payload);
-                        response.put("scenario", scenarioCode); // For context tracking
-
-                        // Use [RESPONSE] marker so frontend detects this as structured response
-                        return "[RESPONSE]" + objectMapper.writeValueAsString(response);
-                    } catch (Exception e) {
-                        log.error("Failed to build structured follow-up: {}", e.getMessage());
-                        return generateSimpleMissingParamMessageAsJson(scenarioCode, missingParams, question);
-                    }
+                    log.info("Generating structured follow-up for missing params: {}, question : {}", missingParams, question);
+                    return "[RESPONSE]" + question;
                 })
                 .flatMapMany(Flux::just)
                 .onErrorResume(e -> {
