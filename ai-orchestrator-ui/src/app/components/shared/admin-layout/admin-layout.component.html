@@ -1,0 +1,14 @@
+<!-- Admin Layout with Sidebar -->
+<div class="min-h-screen bg-gray-50 flex">
+  <!-- Sidebar -->
+  <app-admin-sidebar
+    [(collapsed)]="sidebarCollapsed"
+    (collapsedChange)="onSidebarToggle($event)">
+  </app-admin-sidebar>
+
+  <!-- Main Content Area -->
+  <div class="flex-1 overflow-auto">
+    <ng-content></ng-content>
+  </div>
+</div>
+

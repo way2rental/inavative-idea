@@ -1,7 +1,7 @@
 <!-- Enhanced Admin Dashboard with Sidebar Layout -->
 <div class="min-h-screen bg-gray-50 flex">
   <!-- Collapsible Sidebar - Quick Actions -->
-  <aside [class]="sidebarCollapsed ? 'w-16' : 'w-64'" 
+  <aside [class]="sidebarCollapsed ? 'w-16' : 'w-64'"
          class="bg-white border-r border-gray-200 flex flex-col transition-all duration-300 sticky top-0 h-screen">
     <!-- Sidebar Header -->
     <div class="p-4 border-b border-gray-200 flex items-center justify-between">
@@ -15,7 +15,7 @@
       </div>
       <button (click)="toggleSidebar()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
         <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 [attr.d]="sidebarCollapsed ? 'M13 5l7 7-7 7M5 5l7 7-7 7' : 'M11 19l-7-7 7-7m8 14l-7-7 7-7'" />
         </svg>
       </button>
@@ -68,6 +68,15 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
         <span [class]="sidebarCollapsed ? 'hidden' : 'block'" class="text-sm font-medium">Access Control</span>
+      </a>
+
+      <a routerLink="/admin/response-mappings" routerLinkActive="bg-axis-burgundy text-white"
+         class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100 transition-all"
+         [class]="sidebarCollapsed ? 'justify-center' : ''">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+        </svg>
+        <span [class]="sidebarCollapsed ? 'hidden' : 'block'" class="text-sm font-medium">Response Mappings</span>
       </a>
 
       <a routerLink="/admin/feedback" routerLinkActive="bg-axis-burgundy text-white"

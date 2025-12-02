@@ -1,4 +1,4 @@
-package com.enterprise.ai.api.controller.admin;
+package com.enterprise.ai.api.controller;
 
 import com.enterprise.ai.data.entity.IntentConfig;
 import com.enterprise.ai.data.repository.IntentConfigRepository;
