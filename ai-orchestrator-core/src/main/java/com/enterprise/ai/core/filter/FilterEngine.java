@@ -181,6 +181,13 @@ public class FilterEngine {
 
     /**
      * Build complete SQL query with dynamic filters.
+     * 
+     * Handles various SQL patterns:
+     * - Simple queries (SELECT ... FROM ...)
+     * - Queries with WHERE clause
+     * - Queries with GROUP BY (filters must go before GROUP BY)
+     * - Queries with ORDER BY (filters must go before ORDER BY if no GROUP BY)
+     * - Queries with LIMIT
      */
     public String buildDynamicQuery(AiScenario scenario, FilterResult filterResult) {
         String baseQuery = scenario.getSqlQuery();
@@ -191,43 +198,48 @@ public class FilterEngine {
         String upperQuery = baseQuery.toUpperCase();
         String whereClauses = filterResult.whereClauses();
         
-        // Handle GROUP BY queries - insert filters before GROUP BY
+        // Find clause positions
         int groupByIndex = upperQuery.indexOf(" GROUP BY ");
         int orderByIndex = upperQuery.indexOf(" ORDER BY ");
         int limitIndex = upperQuery.indexOf(" LIMIT ");
+        int whereIndex = upperQuery.indexOf(" WHERE ");
         
         StringBuilder query = new StringBuilder();
         
-        if (whereClauses != null && !whereClauses.isEmpty()) {
-            if (groupByIndex > 0) {
-                // Query has GROUP BY - insert filters before it
-                String beforeGroupBy = baseQuery.substring(0, groupByIndex);
-                String afterGroupBy = baseQuery.substring(groupByIndex);
-                
-                if (upperQuery.contains(" WHERE ")) {
-                    query.append(beforeGroupBy).append(" AND ").append(whereClauses).append(afterGroupBy);
-                } else {
-                    query.append(beforeGroupBy).append(" WHERE ").append(whereClauses).append(afterGroupBy);
-                }
-            } else if (orderByIndex > 0 && !upperQuery.contains(" WHERE ")) {
-                // Query has ORDER BY but no WHERE - insert filters before ORDER BY
-                String beforeOrderBy = baseQuery.substring(0, orderByIndex);
-                String afterOrderBy = baseQuery.substring(orderByIndex);
-                query.append(beforeOrderBy).append(" WHERE ").append(whereClauses).append(afterOrderBy);
-            } else if (limitIndex > 0 && !upperQuery.contains(" WHERE ")) {
-                // Query has LIMIT but no WHERE - insert filters before LIMIT
-                String beforeLimit = baseQuery.substring(0, limitIndex);
-                String afterLimit = baseQuery.substring(limitIndex);
-                query.append(beforeLimit).append(" WHERE ").append(whereClauses).append(afterLimit);
-            } else if (upperQuery.contains(" WHERE ")) {
-                // Query already has WHERE - append with AND
-                query.append(baseQuery).append(" AND ").append(whereClauses);
-            } else {
-                // Simple query - append WHERE
-                query.append(baseQuery).append(" WHERE ").append(whereClauses);
-            }
-        } else {
+        if (whereClauses == null || whereClauses.isEmpty()) {
             query.append(baseQuery);
+        } else {
+            // Determine where to insert filters
+            // Priority: before GROUP BY > before ORDER BY > before LIMIT > at end
+            int insertPoint = -1;
+            
+            if (groupByIndex > 0) {
+                insertPoint = groupByIndex;
+            } else if (orderByIndex > 0) {
+                insertPoint = orderByIndex;
+            } else if (limitIndex > 0) {
+                insertPoint = limitIndex;
+            }
+            
+            if (insertPoint > 0) {
+                // Check if WHERE exists before the insert point
+                String beforeInsert = baseQuery.substring(0, insertPoint);
+                String afterInsert = baseQuery.substring(insertPoint);
+                boolean hasWhereBefore = beforeInsert.toUpperCase().contains(" WHERE ");
+                
+                if (hasWhereBefore) {
+                    query.append(beforeInsert).append(" AND ").append(whereClauses).append(afterInsert);
+                } else {
+                    query.append(beforeInsert).append(" WHERE ").append(whereClauses).append(afterInsert);
+                }
+            } else {
+                // No GROUP BY, ORDER BY, or LIMIT - append at end
+                if (whereIndex > 0) {
+                    query.append(baseQuery).append(" AND ").append(whereClauses);
+                } else {
+                    query.append(baseQuery).append(" WHERE ").append(whereClauses);
+                }
+            }
         }
 
         String resultQuery = query.toString();
