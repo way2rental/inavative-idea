@@ -360,7 +360,67 @@ RESPONSE (JSON):
   "suggestedFollowUps": ["Escalate", "Edit", "Contact directly"]
 }'),
 
--- 15. Chat Summary (LLM_ONLY)
+-- 15. Email Writing - General purpose email assistant (LLM_ONLY)
+-- This is a high-level scenario that helps users draft emails based on chat context
+('EMAIL_WRITING', 'Email Writing Assistant',
+ 'AI-powered email composition for business and personal communication',
+ 'LLM_ONLY',
+ '["purpose"]',
+ '["write email", "compose email", "draft email", "email help", "send email", "email template", "business email", "formal email"]',
+ '["Write a professional email to request account statement", "Compose email for loan application", "Draft email to complain about service", "Write thank you email"]',
+ 'Communication', 'mail-plus',
+ 30000, TRUE,
+ 'You are {{assistantName}}, an AI-powered email writing assistant for {{orgName}} customers.
+
+BANK INFORMATION:
+- Bank Name: {{orgName}}
+- Support Email: {{supportEmail}}
+- Escalation Email: {{escalationEmail}}
+- Today''s Date: {{date}}
+- Currency: {{currencySymbol}}
+
+EMAIL CONTEXT:
+- Purpose: {{purpose}}
+- Email Type: {{emailType}}
+- Recipient: {{recipient}}
+- Customer Name: {{customerName}}
+- Account Number: {{accountNumber}}
+
+CONVERSATION HISTORY (Use this to understand context):
+{{chatHistory}}
+
+YOUR TASK:
+1. Analyze the conversation history and purpose to understand what email is needed
+2. Determine the appropriate email type (FORMAL/INFORMAL/REQUEST/COMPLAINT/THANK_YOU/FOLLOW_UP/APOLOGY)
+3. Generate a professional, well-structured email
+
+IMPORTANT:
+- If information is missing, use placeholders like [Customer Name], [Account Number], [Date], [Amount]
+- Keep the tone professional and appropriate for banking communication
+- Include clear subject line and proper salutation
+- End with appropriate closing
+
+RESPONSE FORMAT (JSON only):
+{
+  "type": "EMAIL",
+  "title": "Email Draft ✉️",
+  "confidence": 1.0,
+  "payload": {
+    "emailType": "FORMAL | REQUEST | COMPLAINT | THANK_YOU | FOLLOW_UP | APOLOGY",
+    "subject": "Clear, professional subject line",
+    "to": "{{supportEmail}}",
+    "salutation": "Dear Sir/Madam," OR "Dear [Recipient Name],",
+    "body": "Well-structured email body with proper paragraphs.\n\nSecond paragraph.\n\nThird paragraph.",
+    "closing": "Sincerely, OR Best regards,",
+    "signature": "[Your Name]\nAccount: [Account Number]",
+    "placeholders": ["List of placeholders that need to be filled"],
+    "tips": ["Review the email before sending", "Verify account details"]
+  },
+  "footer": "Please review and customize before sending",
+  "suggestedFollowUps": ["Edit email", "Change tone", "Add more details"]
+}'),
+
+-- 16. Chat Summary (LLM_ONLY)
 ('SUMMARIZE_CHAT', 'Summarize Conversation',
  'Generate a summary of the current conversation including key topics, actions, and pending items.',
  'LLM_ONLY',
@@ -412,6 +472,7 @@ INSERT INTO ai_intents (intent_key, intent_name, scenario_code, training_phrases
 ('INTENT_SPENDING', 'Spending Analysis Intent', 'SPENDING_ANALYSIS', '["spending analysis", "expense analysis", "spending pattern", "where did I spend"]', 0.85, 'Analytics', TRUE),
 -- Email-related intents (LLM_ONLY scenarios)
 ('INTENT_EMAIL_DRAFT', 'Email Draft Intent', 'EMAIL_DRAFT', '["draft email", "write email", "compose email", "email to bank", "send email", "prepare email", "help me write email"]', 0.85, 'Communication', TRUE),
+('INTENT_EMAIL_WRITING', 'Email Writing Intent', 'EMAIL_WRITING', '["write email", "compose email", "draft email", "email help", "email template", "business email", "formal email", "email for manager", "email to manager"]', 0.85, 'Communication', TRUE),
 ('INTENT_EMAIL_COMPLAINT', 'Complaint Email Intent', 'EMAIL_COMPLAINT', '["complaint email", "write complaint", "complain about", "issue email", "problem email", "dispute email"]', 0.85, 'Communication', TRUE),
 ('INTENT_EMAIL_REQUEST', 'Request Email Intent', 'EMAIL_REQUEST', '["request email", "service request", "apply for", "need statement", "cheque book", "address change"]', 0.85, 'Communication', TRUE),
 ('INTENT_EMAIL_FOLLOWUP', 'Follow-up Email Intent', 'EMAIL_FOLLOWUP', '["follow up", "follow-up email", "reminder", "pending request", "no response", "escalate"]', 0.85, 'Communication', TRUE),
@@ -429,6 +490,7 @@ INSERT INTO role_scenario_map (role_name, scenario_code) VALUES
 ('USER', 'CARD_DETAILS'),
 -- USER role can also access email drafting and utility features
 ('USER', 'EMAIL_DRAFT'),
+('USER', 'EMAIL_WRITING'),
 ('USER', 'EMAIL_COMPLAINT'),
 ('USER', 'EMAIL_REQUEST'),
 ('USER', 'EMAIL_FOLLOWUP'),
@@ -443,6 +505,7 @@ INSERT INTO role_scenario_map (role_name, scenario_code) VALUES
 ('PREMIUM', 'BENEFICIARY_LIST'),
 ('PREMIUM', 'SPENDING_ANALYSIS'),
 ('PREMIUM', 'EMAIL_DRAFT'),
+('PREMIUM', 'EMAIL_WRITING'),
 ('PREMIUM', 'EMAIL_COMPLAINT'),
 ('PREMIUM', 'EMAIL_REQUEST'),
 ('PREMIUM', 'EMAIL_FOLLOWUP'),
@@ -459,6 +522,7 @@ INSERT INTO role_scenario_map (role_name, scenario_code) VALUES
 ('CORPORATE', 'LOAN_STATUS'),
 ('CORPORATE', 'FIXED_DEPOSIT_DETAILS'),
 ('CORPORATE', 'EMAIL_DRAFT'),
+('CORPORATE', 'EMAIL_WRITING'),
 ('CORPORATE', 'EMAIL_COMPLAINT'),
 ('CORPORATE', 'EMAIL_REQUEST'),
 ('CORPORATE', 'EMAIL_FOLLOWUP'),
@@ -475,6 +539,7 @@ INSERT INTO role_scenario_map (role_name, scenario_code) VALUES
 ('ADMIN', 'LOAN_STATUS'),
 ('ADMIN', 'FIXED_DEPOSIT_DETAILS'),
 ('ADMIN', 'EMAIL_DRAFT'),
+('ADMIN', 'EMAIL_WRITING'),
 ('ADMIN', 'EMAIL_COMPLAINT'),
 ('ADMIN', 'EMAIL_REQUEST'),
 ('ADMIN', 'EMAIL_FOLLOWUP'),
