@@ -2,7 +2,7 @@
 <div class="min-h-screen bg-bank-bg">
   <!-- Page Title Section -->
   <div class="bg-white border-b">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div class="mx-auto px-4 sm:px-6 lg:px-8 py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
@@ -39,7 +39,7 @@
     </div>
   </div>
 
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Filters -->
     <div class="card-axis p-4 mb-6">
       <div class="flex flex-wrap gap-4">
@@ -71,7 +71,7 @@
               <span class="px-2 py-1 rounded text-sm" [class]="getCategoryColor(category)">{{ category }}</span>
               <span class="text-gray-400 text-sm font-normal">({{ getConfigCountByCategory(category) }} configs)</span>
             </h2>
-            
+
             <div class="space-y-3">
               @for (config of getConfigsByCategory(category); track config.id) {
                 <div class="card-axis p-4 hover:shadow-elevated transition-all duration-300">

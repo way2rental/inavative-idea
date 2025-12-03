@@ -41,7 +41,7 @@ export class SystemConfigComponent implements OnInit {
 
   formData = this.getEmptyFormData();
 
-  private apiUrl = `${environment.apiUrl}/api/admin/config`;
+  private apiUrl = `${environment.apiUrl}/admin/config`;
 
   constructor(
     private http: HttpClient,
@@ -98,7 +98,7 @@ export class SystemConfigComponent implements OnInit {
   applyFilters(): void {
     this.filteredConfigs = this.configs.filter(config => {
       const matchesCategory = !this.selectedCategory || config.category === this.selectedCategory;
-      const matchesSearch = !this.searchTerm || 
+      const matchesSearch = !this.searchTerm ||
         config.configKey.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
         config.description?.toLowerCase().includes(this.searchTerm.toLowerCase());
       return matchesCategory && matchesSearch;

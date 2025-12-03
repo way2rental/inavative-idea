@@ -1,6 +1,4 @@
-<!-- Admin - Comprehensive Scenario Management -->
 <div class="min-h-screen bg-bank-bg">
-  <!-- Page Title Section -->
   <div class="bg-white border-b">
     <div class="px-6 lg:px-8 py-4">
       <div class="flex items-center justify-between">
@@ -82,13 +80,13 @@
                (click)="viewDetails(scenario)">
             <div class="flex items-start justify-between mb-4">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center" 
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center"
                      [class]="getCategoryColor(scenario.category)">
                   <span class="text-xl">{{ scenario.icon || '📋' }}</span>
                 </div>
                 <div>
                   <h3 class="font-semibold text-gray-900">{{ scenario.scenarioName || scenario.scenarioCode }}</h3>
-                  <p class="text-xs text-gray-500 font-mono">{{ scenario.scenarioCode }}</p>
+                  <p class="text-xl bold axis-burgandy font-mono">{{ scenario.scenarioCode }}</p>
                 </div>
               </div>
               <span class="px-2 py-1 rounded-full text-xs font-medium"
@@ -96,9 +94,9 @@
                 {{ scenario.active ? 'Active' : 'Inactive' }}
               </span>
             </div>
-            
+
             <p class="text-gray-600 text-sm mb-4 line-clamp-2">{{ scenario.description || 'No description' }}</p>
-            
+
             <div class="flex flex-wrap gap-2 mb-4">
               <span class="badge bg-blue-100 text-blue-700">{{ scenario.executionType }}</span>
               @if (scenario.category) {
@@ -108,12 +106,12 @@
                 <span class="badge bg-purple-100 text-purple-700">Multi-Filter</span>
               }
             </div>
-            
+
             <div class="flex items-center justify-between pt-4 border-t">
               <div class="flex items-center gap-2">
-                <button (click)="openEditModal(scenario); $event.stopPropagation()" 
+                <button (click)="openEditModal(scenario); $event.stopPropagation()"
                         class="text-indigo-600 hover:text-indigo-800 text-sm">Edit</button>
-                <button (click)="testScenario(scenario); $event.stopPropagation()" 
+                <button (click)="testScenario(scenario); $event.stopPropagation()"
                         class="text-green-600 hover:text-green-800 text-sm">Test</button>
               </div>
               <button (click)="toggleStatus(scenario); $event.stopPropagation()"
@@ -155,7 +153,7 @@
           </button>
         </div>
       </div>
-      
+
       <div class="p-6 space-y-6">
         <!-- Basic Info -->
         <div>
@@ -257,25 +255,25 @@
               </svg>
             </button>
           </div>
-          
+
           <!-- Tabs -->
           <div class="flex gap-1 mt-4 -mb-6 px-2">
-            <button (click)="activeTab = 'basic'" 
+            <button (click)="activeTab = 'basic'"
                     class="px-4 py-2 rounded-t-lg text-sm font-medium transition-colors"
                     [class]="activeTab === 'basic' ? 'bg-white text-indigo-600' : 'text-white/70 hover:text-white'">
               Basic Info
             </button>
-            <button (click)="activeTab = 'query'" 
+            <button (click)="activeTab = 'query'"
                     class="px-4 py-2 rounded-t-lg text-sm font-medium transition-colors"
                     [class]="activeTab === 'query' ? 'bg-white text-indigo-600' : 'text-white/70 hover:text-white'">
               Query & Mapping
             </button>
-            <button (click)="activeTab = 'filters'" 
+            <button (click)="activeTab = 'filters'"
                     class="px-4 py-2 rounded-t-lg text-sm font-medium transition-colors"
                     [class]="activeTab === 'filters' ? 'bg-white text-indigo-600' : 'text-white/70 hover:text-white'">
               Filters
             </button>
-            <button (click)="activeTab = 'ai'" 
+            <button (click)="activeTab = 'ai'"
                     class="px-4 py-2 rounded-t-lg text-sm font-medium transition-colors"
                     [class]="activeTab === 'ai' ? 'bg-white text-indigo-600' : 'text-white/70 hover:text-white'">
               AI Settings
