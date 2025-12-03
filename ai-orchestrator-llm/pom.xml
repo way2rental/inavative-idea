@@ -43,6 +43,11 @@
             <groupId>com.enterprise.ai</groupId>
             <artifactId>ai-orchestrator-data</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.enterprise.ai</groupId>
+            <artifactId>ai-orchestrator-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- Spring AI - Ollama -->
 <!--        <dependency>-->

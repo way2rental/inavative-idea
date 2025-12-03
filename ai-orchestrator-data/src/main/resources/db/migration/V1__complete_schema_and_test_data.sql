@@ -174,6 +174,67 @@ INSERT INTO ai_scenarios (
 UPDATE ai_scenarios SET sql_query = 'SELECT category, SUM(amount) as total_spent, COUNT(*) as transaction_count, AVG(amount) as avg_transaction FROM transactions WHERE txn_type = ''DEBIT'' GROUP BY category' WHERE scenario_code = 'SPENDING_ANALYSIS';
 
 -- =====================================================================
+-- LLM_ONLY SCENARIOS - Email Drafting (No DB calls needed)
+-- These use the LlmOnlyExecutor for content generation based on chat history
+-- =====================================================================
+
+INSERT INTO ai_scenarios (
+    scenario_code, scenario_name, description, execution_type,
+    required_params, trigger_phrases, example_queries, category, icon,
+    timeout_ms, active, llm_prompt_template
+) VALUES 
+
+-- 11. Email Draft - General (LLM_ONLY)
+('EMAIL_DRAFT', 'Draft Email',
+ 'Draft a professional banking email based on conversation context. Supports complaints, requests, inquiries, and follow-ups.',
+ 'LLM_ONLY',
+ '[]',
+ '["draft email", "write email", "compose email", "help me write", "email to bank", "send email", "prepare email", "create email"]',
+ '["Help me draft an email to the bank", "Write an email about my failed transaction", "Draft a complaint email", "I want to send an email to customer service"]',
+ 'Communication', 'mail',
+ 30000, TRUE, NULL),
+
+-- 12. Complaint Email (LLM_ONLY)
+('EMAIL_COMPLAINT', 'Draft Complaint Email',
+ 'Draft a formal complaint email regarding banking issues, failed transactions, or service problems.',
+ 'LLM_ONLY',
+ '[]',
+ '["complaint email", "write complaint", "complain about", "issue email", "problem email", "dispute email"]',
+ '["Draft a complaint about failed transaction", "Write complaint email for wrong deduction", "I want to complain about ATM issue"]',
+ 'Communication', 'alert-triangle',
+ 30000, TRUE, NULL),
+
+-- 13. Service Request Email (LLM_ONLY)
+('EMAIL_REQUEST', 'Draft Service Request Email',
+ 'Draft a service request email for account changes, document requests, or banking services.',
+ 'LLM_ONLY',
+ '[]',
+ '["request email", "service request", "request for", "apply for", "need statement", "cheque book request"]',
+ '["Draft email requesting bank statement", "Write email to request cheque book", "Email for address change request"]',
+ 'Communication', 'file-plus',
+ 30000, TRUE, NULL),
+
+-- 14. Follow-up Email (LLM_ONLY)
+('EMAIL_FOLLOWUP', 'Draft Follow-up Email',
+ 'Draft a follow-up email for pending requests or unresolved issues.',
+ 'LLM_ONLY',
+ '[]',
+ '["follow up email", "follow-up", "reminder email", "pending request", "no response", "escalate"]',
+ '["Draft follow-up email for my pending request", "Write reminder about unresolved issue", "Follow up on my complaint"]',
+ 'Communication', 'repeat',
+ 30000, TRUE, NULL),
+
+-- 15. Chat Summary (LLM_ONLY)
+('SUMMARIZE_CHAT', 'Summarize Conversation',
+ 'Generate a summary of the current conversation including key topics, actions, and pending items.',
+ 'LLM_ONLY',
+ '[]',
+ '["summarize", "summary", "what did we discuss", "recap", "conversation summary"]',
+ '["Summarize our conversation", "Give me a recap", "What have we discussed so far?"]',
+ 'Utility', 'file-text',
+ 15000, TRUE, NULL);
+
+-- =====================================================================
 -- SAMPLE DATA - INTENT CONFIGS (uses intent_key per IntentConfig entity)
 -- =====================================================================
 
@@ -187,7 +248,13 @@ INSERT INTO ai_intents (intent_key, intent_name, scenario_code, training_phrases
 ('INTENT_LOANS', 'Loan Status Intent', 'LOAN_STATUS', '["loan status", "my loan", "emi details", "loan balance", "outstanding loan"]', 0.85, 'Loan', TRUE),
 ('INTENT_FD', 'Fixed Deposit Intent', 'FIXED_DEPOSIT_DETAILS', '["fixed deposit", "fd details", "my fd", "term deposit"]', 0.85, 'Investment', TRUE),
 ('INTENT_BENEFICIARIES', 'Beneficiary List Intent', 'BENEFICIARY_LIST', '["beneficiaries", "payee list", "saved accounts", "transfer contacts"]', 0.85, 'Payment', TRUE),
-('INTENT_SPENDING', 'Spending Analysis Intent', 'SPENDING_ANALYSIS', '["spending analysis", "expense analysis", "spending pattern", "where did I spend"]', 0.85, 'Analytics', TRUE);
+('INTENT_SPENDING', 'Spending Analysis Intent', 'SPENDING_ANALYSIS', '["spending analysis", "expense analysis", "spending pattern", "where did I spend"]', 0.85, 'Analytics', TRUE),
+-- Email-related intents (LLM_ONLY scenarios)
+('INTENT_EMAIL_DRAFT', 'Email Draft Intent', 'EMAIL_DRAFT', '["draft email", "write email", "compose email", "email to bank", "send email", "prepare email", "help me write email"]', 0.85, 'Communication', TRUE),
+('INTENT_EMAIL_COMPLAINT', 'Complaint Email Intent', 'EMAIL_COMPLAINT', '["complaint email", "write complaint", "complain about", "issue email", "problem email", "dispute email"]', 0.85, 'Communication', TRUE),
+('INTENT_EMAIL_REQUEST', 'Request Email Intent', 'EMAIL_REQUEST', '["request email", "service request", "apply for", "need statement", "cheque book", "address change"]', 0.85, 'Communication', TRUE),
+('INTENT_EMAIL_FOLLOWUP', 'Follow-up Email Intent', 'EMAIL_FOLLOWUP', '["follow up", "follow-up email", "reminder", "pending request", "no response", "escalate"]', 0.85, 'Communication', TRUE),
+('INTENT_SUMMARIZE', 'Summarize Chat Intent', 'SUMMARIZE_CHAT', '["summarize", "summary", "recap", "what did we discuss", "conversation summary"]', 0.85, 'Utility', TRUE);
 
 -- =====================================================================
 -- SAMPLE DATA - RBAC (Role-Scenario Mapping)
@@ -199,6 +266,12 @@ INSERT INTO role_scenario_map (role_name, scenario_code) VALUES
 ('USER', 'TRANSACTION_HISTORY'),
 ('USER', 'ACCOUNT_SUMMARY'),
 ('USER', 'CARD_DETAILS'),
+-- USER role can also access email drafting and utility features
+('USER', 'EMAIL_DRAFT'),
+('USER', 'EMAIL_COMPLAINT'),
+('USER', 'EMAIL_REQUEST'),
+('USER', 'EMAIL_FOLLOWUP'),
+('USER', 'SUMMARIZE_CHAT'),
 -- PREMIUM role gets additional features
 ('PREMIUM', 'ACCOUNT_BALANCE'),
 ('PREMIUM', 'TRANSACTION_HISTORY'),
@@ -208,6 +281,11 @@ INSERT INTO role_scenario_map (role_name, scenario_code) VALUES
 ('PREMIUM', 'BILL_PAYMENT_HISTORY'),
 ('PREMIUM', 'BENEFICIARY_LIST'),
 ('PREMIUM', 'SPENDING_ANALYSIS'),
+('PREMIUM', 'EMAIL_DRAFT'),
+('PREMIUM', 'EMAIL_COMPLAINT'),
+('PREMIUM', 'EMAIL_REQUEST'),
+('PREMIUM', 'EMAIL_FOLLOWUP'),
+('PREMIUM', 'SUMMARIZE_CHAT'),
 -- CORPORATE role gets everything
 ('CORPORATE', 'ACCOUNT_BALANCE'),
 ('CORPORATE', 'TRANSACTION_HISTORY'),
@@ -219,6 +297,11 @@ INSERT INTO role_scenario_map (role_name, scenario_code) VALUES
 ('CORPORATE', 'SPENDING_ANALYSIS'),
 ('CORPORATE', 'LOAN_STATUS'),
 ('CORPORATE', 'FIXED_DEPOSIT_DETAILS'),
+('CORPORATE', 'EMAIL_DRAFT'),
+('CORPORATE', 'EMAIL_COMPLAINT'),
+('CORPORATE', 'EMAIL_REQUEST'),
+('CORPORATE', 'EMAIL_FOLLOWUP'),
+('CORPORATE', 'SUMMARIZE_CHAT'),
 -- ADMIN has access to all
 ('ADMIN', 'ACCOUNT_BALANCE'),
 ('ADMIN', 'TRANSACTION_HISTORY'),
@@ -229,7 +312,12 @@ INSERT INTO role_scenario_map (role_name, scenario_code) VALUES
 ('ADMIN', 'BENEFICIARY_LIST'),
 ('ADMIN', 'SPENDING_ANALYSIS'),
 ('ADMIN', 'LOAN_STATUS'),
-('ADMIN', 'FIXED_DEPOSIT_DETAILS');
+('ADMIN', 'FIXED_DEPOSIT_DETAILS'),
+('ADMIN', 'EMAIL_DRAFT'),
+('ADMIN', 'EMAIL_COMPLAINT'),
+('ADMIN', 'EMAIL_REQUEST'),
+('ADMIN', 'EMAIL_FOLLOWUP'),
+('ADMIN', 'SUMMARIZE_CHAT');
 
 -- =====================================================================
 -- SAMPLE DATA - PROMPT TEMPLATES
@@ -239,7 +327,11 @@ INSERT INTO ai_prompt_templates (prompt_key, category, system_prompt, user_templ
 ('INTENT_DETECTION', 'CORE', 'You are an AI banking assistant. Detect user intent from their message and extract relevant parameters.', 'User said: {{userMessage}}\n\nAvailable scenarios: {{scenarios}}\n\nExtract intent and parameters as JSON.', 'JSON', 0.3, 512, 1, TRUE),
 ('RESPONSE_FORMATTING', 'CORE', 'You are a friendly banking assistant. Format the data into a clear, helpful response.', 'Format this data for the user:\n{{data}}\n\nUser asked: {{query}}', 'STRUCTURED', 0.7, 1024, 1, TRUE),
 ('CLARIFICATION', 'CORE', 'You are a helpful assistant. Ask a clarifying question to understand the user better.', 'User intent is unclear. Possible matches: {{options}}\n\nAsk a friendly clarifying question.', 'TEXT', 0.7, 256, 1, TRUE),
-('FOLLOW_UP', 'CORE', 'You are asking for missing information in a friendly way.', 'Missing parameters: {{missingParams}}\n\nAsk for this information naturally.', 'TEXT', 0.7, 256, 1, TRUE);
+('FOLLOW_UP', 'CORE', 'You are asking for missing information in a friendly way.', 'Missing parameters: {{missingParams}}\n\nAsk for this information naturally.', 'TEXT', 0.7, 256, 1, TRUE),
+-- Email drafting templates
+('EMAIL_DRAFT_SYSTEM', 'EMAIL', 'You are a professional email drafting assistant for {{orgName}}. Help customers write clear, professional banking correspondence. Always use proper formatting and include all necessary details.', 'Draft an email based on this context:\n\nConversation: {{chatHistory}}\nEmail Type: {{emailType}}\nSubject: {{subject}}\n\nGenerate professional email in JSON format.', 'JSON', 0.7, 2048, 1, TRUE),
+('EMAIL_COMPLAINT_SYSTEM', 'EMAIL', 'You are helping a {{orgName}} customer draft a formal complaint email. Be professional, clear about the issue, and request specific resolution.', 'Draft a complaint email:\n\nIssue: {{issueDescription}}\nTransaction: {{transactionId}}\nAmount: {{amount}}\nDate: {{transactionDate}}\n\nGenerate professional complaint email.', 'JSON', 0.6, 2048, 1, TRUE),
+('EMAIL_REQUEST_SYSTEM', 'EMAIL', 'You are helping a {{orgName}} customer draft a service request email. Be clear about what is being requested and any necessary timelines.', 'Draft a service request email:\n\nRequest Type: {{requestType}}\nDetails: {{details}}\nUrgency: {{urgency}}\n\nGenerate professional request email.', 'JSON', 0.6, 1536, 1, TRUE);
 
 -- =====================================================================
 -- SAMPLE DATA - POLICY RULES

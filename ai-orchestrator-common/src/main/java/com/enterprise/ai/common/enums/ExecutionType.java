@@ -15,7 +15,15 @@ public enum ExecutionType {
      * Execute HTTP GET or safe POST calls.
      * URL must be in whitelist.
      */
-    HTTP_CALL;
+    HTTP_CALL,
+
+    /**
+     * LLM-only execution - no database or HTTP calls.
+     * Used for content generation scenarios like email drafting,
+     * summarization, and conversational responses based on chat history.
+     * The LLM generates content directly without external data fetching.
+     */
+    LLM_ONLY;
 
     /**
      * Check if this execution type is supported.
