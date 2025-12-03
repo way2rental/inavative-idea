@@ -15,7 +15,7 @@ export class AuditLogsComponent implements OnInit {
   logs: AuditLog[] = [];
   totalElements = 0;
   currentPage = 0;
-  pageSize = 20;
+  pageSize = 10;
   isLoading = true;
 
   filterUserId = '';

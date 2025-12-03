@@ -64,7 +64,6 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
 
     @Override
     public Mono<IntentResult> detectIntentTwoStage(String userInput, String sessionContext) {
-        // Two-stage detection not needed with Spring AI
         return detectIntent(userInput, sessionContext);
     }
 
