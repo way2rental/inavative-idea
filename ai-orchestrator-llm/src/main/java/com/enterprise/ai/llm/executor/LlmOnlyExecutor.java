@@ -17,20 +17,84 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Dynamic executor for LLM_ONLY execution type.
- * Used for scenarios that don't require database or HTTP calls,
- * such as email drafting, summarization, and content generation.
+ * GENERIC Dynamic executor for LLM_ONLY execution type.
  * 
- * The LLM generates content directly based on:
- * - Chat history and context
- * - User-provided parameters
- * - Scenario-specific prompt templates from database
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * FULLY CONFIGURABLE FROM ADMIN PANEL - NO HARDCODED SCENARIO LOGIC
+ * ═══════════════════════════════════════════════════════════════════════════════
  * 
- * Key scenarios: EMAIL_DRAFT, SUMMARY_GENERATION, CONVERSATIONAL_REPLY
+ * This executor uses ONLY the configuration from AiScenario entity:
+ * 
+ * - llmPromptTemplate: The prompt template with {{variable}} placeholders
+ * - description: Context for the AI about what this scenario does
+ * - triggerPhrases: Help AI understand when to use this scenario
+ * - exampleQueries: Example user queries for context
+ * - requiredParams: Parameters that must be provided (JSON array)
+ * 
+ * VARIABLE SUBSTITUTION (automatically available in templates):
+ * ─────────────────────────────────────────────────────────────
+ * From Request Params:
+ *   {{paramName}} - Any parameter from request.params
+ *   
+ * From SystemConfig (no hardcoding):
+ *   {{orgName}} - Organization name from BRANDING.ORG_NAME
+ *   {{orgShortName}} - Short name from BRANDING.ORG_SHORT_NAME
+ *   {{assistantName}} - AI assistant name from BRANDING.AI_ASSISTANT_NAME
+ *   {{assistantFullName}} - Full name from BRANDING.AI_ASSISTANT_FULL_NAME
+ *   {{supportEmail}} - From BRANDING.SUPPORT_EMAIL (if configured)
+ *   {{currencySymbol}} - From BRANDING.CURRENCY_SYMBOL (if configured)
+ *   
+ * Auto-generated:
+ *   {{date}} - Current date (format from BRANDING.DATE_FORMAT or default)
+ *   {{datetime}} - Current datetime
+ *   {{timestamp}} - Unix timestamp
+ *   
+ * From Scenario Entity:
+ *   {{scenarioCode}} - The scenario code
+ *   {{scenarioName}} - Human-readable scenario name
+ *   {{description}} - Scenario description
+ *   {{category}} - Scenario category
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * TO ADD A NEW LLM_ONLY SCENARIO (NO CODE CHANGES REQUIRED):
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * 1. Go to Admin Panel → Scenarios
+ * 2. Create new scenario with:
+ *    - execution_type = LLM_ONLY
+ *    - llm_prompt_template = Your prompt with {{variables}}
+ *    - required_params = ["param1", "param2"] (JSON array)
+ *    - trigger_phrases = ["phrase1", "phrase2"] for AI detection
+ *    - example_queries = ["Example query 1", "Example query 2"]
+ * 3. Add RBAC mapping for roles that can access this scenario
+ * 4. Done! The scenario is immediately available.
+ * 
+ * EXAMPLE EMAIL DRAFT SCENARIO TEMPLATE:
+ * ───────────────────────────────────────
+ * You are {{assistantName}}, helping a customer of {{orgName}} draft an email.
+ * 
+ * Customer Name: {{customerName}}
+ * Account: {{accountNumber}}
+ * Email Type: {{emailType}}
+ * Issue: {{issueDescription}}
+ * Chat History: {{chatHistory}}
+ * 
+ * Generate a professional banking email in JSON format:
+ * {
+ *   "type": "EMAIL",
+ *   "payload": {
+ *     "subject": "...",
+ *     "body": "...",
+ *     "to": "support@{{orgShortName}}.com"
+ *   }
+ * }
  */
 @Slf4j
 @Component
@@ -38,6 +102,7 @@ import java.util.*;
 public class LlmOnlyExecutor implements DynamicExecutor {
 
     private static final long DEFAULT_TIMEOUT_MS = 30000;
+    private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\{\\{(\\w+)}}");
 
     private final ChatClient chatClient;
     private final SystemConfigService systemConfigService;
@@ -54,12 +119,43 @@ public class LlmOnlyExecutor implements DynamicExecutor {
         String scenarioCode = scenario.getScenarioCode();
 
         try {
-            log.info("Executing LLM_ONLY scenario: {} with params: {}", scenarioCode, request.getParams());
+            log.info("Executing LLM_ONLY scenario: {} with params: {}", scenarioCode, 
+                    request.getParams() != null ? request.getParams().keySet() : "none");
 
-            // Build the prompt for this scenario
-            String prompt = buildScenarioPrompt(request, scenario);
-            log.debug("LLM prompt for {}: {}", scenarioCode, 
-                    prompt.length() > 500 ? prompt.substring(0, 500) + "..." : prompt);
+            // Check if llmPromptTemplate is configured
+            String template = scenario.getLlmPromptTemplate();
+            if (template == null || template.isBlank()) {
+                log.error("No llm_prompt_template configured for LLM_ONLY scenario: {}", scenarioCode);
+                return ScenarioResult.builder()
+                        .scenario(scenarioCode)
+                        .success(false)
+                        .errorMessage("This scenario is not properly configured. Please configure llm_prompt_template in Admin Panel.")
+                        .data(Map.of(
+                                "error", "MISSING_TEMPLATE",
+                                "hint", "Set llm_prompt_template in Admin Panel for scenario: " + scenarioCode
+                        ))
+                        .build();
+            }
+
+            // Validate required params
+            List<String> missingParams = validateRequiredParams(request, scenario);
+            if (!missingParams.isEmpty()) {
+                log.warn("Missing required params for {}: {}", scenarioCode, missingParams);
+                return ScenarioResult.builder()
+                        .scenario(scenarioCode)
+                        .success(false)
+                        .errorMessage("Missing required information: " + String.join(", ", missingParams))
+                        .data(Map.of("missingParams", missingParams))
+                        .build();
+            }
+
+            // Build the prompt by substituting all variables
+            String prompt = substituteAllVariables(template, request, scenario);
+            
+            log.debug("LLM prompt for {} (length={})", scenarioCode, prompt.length());
+            if (log.isTraceEnabled()) {
+                log.trace("Full prompt: {}", prompt);
+            }
 
             // Call LLM
             String llmResponse = chatClient.prompt()
@@ -67,11 +163,11 @@ public class LlmOnlyExecutor implements DynamicExecutor {
                     .call()
                     .content();
 
-            log.debug("LLM response for {}: {}", scenarioCode, 
-                    llmResponse.length() > 500 ? llmResponse.substring(0, 500) + "..." : llmResponse);
+            log.debug("LLM response for {} (length={})", scenarioCode, 
+                    llmResponse != null ? llmResponse.length() : 0);
 
             // Parse and structure the response
-            Map<String, Object> responseData = parseResponse(llmResponse, scenarioCode);
+            Map<String, Object> responseData = parseResponse(llmResponse, scenario);
 
             long executionTime = System.currentTimeMillis() - startTime;
             log.info("LLM_ONLY scenario {} completed in {}ms", scenarioCode, executionTime);
@@ -87,7 +183,7 @@ public class LlmOnlyExecutor implements DynamicExecutor {
             return ScenarioResult.builder()
                     .scenario(scenarioCode)
                     .success(false)
-                    .errorMessage("Failed to generate content: " + e.getMessage())
+                    .errorMessage("Failed to generate content. Please try again.")
                     .data(Map.of("error", "Content generation error"))
                     .build();
         }
@@ -101,11 +197,11 @@ public class LlmOnlyExecutor implements DynamicExecutor {
                 .subscribeOn(Schedulers.boundedElastic())
                 .timeout(Duration.ofMillis(timeoutMs))
                 .onErrorResume(e -> {
-                    log.error("Reactive LLM_ONLY failed: {}", e.getMessage());
+                    log.error("Reactive LLM_ONLY failed for {}: {}", scenario.getScenarioCode(), e.getMessage());
                     return Mono.just(ScenarioResult.builder()
                             .scenario(scenario.getScenarioCode())
                             .success(false)
-                            .errorMessage("Content generation timeout or error: " + e.getMessage())
+                            .errorMessage("Content generation timeout or error. Please try again.")
                             .build());
                 });
     }
@@ -113,18 +209,25 @@ public class LlmOnlyExecutor implements DynamicExecutor {
     @Override
     public ScenarioResult executeDryRun(ScenarioRequest request, AiScenario scenario) {
         try {
-            String prompt = buildScenarioPrompt(request, scenario);
+            String template = scenario.getLlmPromptTemplate();
+            String prompt = template != null ? substituteAllVariables(template, request, scenario) : "NO_TEMPLATE";
+            List<String> missingParams = validateRequiredParams(request, scenario);
+
+            Map<String, Object> dryRunData = new LinkedHashMap<>();
+            dryRunData.put("dryRun", true);
+            dryRunData.put("executionType", ExecutionType.LLM_ONLY.name());
+            dryRunData.put("scenarioCode", scenario.getScenarioCode());
+            dryRunData.put("hasTemplate", template != null && !template.isBlank());
+            dryRunData.put("templateLength", template != null ? template.length() : 0);
+            dryRunData.put("promptPreview", prompt.length() > 500 ? prompt.substring(0, 500) + "..." : prompt);
+            dryRunData.put("providedParams", request.getParams() != null ? request.getParams().keySet() : List.of());
+            dryRunData.put("missingParams", missingParams);
+            dryRunData.put("timeoutMs", scenario.getTimeoutMs());
 
             return ScenarioResult.builder()
                     .scenario(scenario.getScenarioCode())
-                    .success(true)
-                    .data(Map.of(
-                            "dryRun", true,
-                            "executionType", ExecutionType.LLM_ONLY.name(),
-                            "prompt", prompt.length() > 1000 ? prompt.substring(0, 1000) + "..." : prompt,
-                            "params", request.getParams(),
-                            "timeoutMs", scenario.getTimeoutMs()
-                    ))
+                    .success(missingParams.isEmpty() && template != null)
+                    .data(dryRunData)
                     .build();
         } catch (Exception e) {
             return ScenarioResult.builder()
@@ -136,329 +239,170 @@ public class LlmOnlyExecutor implements DynamicExecutor {
     }
 
     /**
-     * Build the prompt for LLM-only scenarios.
-     * Uses scenario-specific template from database if available.
+     * Validate that all required parameters are provided.
+     * Required params are defined in scenario.requiredParams as JSON array.
      */
-    private String buildScenarioPrompt(ScenarioRequest request, AiScenario scenario) {
-        String scenarioCode = scenario.getScenarioCode();
-        Map<String, Object> params = request.getParams() != null ? request.getParams() : new HashMap<>();
-
-        // Get branding from config
-        String orgName = systemConfigService.getOrgName();
-        String assistantName = systemConfigService.getAssistantName();
-
-        // Check if scenario has a custom LLM prompt template
-        String customTemplate = scenario.getLlmPromptTemplate();
-        if (customTemplate != null && !customTemplate.isBlank()) {
-            return substituteVariables(customTemplate, params, orgName, assistantName);
+    private List<String> validateRequiredParams(ScenarioRequest request, AiScenario scenario) {
+        List<String> missing = new ArrayList<>();
+        
+        String requiredParamsJson = scenario.getRequiredParams();
+        if (requiredParamsJson == null || requiredParamsJson.isBlank()) {
+            return missing; // No required params
         }
 
-        // Build default prompt based on scenario code
-        return switch (scenarioCode.toUpperCase()) {
-            case "EMAIL_DRAFT" -> buildEmailDraftPrompt(params, orgName, assistantName);
-            case "EMAIL_COMPLAINT" -> buildComplaintEmailPrompt(params, orgName, assistantName);
-            case "EMAIL_REQUEST" -> buildRequestEmailPrompt(params, orgName, assistantName);
-            case "EMAIL_FOLLOWUP" -> buildFollowUpEmailPrompt(params, orgName, assistantName);
-            case "SUMMARIZE_CHAT" -> buildSummarizePrompt(params, assistantName);
-            default -> buildGenericContentPrompt(params, scenario.getDescription(), assistantName);
-        };
-    }
-
-    /**
-     * Build email drafting prompt based on chat history and user context.
-     * Identifies email type and creates professional banking correspondence.
-     */
-    private String buildEmailDraftPrompt(Map<String, Object> params, String orgName, String assistantName) {
-        StringBuilder prompt = new StringBuilder();
-
-        // Get email context from params
-        String chatHistory = getStringParam(params, "chatHistory", "");
-        String emailType = getStringParam(params, "emailType", "general");
-        String subject = getStringParam(params, "subject", "");
-        String recipientType = getStringParam(params, "recipientType", "customer_service");
-        String customerName = getStringParam(params, "customerName", "[Customer Name]");
-        String accountNumber = getStringParam(params, "accountNumber", "[Account Number]");
-        String issueDescription = getStringParam(params, "issueDescription", "");
-        String transactionId = getStringParam(params, "transactionId", "");
-        String amount = getStringParam(params, "amount", "");
-        String transactionDate = getStringParam(params, "transactionDate", "");
-
-        prompt.append("""
-            ═══════════════════════════════════════════════════════════════════════════════
-            PROFESSIONAL BANKING EMAIL GENERATOR
-            ═══════════════════════════════════════════════════════════════════════════════
+        try {
+            List<String> requiredParams = objectMapper.readValue(requiredParamsJson, 
+                    new TypeReference<List<String>>() {});
             
-            You are helping a customer of %s draft a professional banking email.
-            
-            BANK INFORMATION:
-            - Bank Name: %s
-            - Customer Support Email: support@%s.com
-            - Escalations: escalations@%s.com
-            
-            """.formatted(orgName, orgName, orgName.toLowerCase().replace(" ", ""), orgName.toLowerCase().replace(" ", "")));
-
-        // Add chat history context if available
-        if (!chatHistory.isBlank()) {
-            prompt.append("""
-                ═══════════════════════════════════════════════════════════════════════════════
-                CONVERSATION CONTEXT (Use this to understand the customer's situation):
-                ═══════════════════════════════════════════════════════════════════════════════
-                %s
-                
-                """.formatted(chatHistory));
-        }
-
-        prompt.append("""
-            ═══════════════════════════════════════════════════════════════════════════════
-            EMAIL DETAILS:
-            ═══════════════════════════════════════════════════════════════════════════════
-            Email Type: %s
-            Subject: %s
-            Recipient: %s
-            Customer Name: %s
-            Account Number: %s
-            """.formatted(
-                emailType.isBlank() ? "[To be determined from context]" : emailType,
-                subject.isBlank() ? "[To be generated]" : subject,
-                recipientType,
-                customerName,
-                accountNumber
-            ));
-
-        // Add transaction details if available
-        if (!transactionId.isBlank() || !amount.isBlank() || !transactionDate.isBlank()) {
-            prompt.append("""
-                
-                Transaction Details:
-                - Transaction ID: %s
-                - Amount: %s
-                - Date: %s
-                """.formatted(
-                    transactionId.isBlank() ? "[Not provided]" : transactionId,
-                    amount.isBlank() ? "[Not provided]" : "₹" + amount,
-                    transactionDate.isBlank() ? "[Not provided]" : transactionDate
-                ));
-        }
-
-        if (!issueDescription.isBlank()) {
-            prompt.append("\nIssue Description: ").append(issueDescription).append("\n");
-        }
-
-        prompt.append("""
-            
-            ═══════════════════════════════════════════════════════════════════════════════
-            YOUR TASK:
-            ═══════════════════════════════════════════════════════════════════════════════
-            
-            1. ANALYZE the conversation context to understand what the customer needs
-            2. IDENTIFY the appropriate email type:
-               - COMPLAINT: For issues, disputes, failed transactions
-               - REQUEST: For service requests, document requests, account changes
-               - INQUIRY: For information, clarification, status checks
-               - FEEDBACK: For suggestions, appreciation, general feedback
-               - ESCALATION: For unresolved issues needing higher attention
-            
-            3. GENERATE a professional email with:
-               - Clear subject line (if not provided)
-               - Proper salutation
-               - Reference numbers where applicable
-               - Specific details from the conversation
-               - Professional tone appropriate for banking
-               - Clear call to action
-               - Proper closing
-            
-            4. USE PLACEHOLDERS for missing information:
-               - [Customer Name] - if name not provided
-               - [Account Number] - if account not provided
-               - [Transaction ID] - if transaction reference not provided
-               - [Date] - for specific dates
-               - [Amount] - for specific amounts
-            
-            ═══════════════════════════════════════════════════════════════════════════════
-            EMAIL TEMPLATES BY TYPE:
-            ═══════════════════════════════════════════════════════════════════════════════
-            
-            COMPLAINT EMAIL STRUCTURE:
-            - Subject: Complaint Regarding [Issue] - Account: [Account Number]
-            - Reference any case numbers or previous communications
-            - Clearly state the issue with dates and amounts
-            - Mention impact on customer
-            - Request specific resolution with timeline
-            - Request acknowledgment and case number
-            
-            REQUEST EMAIL STRUCTURE:
-            - Subject: Request for [Service] - Account: [Account Number]
-            - Clearly state what is being requested
-            - Provide necessary account/identity details
-            - Mention any urgency if applicable
-            - Request confirmation and timeline
-            
-            ═══════════════════════════════════════════════════════════════════════════════
-            RESPONSE FORMAT (JSON):
-            ═══════════════════════════════════════════════════════════════════════════════
-            
-            {
-              "type": "EMAIL",
-              "title": "Email Draft 📧",
-              "confidence": 1.0,
-              "payload": {
-                "emailType": "COMPLAINT | REQUEST | INQUIRY | FEEDBACK | ESCALATION",
-                "subject": "Generated or provided subject line",
-                "to": "Recipient email suggestion",
-                "body": "Complete email body with proper formatting",
-                "placeholders": ["List of placeholders used that need customer input"],
-                "tips": ["Any tips for the customer before sending"]
-              },
-              "footer": "Review and customize before sending",
-              "suggestedFollowUps": ["Edit recipient", "Add attachment note", "Send another email"]
+            Map<String, Object> providedParams = request.getParams();
+            if (providedParams == null) {
+                providedParams = Map.of();
             }
-            
-            IMPORTANT:
-            - Use proper email formatting with paragraphs
-            - Include today's date: %s
-            - Be professional but not overly formal
-            - If context is unclear, generate a general inquiry email and note what information is needed
-            
-            Generate the email now.
-            """.formatted(LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMMM yyyy"))));
 
-        return prompt.toString();
-    }
-
-    /**
-     * Build complaint-specific email prompt.
-     */
-    private String buildComplaintEmailPrompt(Map<String, Object> params, String orgName, String assistantName) {
-        Map<String, Object> enhancedParams = new HashMap<>(params);
-        enhancedParams.put("emailType", "complaint");
-        return buildEmailDraftPrompt(enhancedParams, orgName, assistantName);
-    }
-
-    /**
-     * Build request-specific email prompt.
-     */
-    private String buildRequestEmailPrompt(Map<String, Object> params, String orgName, String assistantName) {
-        Map<String, Object> enhancedParams = new HashMap<>(params);
-        enhancedParams.put("emailType", "request");
-        return buildEmailDraftPrompt(enhancedParams, orgName, assistantName);
-    }
-
-    /**
-     * Build follow-up email prompt.
-     */
-    private String buildFollowUpEmailPrompt(Map<String, Object> params, String orgName, String assistantName) {
-        Map<String, Object> enhancedParams = new HashMap<>(params);
-        enhancedParams.put("emailType", "followup");
-        enhancedParams.put("subject", getStringParam(params, "subject", "Follow-up: Previous Communication"));
-        return buildEmailDraftPrompt(enhancedParams, orgName, assistantName);
-    }
-
-    /**
-     * Build chat summarization prompt.
-     */
-    private String buildSummarizePrompt(Map<String, Object> params, String assistantName) {
-        String chatHistory = getStringParam(params, "chatHistory", "No conversation history available.");
-
-        return """
-            You are %s, a banking assistant.
-            
-            Summarize the following conversation into key points:
-            
-            CONVERSATION:
-            %s
-            
-            Create a concise summary with:
-            1. Main topics discussed
-            2. Key actions taken or requested
-            3. Any pending items
-            4. Important reference numbers mentioned
-            
-            RESPONSE FORMAT (JSON):
-            {
-              "type": "SUMMARY",
-              "title": "Conversation Summary 📋",
-              "payload": {
-                "topics": ["topic1", "topic2"],
-                "actions": ["action1", "action2"],
-                "pending": ["pending item"],
-                "references": {"type": "reference_number"}
-              },
-              "suggestedFollowUps": ["Continue with...", "Start new topic"]
+            for (String param : requiredParams) {
+                if (!providedParams.containsKey(param) || 
+                    providedParams.get(param) == null ||
+                    providedParams.get(param).toString().isBlank()) {
+                    missing.add(param);
+                }
             }
-            """.formatted(assistantName, chatHistory);
-    }
-
-    /**
-     * Build generic content generation prompt.
-     */
-    private String buildGenericContentPrompt(Map<String, Object> params, String description, String assistantName) {
-        String content = getStringParam(params, "content", "");
-        String instruction = getStringParam(params, "instruction", "Generate helpful content");
-
-        return """
-            You are %s, a professional banking assistant.
-            
-            TASK: %s
-            Description: %s
-            
-            USER INPUT: %s
-            
-            Generate appropriate content in JSON format:
-            {
-              "type": "TEXT",
-              "title": "Generated Content",
-              "payload": {
-                "content": "Your generated content here"
-              },
-              "suggestedFollowUps": ["Related action 1", "Related action 2"]
-            }
-            """.formatted(assistantName, instruction, 
-                description != null ? description : "Content generation", 
-                content);
-    }
-
-    /**
-     * Substitute variables in a template string.
-     */
-    private String substituteVariables(String template, Map<String, Object> params, String orgName, String assistantName) {
-        String result = template;
-        result = result.replace("{{orgName}}", orgName);
-        result = result.replace("{{assistantName}}", assistantName);
-        result = result.replace("{{date}}", LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMMM yyyy")));
-
-        for (Map.Entry<String, Object> entry : params.entrySet()) {
-            String value = entry.getValue() != null ? entry.getValue().toString() : "";
-            result = result.replace("{{" + entry.getKey() + "}}", value);
+        } catch (Exception e) {
+            log.warn("Failed to parse requiredParams for {}: {}", scenario.getScenarioCode(), e.getMessage());
         }
 
-        return result;
+        return missing;
+    }
+
+    /**
+     * Substitute ALL variables in the template.
+     * Variables come from: request params, SystemConfig, scenario entity, and auto-generated values.
+     */
+    private String substituteAllVariables(String template, ScenarioRequest request, AiScenario scenario) {
+        // Build the complete variable map
+        Map<String, String> variables = buildVariableMap(request, scenario);
+        
+        // Substitute all {{variable}} patterns
+        StringBuilder result = new StringBuilder();
+        Matcher matcher = VARIABLE_PATTERN.matcher(template);
+        
+        while (matcher.find()) {
+            String varName = matcher.group(1);
+            String value = variables.getOrDefault(varName, "{{" + varName + "}}"); // Keep original if not found
+            matcher.appendReplacement(result, Matcher.quoteReplacement(value));
+        }
+        matcher.appendTail(result);
+        
+        return result.toString();
+    }
+
+    /**
+     * Build the complete map of all available variables for substitution.
+     */
+    private Map<String, String> buildVariableMap(ScenarioRequest request, AiScenario scenario) {
+        Map<String, String> variables = new HashMap<>();
+        
+        // 1. From SystemConfig (no hardcoding - all from DB)
+        variables.put("orgName", systemConfigService.getOrgName());
+        variables.put("orgShortName", getConfigValue("ORG_SHORT_NAME", systemConfigService.getOrgName()));
+        variables.put("assistantName", systemConfigService.getAssistantName());
+        variables.put("assistantFullName", systemConfigService.getAssistantFullName());
+        variables.put("supportEmail", getConfigValue("SUPPORT_EMAIL", "support@bank.com"));
+        variables.put("escalationEmail", getConfigValue("ESCALATION_EMAIL", "escalations@bank.com"));
+        variables.put("currencySymbol", getConfigValue("CURRENCY_SYMBOL", "₹"));
+        variables.put("dateFormat", getConfigValue("DATE_FORMAT", "dd MMMM yyyy"));
+        
+        // 2. Auto-generated date/time values
+        String dateFormat = variables.get("dateFormat");
+        try {
+            variables.put("date", LocalDate.now().format(DateTimeFormatter.ofPattern(dateFormat)));
+        } catch (Exception e) {
+            variables.put("date", LocalDate.now().toString());
+        }
+        variables.put("datetime", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        variables.put("timestamp", String.valueOf(System.currentTimeMillis()));
+        
+        // 3. From Scenario entity
+        variables.put("scenarioCode", scenario.getScenarioCode());
+        variables.put("scenarioName", scenario.getScenarioName() != null ? scenario.getScenarioName() : scenario.getScenarioCode());
+        variables.put("description", scenario.getDescription() != null ? scenario.getDescription() : "");
+        variables.put("category", scenario.getCategory() != null ? scenario.getCategory() : "");
+        
+        // 4. From Request params (these override if same key exists)
+        if (request.getParams() != null) {
+            for (Map.Entry<String, Object> entry : request.getParams().entrySet()) {
+                String value = entry.getValue() != null ? entry.getValue().toString() : "";
+                variables.put(entry.getKey(), value);
+            }
+        }
+        
+        // 5. Special request fields
+        if (request.getUserId() != null) {
+            variables.put("userId", request.getUserId());
+        }
+        if (request.getSessionId() != null) {
+            variables.put("sessionId", request.getSessionId());
+        }
+        
+        return variables;
+    }
+
+    /**
+     * Get config value with fallback default.
+     */
+    private String getConfigValue(String key, String defaultValue) {
+        try {
+            String value = systemConfigService.getString(key, defaultValue);
+            return value != null && !value.isBlank() ? value : defaultValue;
+        } catch (Exception e) {
+            return defaultValue;
+        }
     }
 
     /**
      * Parse LLM response into structured data.
+     * Tries to extract JSON, falls back to text response.
      */
-    private Map<String, Object> parseResponse(String llmResponse, String scenarioCode) {
+    private Map<String, Object> parseResponse(String llmResponse, AiScenario scenario) {
+        if (llmResponse == null || llmResponse.isBlank()) {
+            Map<String, Object> errorResponse = new LinkedHashMap<>();
+            errorResponse.put("type", "ERROR");
+            errorResponse.put("payload", Map.of("message", "No response generated"));
+            return errorResponse;
+        }
+
         try {
-            // Try to parse as JSON
+            // Try to extract JSON from response
             String jsonPart = extractJson(llmResponse);
             if (jsonPart != null) {
-                return objectMapper.readValue(jsonPart, new TypeReference<Map<String, Object>>() {});
+                Map<String, Object> parsed = objectMapper.readValue(jsonPart, 
+                        new TypeReference<Map<String, Object>>() {});
+                
+                // Ensure required fields exist
+                if (!parsed.containsKey("type")) {
+                    parsed.put("type", "TEXT");
+                }
+                if (!parsed.containsKey("payload")) {
+                    parsed.put("payload", Map.of("content", llmResponse));
+                }
+                
+                return parsed;
             }
         } catch (Exception e) {
-            log.warn("Failed to parse LLM response as JSON for {}: {}", scenarioCode, e.getMessage());
+            log.debug("Could not parse LLM response as JSON for {}: {}", 
+                    scenario.getScenarioCode(), e.getMessage());
         }
 
         // Fallback: wrap as text response
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("type", "TEXT");
-        response.put("title", getDefaultTitle(scenarioCode));
+        response.put("title", scenario.getScenarioName() != null ? scenario.getScenarioName() : "Response");
         response.put("payload", Map.of("content", llmResponse));
-        response.put("suggestedFollowUps", List.of("Edit content", "Generate another", "Help"));
+        response.put("suggestedFollowUps", List.of("Continue", "Start over", "Help"));
         return response;
     }
 
     /**
-     * Extract JSON from LLM response.
+     * Extract JSON object from text (finds first { to last }).
      */
     private String extractJson(String text) {
         if (text == null || text.isEmpty()) {
@@ -467,33 +411,15 @@ public class LlmOnlyExecutor implements DynamicExecutor {
         int start = text.indexOf('{');
         int end = text.lastIndexOf('}');
         if (start >= 0 && end > start) {
-            return text.substring(start, end + 1);
+            String json = text.substring(start, end + 1);
+            // Basic validation - check if it's valid JSON structure
+            try {
+                objectMapper.readTree(json);
+                return json;
+            } catch (Exception e) {
+                return null;
+            }
         }
         return null;
-    }
-
-    /**
-     * Get default title based on scenario code.
-     */
-    private String getDefaultTitle(String scenarioCode) {
-        return switch (scenarioCode.toUpperCase()) {
-            case "EMAIL_DRAFT" -> "Email Draft 📧";
-            case "EMAIL_COMPLAINT" -> "Complaint Email 📧";
-            case "EMAIL_REQUEST" -> "Request Email 📧";
-            case "EMAIL_FOLLOWUP" -> "Follow-up Email 📧";
-            case "SUMMARIZE_CHAT" -> "Conversation Summary 📋";
-            default -> "Generated Content";
-        };
-    }
-
-    /**
-     * Safely get string parameter with default value.
-     */
-    private String getStringParam(Map<String, Object> params, String key, String defaultValue) {
-        if (params == null || !params.containsKey(key)) {
-            return defaultValue;
-        }
-        Object value = params.get(key);
-        return value != null ? value.toString() : defaultValue;
     }
 }

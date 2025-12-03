@@ -19,6 +19,11 @@ INSERT INTO ai_system_config (config_key, config_value, category, description, d
 ('AI_ASSISTANT_FULL_NAME', 'AI Helpdesk Assistant', 'BRANDING', 'AI assistant full name', 'AI Helpdesk Assistant', 'STRING'),
 ('WELCOME_MESSAGE', 'Hello! I''m your AI banking assistant. How can I help you today?', 'BRANDING', 'Welcome message', 'Hello! I''m your AI banking assistant.', 'STRING'),
 ('GOODBYE_MESSAGE', 'Thank you for banking with us. Have a great day!', 'BRANDING', 'Goodbye message', 'Thank you!', 'STRING'),
+-- Email/Communication settings (used by LLM_ONLY email scenarios)
+('SUPPORT_EMAIL', 'support@enterprisebank.com', 'BRANDING', 'Customer support email address', 'support@bank.com', 'STRING'),
+('ESCALATION_EMAIL', 'escalations@enterprisebank.com', 'BRANDING', 'Escalation email address', 'escalations@bank.com', 'STRING'),
+('CURRENCY_SYMBOL', '₹', 'BRANDING', 'Currency symbol for display', '₹', 'STRING'),
+('DATE_FORMAT', 'dd MMMM yyyy', 'BRANDING', 'Date format pattern', 'dd MMMM yyyy', 'STRING'),
 -- Performance
 ('DEFAULT_TIMEOUT_MS', '5000', 'PERFORMANCE', 'Default request timeout in milliseconds', '5000', 'LONG'),
 ('MAX_TIMEOUT_MS', '30000', 'PERFORMANCE', 'Maximum request timeout in milliseconds', '30000', 'LONG'),
@@ -176,6 +181,8 @@ UPDATE ai_scenarios SET sql_query = 'SELECT category, SUM(amount) as total_spent
 -- =====================================================================
 -- LLM_ONLY SCENARIOS - Email Drafting (No DB calls needed)
 -- These use the LlmOnlyExecutor for content generation based on chat history
+-- FULLY CONFIGURABLE: llm_prompt_template uses {{variables}} that are
+-- substituted at runtime from params and SystemConfig
 -- =====================================================================
 
 INSERT INTO ai_scenarios (
@@ -185,6 +192,7 @@ INSERT INTO ai_scenarios (
 ) VALUES 
 
 -- 11. Email Draft - General (LLM_ONLY)
+-- This is a fully generic template - all values come from params and SystemConfig
 ('EMAIL_DRAFT', 'Draft Email',
  'Draft a professional banking email based on conversation context. Supports complaints, requests, inquiries, and follow-ups.',
  'LLM_ONLY',
@@ -192,7 +200,52 @@ INSERT INTO ai_scenarios (
  '["draft email", "write email", "compose email", "help me write", "email to bank", "send email", "prepare email", "create email"]',
  '["Help me draft an email to the bank", "Write an email about my failed transaction", "Draft a complaint email", "I want to send an email to customer service"]',
  'Communication', 'mail',
- 30000, TRUE, NULL),
+ 30000, TRUE,
+ 'You are {{assistantName}}, a professional assistant helping customers of {{orgName}} draft banking emails.
+
+BANK INFORMATION:
+- Bank Name: {{orgName}}
+- Support Email: {{supportEmail}}
+- Escalations: {{escalationEmail}}
+- Today''s Date: {{date}}
+
+CUSTOMER CONTEXT:
+- Customer Name: {{customerName}}
+- Account Number: {{accountNumber}}
+- Email Type Requested: {{emailType}}
+- Issue Description: {{issueDescription}}
+
+CONVERSATION HISTORY:
+{{chatHistory}}
+
+TRANSACTION DETAILS (if applicable):
+- Transaction ID: {{transactionId}}
+- Amount: {{currencySymbol}}{{amount}}
+- Date: {{transactionDate}}
+
+YOUR TASK:
+1. Analyze the conversation to understand the customer''s needs
+2. Identify the appropriate email type (COMPLAINT/REQUEST/INQUIRY/FEEDBACK/ESCALATION)
+3. Generate a professional banking email with proper formatting
+
+Use [Customer Name], [Account Number], [Transaction ID], [Date], [Amount] as placeholders for missing information.
+
+RESPONSE FORMAT (JSON only):
+{
+  "type": "EMAIL",
+  "title": "Email Draft 📧",
+  "confidence": 1.0,
+  "payload": {
+    "emailType": "COMPLAINT | REQUEST | INQUIRY | FEEDBACK | ESCALATION",
+    "subject": "Clear subject line",
+    "to": "Recipient email",
+    "body": "Complete email body with proper paragraphs",
+    "placeholders": ["List of placeholders needing customer input"],
+    "tips": ["Tips before sending"]
+  },
+  "footer": "Review and customize before sending",
+  "suggestedFollowUps": ["Edit email", "Add more details", "Send another"]
+}'),
 
 -- 12. Complaint Email (LLM_ONLY)
 ('EMAIL_COMPLAINT', 'Draft Complaint Email',
@@ -202,7 +255,37 @@ INSERT INTO ai_scenarios (
  '["complaint email", "write complaint", "complain about", "issue email", "problem email", "dispute email"]',
  '["Draft a complaint about failed transaction", "Write complaint email for wrong deduction", "I want to complain about ATM issue"]',
  'Communication', 'alert-triangle',
- 30000, TRUE, NULL),
+ 30000, TRUE,
+ 'You are {{assistantName}} helping a {{orgName}} customer draft a COMPLAINT email.
+
+BANK: {{orgName}}
+SUPPORT: {{supportEmail}}
+DATE: {{date}}
+
+CUSTOMER: {{customerName}}
+ACCOUNT: {{accountNumber}}
+ISSUE: {{issueDescription}}
+TRANSACTION: {{transactionId}} | {{currencySymbol}}{{amount}} | {{transactionDate}}
+
+CHAT CONTEXT:
+{{chatHistory}}
+
+Generate a formal complaint email. Use placeholders like [Account Number] for missing info.
+
+RESPONSE (JSON):
+{
+  "type": "EMAIL",
+  "title": "Complaint Email 📧",
+  "payload": {
+    "emailType": "COMPLAINT",
+    "subject": "Complaint Regarding [Issue] - Account: [Number]",
+    "to": "{{supportEmail}}",
+    "body": "Professional complaint with issue details and resolution request",
+    "placeholders": [],
+    "tips": []
+  },
+  "suggestedFollowUps": ["Edit", "Add details", "Escalate"]
+}'),
 
 -- 13. Service Request Email (LLM_ONLY)
 ('EMAIL_REQUEST', 'Draft Service Request Email',
@@ -212,7 +295,33 @@ INSERT INTO ai_scenarios (
  '["request email", "service request", "request for", "apply for", "need statement", "cheque book request"]',
  '["Draft email requesting bank statement", "Write email to request cheque book", "Email for address change request"]',
  'Communication', 'file-plus',
- 30000, TRUE, NULL),
+ 30000, TRUE,
+ 'You are {{assistantName}} helping a {{orgName}} customer draft a SERVICE REQUEST email.
+
+BANK: {{orgName}} | SUPPORT: {{supportEmail}} | DATE: {{date}}
+CUSTOMER: {{customerName}} | ACCOUNT: {{accountNumber}}
+REQUEST TYPE: {{requestType}}
+DETAILS: {{details}}
+
+CHAT CONTEXT:
+{{chatHistory}}
+
+Generate a professional service request email.
+
+RESPONSE (JSON):
+{
+  "type": "EMAIL",
+  "title": "Service Request Email 📧",
+  "payload": {
+    "emailType": "REQUEST",
+    "subject": "Request for [Service] - Account: [Number]",
+    "to": "{{supportEmail}}",
+    "body": "Clear request with necessary details",
+    "placeholders": [],
+    "tips": []
+  },
+  "suggestedFollowUps": ["Edit", "Add documents", "Track request"]
+}'),
 
 -- 14. Follow-up Email (LLM_ONLY)
 ('EMAIL_FOLLOWUP', 'Draft Follow-up Email',
@@ -222,7 +331,34 @@ INSERT INTO ai_scenarios (
  '["follow up email", "follow-up", "reminder email", "pending request", "no response", "escalate"]',
  '["Draft follow-up email for my pending request", "Write reminder about unresolved issue", "Follow up on my complaint"]',
  'Communication', 'repeat',
- 30000, TRUE, NULL),
+ 30000, TRUE,
+ 'You are {{assistantName}} helping a {{orgName}} customer draft a FOLLOW-UP email.
+
+BANK: {{orgName}} | DATE: {{date}}
+CUSTOMER: {{customerName}} | ACCOUNT: {{accountNumber}}
+PREVIOUS REFERENCE: {{referenceNumber}}
+ORIGINAL REQUEST DATE: {{originalDate}}
+ISSUE: {{issueDescription}}
+
+CHAT CONTEXT:
+{{chatHistory}}
+
+Generate a polite but firm follow-up email referencing the previous communication.
+
+RESPONSE (JSON):
+{
+  "type": "EMAIL",
+  "title": "Follow-up Email 📧",
+  "payload": {
+    "emailType": "FOLLOWUP",
+    "subject": "Follow-up: [Previous Subject] - Ref: [Number]",
+    "to": "{{supportEmail}}",
+    "body": "Follow-up with reference to previous communication",
+    "placeholders": [],
+    "tips": []
+  },
+  "suggestedFollowUps": ["Escalate", "Edit", "Contact directly"]
+}'),
 
 -- 15. Chat Summary (LLM_ONLY)
 ('SUMMARIZE_CHAT', 'Summarize Conversation',
@@ -232,7 +368,32 @@ INSERT INTO ai_scenarios (
  '["summarize", "summary", "what did we discuss", "recap", "conversation summary"]',
  '["Summarize our conversation", "Give me a recap", "What have we discussed so far?"]',
  'Utility', 'file-text',
- 15000, TRUE, NULL);
+ 15000, TRUE,
+ 'You are {{assistantName}}, a {{orgName}} banking assistant.
+
+Summarize the following conversation:
+
+CONVERSATION:
+{{chatHistory}}
+
+Create a concise summary including:
+1. Main topics discussed
+2. Actions taken or requested
+3. Pending items or next steps
+4. Important reference numbers
+
+RESPONSE (JSON):
+{
+  "type": "SUMMARY",
+  "title": "Conversation Summary 📋",
+  "payload": {
+    "topics": ["topic1", "topic2"],
+    "actions": ["action1", "action2"],
+    "pending": ["pending item"],
+    "references": {"type": "reference_number"}
+  },
+  "suggestedFollowUps": ["Continue", "New topic", "Help"]
+}');
 
 -- =====================================================================
 -- SAMPLE DATA - INTENT CONFIGS (uses intent_key per IntentConfig entity)
