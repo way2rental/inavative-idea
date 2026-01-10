@@ -1,0 +1,210 @@
+<!-- Axis Bank Admin - Response Templates -->
+<div class="min-h-screen bg-bank-bg">
+  <!-- Page Title Section -->
+  <div class="bg-white border-b">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </a>
+          <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">{{ labels.pageTitle }}</h1>
+            <p class="text-gray-500 text-sm">{{ labels.pageDescription }}</p>
+          </div>
+        </div>
+        <button (click)="openCreateModal()" class="btn-axis text-sm flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          {{ labels.addTemplate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Filter Section -->
+    <div class="card-axis mb-6">
+      <div class="flex items-center gap-4">
+        <label class="text-sm font-medium text-gray-700">{{ labels.filterByScenario }}</label>
+        <select [(ngModel)]="filterScenario" (ngModelChange)="applyFilter()" class="input-field flex-1 max-w-xs">
+          <option value="">{{ labels.allScenarios }}</option>
+          @for (scenario of scenarios; track scenario.scenarioCode) {
+            <option [value]="scenario.scenarioCode">{{ scenario.scenarioName }} ({{ scenario.scenarioCode }})</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    @if (isLoading) {
+      <div class="flex items-center justify-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-axis-burgundy"></div>
+      </div>
+    } @else {
+      <!-- Templates Table -->
+      <div class="card-axis overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ tableHeaders.scenario }}</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ tableHeaders.responseType }}</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ tableHeaders.priority }}</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ tableHeaders.version }}</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ tableHeaders.status }}</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ tableHeaders.templatePreview }}</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{{ tableHeaders.actions }}</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            @if (filteredTemplates.length === 0) {
+              <tr>
+                <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                  {{ labels.noTemplates }}
+                </td>
+              </tr>
+            } @else {
+              @for (template of filteredTemplates; track template.id) {
+                <tr class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">{{ getScenarioName(template.scenarioCode) }}</div>
+                    <div class="text-sm text-gray-500">{{ template.scenarioCode }}</div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="badge-info">{{ template.responseType }}</span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ template.priority }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">v{{ template.templateVersion }}</td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    @if (template.active) {
+                      <span class="badge-success">Active</span>
+                    } @else {
+                      <span class="badge-danger">Inactive</span>
+                    }
+                  </td>
+                  <td class="px-6 py-4">
+                    <div class="text-sm text-gray-600 font-mono line-clamp-2 max-w-md">
+                      {{ template.templateContent }}
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div class="flex items-center justify-end gap-2">
+                      <button (click)="openEditModal(template)" class="text-axis-burgundy hover:text-axis-maroon">
+                        {{ labels.edit }}
+                      </button>
+                      <button (click)="toggleStatus(template)" class="text-gray-600 hover:text-gray-900">
+                        {{ getToggleButtonText(template) }}
+                      </button>
+                      <button (click)="deleteTemplate(template)" class="text-red-600 hover:text-red-900">
+                        {{ labels.delete }}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  <!-- Create/Edit Modal -->
+  @if (showModal) {
+    <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b border-gray-200">
+          <h2 class="text-xl font-bold text-gray-900">{{ getModalTitle() }}</h2>
+        </div>
+
+        <div class="p-6 space-y-4">
+          <!-- Scenario Code -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ labels.scenarioCode }} *</label>
+            <select [(ngModel)]="formData.scenarioCode" class="input-field w-full" required>
+              <option value="">{{ labels.selectScenario }}</option>
+              @for (scenario of scenarios; track scenario.scenarioCode) {
+                <option [value]="scenario.scenarioCode">{{ scenario.scenarioName }} ({{ scenario.scenarioCode }})</option>
+              }
+            </select>
+          </div>
+
+          <!-- Response Type -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ labels.responseType }} *</label>
+            <select [(ngModel)]="formData.responseType" class="input-field w-full" required>
+              @for (type of responseTypes; track type) {
+                <option [value]="type">{{ type }}</option>
+              }
+            </select>
+          </div>
+
+          <!-- Priority -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ labels.priority }}</label>
+            <input type="number" [(ngModel)]="formData.priority" class="input-field w-full" min="0" />
+            <p class="text-xs text-gray-500 mt-1">{{ priorityHelp }}</p>
+          </div>
+
+          <!-- Template Version -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ labels.templateVersion }}</label>
+            <input type="number" [(ngModel)]="formData.templateVersion" class="input-field w-full" min="1" />
+          </div>
+
+          <!-- Template Content -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ labels.templateContent }} *</label>
+            <textarea 
+              [(ngModel)]="formData.templateContent" 
+              rows="12" 
+              class="input-field w-full font-mono text-sm" 
+              [placeholder]="templateContentPlaceholder" 
+              required></textarea>
+            <p class="text-xs text-gray-500 mt-1">{{ templateContentHelp }}</p>
+          </div>
+
+          <!-- Template Variables -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ labels.templateVariables }}</label>
+            <textarea 
+              [(ngModel)]="formData.templateVariables" 
+              rows="4" 
+              class="input-field w-full font-mono text-sm" 
+              [placeholder]="templateVariablesPlaceholder"></textarea>
+            <p class="text-xs text-gray-500 mt-1">{{ templateVariablesHelp }}</p>
+          </div>
+
+          <!-- Conditions -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">{{ labels.conditions }}</label>
+            <textarea 
+              [(ngModel)]="formData.conditions" 
+              rows="4" 
+              class="input-field w-full font-mono text-sm" 
+              [placeholder]="conditionsPlaceholder"></textarea>
+            <p class="text-xs text-gray-500 mt-1">{{ conditionsHelp }}</p>
+          </div>
+
+          <!-- Active Status -->
+          <div class="flex items-center gap-2">
+            <input type="checkbox" [(ngModel)]="formData.active" id="active" class="h-4 w-4 text-axis-burgundy rounded" />
+            <label for="active" class="text-sm font-medium text-gray-700">{{ labels.active }}</label>
+          </div>
+        </div>
+
+        <div class="p-6 border-t border-gray-200 flex items-center justify-end gap-3">
+          <button (click)="closeModal()" class="btn-secondary">{{ labels.cancel }}</button>
+          <button (click)="saveTemplate()" class="btn-axis">{{ labels.saveTemplate }}</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

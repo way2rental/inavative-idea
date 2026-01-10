@@ -6,7 +6,7 @@ import com.enterprise.ai.data.entity.ChatMessage;
 import com.enterprise.ai.data.entity.ChatSession;
 import com.enterprise.ai.data.repository.ChatMessageRepository;
 import com.enterprise.ai.data.repository.ChatSessionRepository;
-import com.enterprise.ai.llm.client.LlmClient;
+import com.enterprise.ai.intelligence.client.ReactiveIntelligenceClient;
 import com.enterprise.ai.security.rbac.RbacService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +36,7 @@ public class ChatService {
     private static final String AFFIRMATIVE_PATTERN = 
             "(yes|y|yeah|yep|sure|ok|okay|proceed|confirm|haan|ha|theek hai).*";
 
-    private final LlmClient llmClient;
+    private final ReactiveIntelligenceClient intelligenceClient;
     private final ScenarioRouter scenarioRouter;
     private final RbacService rbacService;
     private final IntentValidationService validationService;
@@ -73,7 +73,7 @@ public class ChatService {
             String sessionContext = getSessionContext(sessionId);
 
             // Detect intent
-            IntentResult intent = llmClient.detectIntent(request.getQuery(), sessionContext);
+            IntentResult intent = intelligenceClient.detectIntent(request.getQuery(), sessionContext).block();
             log.info("Detected intent: scenario={}, confidence={}, params={}", 
                     intent.getScenario(), intent.getConfidence(), intent.getParams());
 
@@ -138,11 +138,11 @@ public class ChatService {
 
         // Ambiguous - ask for clarification
         if (validation.isAmbiguous()) {
-            String clarificationQuestion = llmClient.generateFollowUpQuestion(
+            String clarificationQuestion = intelligenceClient.generateFollowUpQuestion(
                     "CLARIFICATION", 
                     validation.suggestedScenarios() != null ? 
                             validation.suggestedScenarios() : List.of()
-            );
+            ).block();
             
             // Build clarification options
             StringBuilder response = new StringBuilder();
@@ -161,8 +161,8 @@ public class ChatService {
 
         // Missing parameters - ask for them
         if (!validation.missingRequiredParams().isEmpty()) {
-            String followUp = llmClient.generateFollowUpQuestion(
-                    intent.getScenario(), validation.missingRequiredParams());
+            String followUp = intelligenceClient.generateFollowUpQuestion(
+                    intent.getScenario(), validation.missingRequiredParams()).block();
             saveMessage(sessionId, "assistant", followUp);
             return ChatResponse.builder()
                     .sessionId(sessionId)
@@ -272,7 +272,7 @@ public class ChatService {
             String sessionContext = getSessionContext(sessionId);
             
             // Detect intent again with clarified context
-            IntentResult detectedIntent = llmClient.detectIntent(clarifiedQuery, sessionContext);
+                IntentResult detectedIntent = intelligenceClient.detectIntent(clarifiedQuery, sessionContext).block();
             
             // Create a new intent with user-selected scenario (using builder for immutability)
             IntentResult intent = IntentResult.builder()
@@ -289,8 +289,8 @@ public class ChatService {
                     validationService.validate(intent, request.getQuery());
             
             if (!validation.missingRequiredParams().isEmpty()) {
-                String followUp = llmClient.generateFollowUpQuestion(
-                        selectedScenario, validation.missingRequiredParams());
+                String followUp = intelligenceClient.generateFollowUpQuestion(
+                        selectedScenario, validation.missingRequiredParams()).block();
                 saveMessage(sessionId, "assistant", followUp);
                 return ChatResponse.builder()
                         .sessionId(sessionId)
@@ -333,8 +333,8 @@ public class ChatService {
         ScenarioResult result = scenarioRouter.route(scenarioRequest);
 
         // Format response using LLM
-        String formattedResponse = llmClient.formatResponse(
-                intent.getScenario(), result, request.getQuery());
+        String formattedResponse = intelligenceClient.formatResponse(
+                intent.getScenario(), result, request.getQuery()).block();
         saveMessage(sessionId, "assistant", formattedResponse);
 
         // Log successful audit (async - non-blocking)

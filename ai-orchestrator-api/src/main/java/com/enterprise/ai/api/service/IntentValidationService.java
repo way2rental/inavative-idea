@@ -105,8 +105,20 @@ public class IntentValidationService {
         }
 
         // Layer 1: Confidence threshold check
-        if (intent.getConfidence() < lowConfidenceThreshold) {
-            log.info("Intent confidence {} below threshold {}", intent.getConfidence(), lowConfidenceThreshold);
+        // Use scenario's own threshold if available, otherwise use global threshold
+        double effectiveThreshold = lowConfidenceThreshold;
+        if (intent.getScenario() != null && !"UNKNOWN".equals(intent.getScenario()) && !"AMBIGUOUS".equals(intent.getScenario())) {
+            Optional<AiScenario> scenario = configCacheService.getScenarioByCode(intent.getScenario());
+            if (scenario.isPresent() && scenario.get().getConfidenceThreshold() != null) {
+                // Use scenario's threshold, but don't let it go too low (minimum 0.5)
+                effectiveThreshold = Math.max(0.5, Math.min(scenario.get().getConfidenceThreshold(), lowConfidenceThreshold));
+                log.debug("Using scenario-specific threshold {} for {}", effectiveThreshold, intent.getScenario());
+            }
+        }
+        
+        if (intent.getConfidence() < effectiveThreshold) {
+            log.info("Intent confidence {} below threshold {} for scenario {}", 
+                intent.getConfidence(), effectiveThreshold, intent.getScenario());
             return ValidationResult.lowConfidence(
                     String.format("Low confidence (%.0f%%) in understanding your request", intent.getConfidence() * 100)
             );
@@ -135,8 +147,18 @@ public class IntentValidationService {
         }
 
         // Layer 3: Moderate confidence - suggest confirmation
-        if (intent.getConfidence() < confidenceThreshold) {
-            log.info("Moderate confidence {} - suggesting confirmation", intent.getConfidence());
+        // For common banking scenarios like TRANSACTION_HISTORY, allow lower confidence (60%+)
+        // Only ask for confirmation if confidence is really low (< 50%)
+        double confirmationThreshold = confidenceThreshold;
+        if (intent.getScenario() != null && isCommonBankingScenario(intent.getScenario())) {
+            // Common scenarios: TRANSACTION_HISTORY, ACCOUNT_BALANCE, ACCOUNT_SUMMARY
+            // Allow execution with 60% confidence, only confirm if < 50%
+            confirmationThreshold = 0.50;
+        }
+        
+        if (intent.getConfidence() < confirmationThreshold) {
+            log.info("Low confidence {} - suggesting confirmation (threshold: {})", 
+                intent.getConfidence(), confirmationThreshold);
             return ValidationResult.needsConfirmation(
                     String.format("I'm %.0f%% sure you want to check %s. Please confirm.",
                             intent.getConfidence() * 100, getScenarioDescription(intent.getScenario()))
@@ -144,6 +166,19 @@ public class IntentValidationService {
         }
 
         return ValidationResult.valid();
+    }
+    
+    /**
+     * Check if scenario is a common banking scenario that should execute with lower confidence.
+     */
+    private boolean isCommonBankingScenario(String scenarioCode) {
+        if (scenarioCode == null) return false;
+        String code = scenarioCode.toUpperCase();
+        return code.equals("TRANSACTION_HISTORY") || 
+               code.equals("ACCOUNT_BALANCE") || 
+               code.equals("ACCOUNT_SUMMARY") ||
+               code.equals("CARD_DETAILS") ||
+               code.equals("BILL_PAYMENT_HISTORY");
     }
 
     /**

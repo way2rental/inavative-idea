@@ -5,6 +5,7 @@
     <file url="file://$PROJECT_DIR$/ai-orchestrator-common/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/ai-orchestrator-core/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/ai-orchestrator-data/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/ai-orchestrator-intelligence/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/ai-orchestrator-llm/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/ai-orchestrator-security/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />

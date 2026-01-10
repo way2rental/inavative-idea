@@ -14,8 +14,8 @@ import {
   PerformanceMetrics,
   PromptTemplate,
   PromptFormData,
-  IntentConfig,
-  IntentFormData,
+  // IntentConfig, // REMOVED - Use Scenario instead
+  // IntentFormData, // REMOVED - Use Scenario instead
   FollowUpGroup,
   FollowUpGroupFormData,
   FollowUpQuestion,
@@ -27,7 +27,9 @@ import {
   JsonPathTestResult,
   RoleScenarioMapping,
   RbacMatrix,
-  BulkRbacRequest
+  BulkRbacRequest,
+  ResponseTemplate,
+  ResponseTemplateFormData
 } from '../models/admin.model';
 import { environment } from '../../environments/environment';
 
@@ -238,59 +240,57 @@ export class AdminService {
     return this.http.post<any>(`${this.baseUrl}/admin/prompts/${id}/test`, testData);
   }
 
+  // ===================== RESPONSE TEMPLATES =====================
+
+  getResponseTemplates(): Observable<ResponseTemplate[]> {
+    return this.http.get<ResponseTemplate[]>(`${this.baseUrl}/admin/response-templates`).pipe(
+      catchError(this.handleError('getResponseTemplates', []))
+    );
+  }
+
+  getActiveResponseTemplates(): Observable<ResponseTemplate[]> {
+    return this.http.get<ResponseTemplate[]>(`${this.baseUrl}/admin/response-templates/active`).pipe(
+      catchError(this.handleError('getActiveResponseTemplates', []))
+    );
+  }
+
+  getResponseTemplatesByScenario(scenarioCode: string): Observable<ResponseTemplate[]> {
+    return this.http.get<ResponseTemplate[]>(`${this.baseUrl}/admin/response-templates/scenario/${scenarioCode}`).pipe(
+      catchError(this.handleError('getResponseTemplatesByScenario', []))
+    );
+  }
+
+  getActiveResponseTemplatesByScenario(scenarioCode: string): Observable<ResponseTemplate[]> {
+    return this.http.get<ResponseTemplate[]>(`${this.baseUrl}/admin/response-templates/scenario/${scenarioCode}/active`).pipe(
+      catchError(this.handleError('getActiveResponseTemplatesByScenario', []))
+    );
+  }
+
+  getResponseTemplateById(id: number): Observable<ResponseTemplate> {
+    return this.http.get<ResponseTemplate>(`${this.baseUrl}/admin/response-templates/${id}`);
+  }
+
+  createResponseTemplate(template: ResponseTemplateFormData): Observable<ResponseTemplate> {
+    return this.http.post<ResponseTemplate>(`${this.baseUrl}/admin/response-templates`, template);
+  }
+
+  updateResponseTemplate(id: number, template: ResponseTemplateFormData): Observable<ResponseTemplate> {
+    return this.http.put<ResponseTemplate>(`${this.baseUrl}/admin/response-templates/${id}`, template);
+  }
+
+  deleteResponseTemplate(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/response-templates/${id}`);
+  }
+
+  toggleResponseTemplateStatus(id: number, active: boolean): Observable<ResponseTemplate> {
+    return this.http.patch<ResponseTemplate>(`${this.baseUrl}/admin/response-templates/${id}/toggle`, { active });
+  }
+
   // ===================== INTENT CONFIGURATIONS =====================
-
-  getIntents(): Observable<IntentConfig[]> {
-    return this.http.get<IntentConfig[]>(`${this.baseUrl}/admin/intents`).pipe(
-      catchError(this.handleError('getIntents', []))
-    );
-  }
-
-  getActiveIntents(): Observable<IntentConfig[]> {
-    return this.http.get<IntentConfig[]>(`${this.baseUrl}/admin/intents/active`).pipe(
-      catchError(this.handleError('getActiveIntents', []))
-    );
-  }
-
-  getIntentsByCategory(category: string): Observable<IntentConfig[]> {
-    return this.http.get<IntentConfig[]>(`${this.baseUrl}/admin/intents/category/${category}`).pipe(
-      catchError(this.handleError('getIntentsByCategory', []))
-    );
-  }
-
-  getIntentById(id: number): Observable<IntentConfig> {
-    return this.http.get<IntentConfig>(`${this.baseUrl}/admin/intents/${id}`);
-  }
-
-  createIntent(intent: IntentFormData): Observable<IntentConfig> {
-    return this.http.post<IntentConfig>(`${this.baseUrl}/admin/intents`, intent);
-  }
-
-  updateIntent(id: number, intent: IntentFormData): Observable<IntentConfig> {
-    return this.http.put<IntentConfig>(`${this.baseUrl}/admin/intents/${id}`, intent);
-  }
-
-  deleteIntent(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/admin/intents/${id}`);
-  }
-
-  toggleIntentStatus(id: number, active: boolean): Observable<IntentConfig> {
-    return this.http.patch<IntentConfig>(`${this.baseUrl}/admin/intents/${id}/toggle`, { active });
-  }
-
-  addTrainingPhrases(id: number, phrases: string[]): Observable<IntentConfig> {
-    return this.http.post<IntentConfig>(`${this.baseUrl}/admin/intents/${id}/training-phrases`, phrases);
-  }
-
-  removeTrainingPhrases(id: number, phrases: string[]): Observable<IntentConfig> {
-    return this.http.request<IntentConfig>('DELETE', `${this.baseUrl}/admin/intents/${id}/training-phrases`, { body: phrases });
-  }
-
-  getIntentCategories(): Observable<string[]> {
-    return this.http.get<string[]>(`${this.baseUrl}/admin/intents/categories`).pipe(
-      catchError(this.handleError('getIntentCategories', []))
-    );
-  }
+  // NOTE: IntentConfig has been REMOVED. Intent detection is now handled
+  // directly by Scenario entity. All intent configuration fields (training_phrases,
+  // confidence_threshold, category, etc.) are now part of Scenario.
+  // Use Scenario admin methods instead (getScenarios, createScenario, etc.).
 
   // ===================== FOLLOW-UP GROUPS =====================
 
@@ -568,5 +568,132 @@ export class AdminService {
     return this.http.get(`${this.baseUrl}/admin/analytics/scenario-usage?limit=${limit}`).pipe(
       catchError(this.handleError('getScenarioUsage', { labels: [], data: [], total: 0 }))
     );
+  }
+
+  // ===================== INTELLIGENCE ADMIN =====================
+
+  // Fallback Layers
+  getFallbackLayers(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/admin/intelligence/layers`).pipe(
+      catchError(this.handleError('getFallbackLayers', []))
+    );
+  }
+
+  updateFallbackLayer(id: number, layer: any): Observable<any> {
+    return this.http.put<any>(`${this.baseUrl}/admin/intelligence/layers/${id}`, layer).pipe(
+      catchError(this.handleError('updateFallbackLayer', null))
+    );
+  }
+
+  refreshLayers(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/admin/intelligence/layers/refresh`, {}).pipe(
+      catchError(this.handleError('refreshLayers', { message: 'Failed to refresh layers' }))
+    );
+  }
+
+  // Rules
+  getRules(scenarioCode?: string): Observable<any[]> {
+    const params: any = {};
+    if (scenarioCode) params.scenarioCode = scenarioCode;
+    return this.http.get<any[]>(`${this.baseUrl}/admin/intelligence/rules`, { params }).pipe(
+      catchError(this.handleError('getRules', []))
+    );
+  }
+
+  createRule(rule: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/admin/intelligence/rules`, rule);
+  }
+
+  updateRule(id: number, rule: any): Observable<any> {
+    return this.http.put<any>(`${this.baseUrl}/admin/intelligence/rules/${id}`, rule);
+  }
+
+  deleteRule(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/intelligence/rules/${id}`);
+  }
+
+  // Keywords
+  getKeywords(scenarioCode?: string): Observable<any[]> {
+    const params: any = {};
+    if (scenarioCode) params.scenarioCode = scenarioCode;
+    return this.http.get<any[]>(`${this.baseUrl}/admin/intelligence/keywords`, { params }).pipe(
+      catchError(this.handleError('getKeywords', []))
+    );
+  }
+
+  createKeyword(keyword: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/admin/intelligence/keywords`, keyword);
+  }
+
+  updateKeyword(id: number, keyword: any): Observable<any> {
+    return this.http.put<any>(`${this.baseUrl}/admin/intelligence/keywords/${id}`, keyword);
+  }
+
+  deleteKeyword(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/intelligence/keywords/${id}`);
+  }
+
+  // Embeddings
+  getEmbeddings(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/admin/intelligence/embeddings`).pipe(
+      catchError(this.handleError('getEmbeddings', []))
+    );
+  }
+
+  generateEmbedding(scenarioCode: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/admin/intelligence/embeddings/${scenarioCode}`, {});
+  }
+
+  generateAllEmbeddings(): Observable<{ message: string; count: number }> {
+    return this.http.post<{ message: string; count: number }>(`${this.baseUrl}/admin/intelligence/embeddings/generate-all`, {});
+  }
+
+  refreshEmbedding(scenarioCode: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/admin/intelligence/embeddings/${scenarioCode}/refresh`, {});
+  }
+
+  // Entity Patterns
+  getEntityPatterns(entityType?: string): Observable<any[]> {
+    const params: any = {};
+    if (entityType) params.entityType = entityType;
+    return this.http.get<any[]>(`${this.baseUrl}/admin/entity-patterns`, { params }).pipe(
+      catchError(this.handleError('getEntityPatterns', []))
+    );
+  }
+
+  getEntityPattern(id: number): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/admin/entity-patterns/${id}`);
+  }
+
+  createEntityPattern(pattern: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/admin/entity-patterns`, pattern);
+  }
+
+  updateEntityPattern(id: number, pattern: any): Observable<any> {
+    return this.http.put<any>(`${this.baseUrl}/admin/entity-patterns/${id}`, pattern);
+  }
+
+  deleteEntityPattern(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/entity-patterns/${id}`);
+  }
+
+  // Context Memory
+  getContextMemory(sessionId?: string, entityType?: string): Observable<any[]> {
+    const params: any = {};
+    if (sessionId) params.sessionId = sessionId;
+    if (entityType) params.entityType = entityType;
+    return this.http.get<any[]>(`${this.baseUrl}/admin/context-memory`, { params }).pipe(
+      catchError(this.handleError('getContextMemory', []))
+    );
+  }
+
+  clearContextMemory(sessionId: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.baseUrl}/admin/context-memory/session/${sessionId}`);
+  }
+
+  cleanupOldMemory(daysOld: number = 7): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/admin/context-memory/cleanup`, {}, {
+      params: { daysOld: daysOld.toString() }
+    });
   }
 }

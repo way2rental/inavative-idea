@@ -14,8 +14,9 @@
         </processorPath>
         <module name="ai-orchestrator-data" />
         <module name="ai-orchestrator-common" />
-        <module name="ai-orchestrator-llm" />
         <module name="ai-orchestrator-core" />
+        <module name="ai-orchestrator-intelligence" />
+        <module name="ai-orchestrator-llm" />
         <module name="ai-orchestrator-security" />
         <module name="ai-orchestrator-api" />
       </profile>
@@ -27,6 +28,7 @@
       <module name="ai-orchestrator-common" options="-parameters" />
       <module name="ai-orchestrator-core" options="-parameters" />
       <module name="ai-orchestrator-data" options="-parameters" />
+      <module name="ai-orchestrator-intelligence" options="-parameters" />
       <module name="ai-orchestrator-llm" options="-parameters" />
       <module name="ai-orchestrator-security" options="-parameters" />
     </option>

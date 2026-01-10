@@ -456,27 +456,11 @@ RESPONSE (JSON):
 }');
 
 -- =====================================================================
--- SAMPLE DATA - INTENT CONFIGS (uses intent_key per IntentConfig entity)
+-- NOTE: IntentConfig (ai_intents table) has been REMOVED.
+-- Intent detection is now handled directly by AiScenario entity.
+-- All intent configuration fields (training_phrases, confidence_threshold, category, etc.)
+-- are now part of ai_scenarios table.
 -- =====================================================================
-
-INSERT INTO ai_intents (intent_key, intent_name, scenario_code, training_phrases, confidence_threshold, category, active) VALUES
-('INTENT_BALANCE', 'Account Balance Intent', 'ACCOUNT_BALANCE', '["check balance", "account balance", "how much money", "available balance", "show balance", "my balance", "what is my balance", "balance enquiry"]', 0.85, 'Account', TRUE),
-('INTENT_TRANSACTIONS', 'Transaction History Intent', 'TRANSACTION_HISTORY', '["show transactions", "transaction history", "recent transactions", "my transactions", "list transactions", "transaction list"]', 0.85, 'Transaction', TRUE),
-('INTENT_SUMMARY', 'Account Summary Intent', 'ACCOUNT_SUMMARY', '["account summary", "account details", "account info", "my account", "account overview"]', 0.85, 'Account', TRUE),
-('INTENT_TRANSFER_STATUS', 'Transfer Status Intent', 'FUND_TRANSFER_STATUS', '["transfer status", "payment status", "check transfer", "did transfer go through"]', 0.85, 'Payment', TRUE),
-('INTENT_BILLS', 'Bill Payment Intent', 'BILL_PAYMENT_HISTORY', '["bill payments", "utility bills", "paid bills", "bill history"]', 0.85, 'Payment', TRUE),
-('INTENT_CARDS', 'Card Details Intent', 'CARD_DETAILS', '["card details", "my cards", "credit card", "debit card", "card info"]', 0.85, 'Card', TRUE),
-('INTENT_LOANS', 'Loan Status Intent', 'LOAN_STATUS', '["loan status", "my loan", "emi details", "loan balance", "outstanding loan"]', 0.85, 'Loan', TRUE),
-('INTENT_FD', 'Fixed Deposit Intent', 'FIXED_DEPOSIT_DETAILS', '["fixed deposit", "fd details", "my fd", "term deposit"]', 0.85, 'Investment', TRUE),
-('INTENT_BENEFICIARIES', 'Beneficiary List Intent', 'BENEFICIARY_LIST', '["beneficiaries", "payee list", "saved accounts", "transfer contacts"]', 0.85, 'Payment', TRUE),
-('INTENT_SPENDING', 'Spending Analysis Intent', 'SPENDING_ANALYSIS', '["spending analysis", "expense analysis", "spending pattern", "where did I spend"]', 0.85, 'Analytics', TRUE),
--- Email-related intents (LLM_ONLY scenarios)
-('INTENT_EMAIL_DRAFT', 'Email Draft Intent', 'EMAIL_DRAFT', '["draft email", "write email", "compose email", "email to bank", "send email", "prepare email", "help me write email"]', 0.85, 'Communication', TRUE),
-('INTENT_EMAIL_WRITING', 'Email Writing Intent', 'EMAIL_WRITING', '["write email", "compose email", "draft email", "email help", "email template", "business email", "formal email", "email for manager", "email to manager"]', 0.85, 'Communication', TRUE),
-('INTENT_EMAIL_COMPLAINT', 'Complaint Email Intent', 'EMAIL_COMPLAINT', '["complaint email", "write complaint", "complain about", "issue email", "problem email", "dispute email"]', 0.85, 'Communication', TRUE),
-('INTENT_EMAIL_REQUEST', 'Request Email Intent', 'EMAIL_REQUEST', '["request email", "service request", "apply for", "need statement", "cheque book", "address change"]', 0.85, 'Communication', TRUE),
-('INTENT_EMAIL_FOLLOWUP', 'Follow-up Email Intent', 'EMAIL_FOLLOWUP', '["follow up", "follow-up email", "reminder", "pending request", "no response", "escalate"]', 0.85, 'Communication', TRUE),
-('INTENT_SUMMARIZE', 'Summarize Chat Intent', 'SUMMARIZE_CHAT', '["summarize", "summary", "recap", "what did we discuss", "conversation summary"]', 0.85, 'Utility', TRUE);
 
 -- =====================================================================
 -- SAMPLE DATA - RBAC (Role-Scenario Mapping)

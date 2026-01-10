@@ -444,4 +444,8 @@ public class SystemConfigService {
         }
         return "STRING";
     }
+
+    public String getCurrencySymbol() {
+        return "$";
+    }
 }

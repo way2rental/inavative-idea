@@ -1,7 +1,13 @@
 package com.enterprise.ai.core.mapper;
 
+import com.enterprise.ai.data.service.SystemConfigService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
 
 /**
  * Masking Service for sensitive data.
@@ -16,7 +22,11 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class MaskingService {
+
+    private final SystemConfigService systemConfigService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Apply masking based on type.
@@ -35,10 +45,31 @@ public class MaskingService {
             return stringValue;
         }
 
-        // TODO think and make them dynamic so that new masking types can be added via config using patterns
-        // For now, hardcoded types as per spec
+        // Masking types are now configurable via SystemConfig (key: "masking_patterns" as JSON)
+        // Custom masking patterns can be added dynamically via SystemConfig
+        // Format: {"CUSTOM_TYPE": {"pattern": "regex", "format": "template", "visibleChars": 4}}
+        // For now, using hardcoded types as per spec, but extensible via SystemConfig
+        
+        String typeUpper = maskingType.toUpperCase();
+        
+        // Check if custom masking pattern exists in SystemConfig
+        String customPatternsJson = systemConfigService.getJson("masking_patterns");
+        if (customPatternsJson != null && !customPatternsJson.isEmpty()) {
+            try {
+                Map<String, Map<String, Object>> customPatterns = objectMapper.readValue(
+                    customPatternsJson, new TypeReference<Map<String, Map<String, Object>>>() {});
+                
+                if (customPatterns.containsKey(typeUpper)) {
+                    return applyCustomMasking(stringValue, customPatterns.get(typeUpper));
+                }
+            } catch (Exception e) {
+                log.debug("Failed to parse custom masking patterns: {}", e.getMessage());
+            }
+        }
+        
+        // Use built-in masking types
         try {
-            return switch (maskingType.toUpperCase()) {
+            return switch (typeUpper) {
                 case "ACCOUNT" -> maskAccount(stringValue);
                 case "PAN" -> maskPan(stringValue);
                 case "AADHAAR" -> maskAadhaar(stringValue);
@@ -163,8 +194,49 @@ public class MaskingService {
         return "NONE";
     }
 
-    public static void main(String[] args) {
-        MaskingService maskingService = new MaskingService();
-        System.out.println(maskingService.maskAccount("123412342345"));
+    /**
+     * Apply custom masking pattern from SystemConfig.
+     * 
+     * @param value Value to mask
+     * @param patternConfig Custom pattern configuration from SystemConfig
+     * @return Masked value
+     */
+    private String applyCustomMasking(String value, Map<String, Object> patternConfig) {
+        try {
+            String pattern = (String) patternConfig.get("pattern");
+            String format = (String) patternConfig.get("format");
+            Integer visibleChars = patternConfig.get("visibleChars") != null 
+                ? ((Number) patternConfig.get("visibleChars")).intValue() : 4;
+            
+            // Apply regex pattern if provided
+            if (pattern != null && !pattern.isEmpty()) {
+                java.util.regex.Pattern regex = java.util.regex.Pattern.compile(pattern);
+                java.util.regex.Matcher matcher = regex.matcher(value);
+                if (matcher.find()) {
+                    String matched = matcher.group(0);
+                    String cleaned = matched.replaceAll("[^A-Za-z0-9]", "");
+                    
+                    if (format != null && !format.isEmpty()) {
+                        // Use format template with visible chars
+                        String visible = cleaned.length() >= visibleChars 
+                            ? cleaned.substring(cleaned.length() - visibleChars) 
+                            : cleaned;
+                        return format.replace("${visible}", visible);
+                    } else {
+                        // Default format: show last N chars
+                        String visible = cleaned.length() >= visibleChars 
+                            ? cleaned.substring(cleaned.length() - visibleChars) 
+                            : cleaned;
+                        return "****-" + visible;
+                    }
+                }
+            }
+            
+            // Fallback to simple masking
+            return "****";
+        } catch (Exception e) {
+            log.warn("Failed to apply custom masking pattern: {}", e.getMessage());
+            return "****";
+        }
     }
 }

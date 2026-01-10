@@ -1,7 +1,9 @@
 package com.enterprise.ai.core.mapper;
 
 import com.enterprise.ai.data.entity.AiResponseMapping;
+import com.enterprise.ai.data.entity.AiScenario;
 import com.enterprise.ai.data.repository.AiResponseMappingRepository;
+import com.enterprise.ai.data.service.ConfigCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -28,6 +30,7 @@ public class ResponseMappingService {
 
     private final AiResponseMappingRepository mappingRepository;
     private final JsonPathResponseMapper jsonPathMapper;
+    private final ConfigCacheService configCacheService;
 
     /**
      * Map raw database result to structured AI-friendly JSON.
@@ -106,8 +109,13 @@ public class ResponseMappingService {
             List<?> rawDataList,
             List<JsonPathResponseMapper.ResponseMappingConfig> mappings) {
 
-        // Limit to prevent memory issues (configurable via scenario)
-        int maxRows = 100; // TODO: Make this configurable per scenario
+        // Limit to prevent memory issues (configurable per scenario via maxResults field)
+        int maxRows = configCacheService.getScenarioByCode(scenarioCode)
+            .map(AiScenario::getMaxResults)
+            .filter(max -> max != null && max > 0)
+            .orElse(100); // Default to 100 if not configured
+
+        log.debug("Using maxRows={} for scenario {}", maxRows, scenarioCode);
 
         List<Map<String, Object>> mappedRows = jsonPathMapper.mapMultiRowResponse(rawDataList, mappings, maxRows);
 

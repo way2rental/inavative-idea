@@ -168,6 +168,19 @@ public class AiScenario {
     @Column(name = "icon", length = 50)
     private String icon;
 
+    /**
+     * Confidence threshold for intent detection (0.0 to 1.0).
+     * If null, uses fallback layer's default threshold.
+     */
+    @Column(name = "confidence_threshold")
+    private Double confidenceThreshold;
+
+    /**
+     * Associated follow-up group key for missing parameters.
+     */
+    @Column(name = "followup_group", length = 100)
+    private String followupGroup;
+
     // =====================================================================
     // MULTI-FILTER ENGINE FIELDS
     // =====================================================================

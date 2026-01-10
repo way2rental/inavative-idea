@@ -381,36 +381,44 @@ export interface PromptFormData {
   updatedBy?: string;
 }
 
-// ===================== INTENT CONFIGURATIONS =====================
+// ===================== RESPONSE TEMPLATES =====================
 
-export interface IntentConfig {
+export interface ResponseTemplate {
   id: number;
-  intentKey: string;
-  intentName: string;
-  description: string;
-  trainingPhrases: string[];
-  confidenceThreshold: number;
-  followupGroup: string;
   scenarioCode: string;
-  category: string;
+  scenarioName?: string;
+  responseType: string;
+  templateContent: string;
+  templateVariables?: string;
+  conditions?: string;
   priority: number;
+  templateVersion: number;
   active: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface IntentFormData {
-  intentKey: string;
-  intentName: string;
-  description: string;
-  trainingPhrases: string[];
-  confidenceThreshold: number;
-  followupGroup: string;
+export interface ResponseTemplateFormData {
   scenarioCode: string;
-  category: string;
+  responseType: string;
+  templateContent: string;
+  templateVariables?: string;
+  conditions?: string;
   priority: number;
+  templateVersion?: number;
   active: boolean;
 }
+
+// ===================== INTENT CONFIGURATIONS =====================
+// NOTE: IntentConfig has been REMOVED and consolidated into Scenario.
+// All intent configuration is now part of Scenario entity:
+// - intentKey → scenarioCode
+// - intentName → scenarioName
+// - trainingPhrases → triggerPhrases / exampleQueries
+// - confidenceThreshold → confidenceThreshold (added to Scenario)
+// - followupGroup → followupGroup (added to Scenario)
+// - category → category
+// - priority → displayOrder
 
 // ===================== FOLLOW-UP GROUPS =====================
 

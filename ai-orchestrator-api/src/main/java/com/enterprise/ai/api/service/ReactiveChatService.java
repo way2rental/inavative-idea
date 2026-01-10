@@ -9,9 +9,10 @@ import com.enterprise.ai.data.repository.AiAuditLogRepository;
 import com.enterprise.ai.data.repository.ChatMessageRepository;
 import com.enterprise.ai.data.repository.ChatSessionRepository;
 import com.enterprise.ai.llm.client.ConversationalAiService;
-import com.enterprise.ai.llm.client.ReactiveLlmClient;
+import com.enterprise.ai.intelligence.client.ReactiveIntelligenceClient;
 // Removed: import com.enterprise.ai.llm.config.OllamaProperties; - No longer needed
 import com.enterprise.ai.security.rbac.RbacService;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,7 +38,7 @@ public class ReactiveChatService {
     private static final String AFFIRMATIVE_PATTERN = 
             "(yes|y|yeah|yep|sure|ok|okay|proceed|confirm|haan|ha|theek hai).*";
 
-    private final ReactiveLlmClient llmClient;
+    private final com.enterprise.ai.intelligence.client.ReactiveIntelligenceClient intelligenceClient;
     private final DynamicScenarioRouter scenarioRouter;
     private final RbacService rbacService;
     private final IntentValidationService validationService;
@@ -58,7 +59,7 @@ public class ReactiveChatService {
     private final boolean dryRunMode;
 
     public ReactiveChatService(
-            ReactiveLlmClient llmClient,
+            com.enterprise.ai.intelligence.client.ReactiveIntelligenceClient intelligenceClient,
             DynamicScenarioRouter scenarioRouter,
             RbacService rbacService,
             IntentValidationService validationService,
@@ -74,7 +75,7 @@ public class ReactiveChatService {
             @Value("${runtime.protection.max-db-timeout-ms:5000}") long maxDbTimeoutMs,
             @Value("${llm.two-stage-detection:false}") boolean twoStageDetection,
             @Value("${runtime.dry-run-mode:false}") boolean dryRunMode) {
-        this.llmClient = llmClient;
+        this.intelligenceClient = intelligenceClient;
         this.scenarioRouter = scenarioRouter;
         this.rbacService = rbacService;
         this.validationService = validationService;
@@ -126,8 +127,8 @@ public class ReactiveChatService {
             tracker.startIntentDetection();
             
             Mono<IntentResult> intentMono = twoStageDetection
-                    ? llmClient.detectIntentTwoStage(request.getQuery(), sessionContext)
-                    : llmClient.detectIntent(request.getQuery(), sessionContext);
+                    ? intelligenceClient.detectIntentTwoStage(request.getQuery(), sessionContext)
+                    : intelligenceClient.detectIntent(request.getQuery(), sessionContext);
             
             return intentMono
                     .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
@@ -183,13 +184,28 @@ public class ReactiveChatService {
         // Check for pending follow-up context (user is answering a previous question)
         ChatSession session = sessionRepository.findBySessionId(sessionId).orElse(null);
         if (session != null && session.hasPendingFollowUp()) {
-            log.info("Found pending follow-up context: scenario={}, missingParams={}",
-                    session.getPendingScenario(), session.getPendingParams());
-            // Prepend session ID to pending follow-up response
-            return Flux.concat(
-                    Flux.just("[SESSION]" + sessionId),
-                    processPendingFollowUp(request, session, sessionContext, userRoles, executionId)
-            );
+            String pendingParams = session.getPendingParams();
+            log.info("Found pending follow-up context: scenario={}, pendingParams={}",
+                    session.getPendingScenario(), pendingParams);
+            
+            // Check if this is a confirmation follow-up (user confirming previous question)
+            if ("CONFIRMATION".equals(pendingParams)) {
+                // User is confirming - check if affirmative or providing additional info
+                if (isAffirmativeResponse(request.getQuery()) || request.getQuery().length() < 20) {
+                    // Short response like "type", "yes", "debit" - treat as confirmation with parameter
+                    return Flux.concat(
+                            Flux.just("[SESSION]" + sessionId),
+                            Flux.just("[PROGRESS]✅ Confirmed\n"),
+                            processPendingConfirmation(request, session, sessionContext, userRoles, executionId)
+                    );
+                }
+            } else {
+                // Regular follow-up for missing parameters
+                return Flux.concat(
+                        Flux.just("[SESSION]" + sessionId),
+                        processPendingFollowUp(request, session, sessionContext, userRoles, executionId)
+                );
+            }
         }
 
         // Get last used params for context resolution (e.g., "same account", "that account")
@@ -204,9 +220,11 @@ public class ReactiveChatService {
         log.debug("User allowed scenarios (RBAC): {}", allowedScenarios);
 
         // Cache the intent detection to avoid re-execution
-        // Pass lastUsedParamsJson so LLM can resolve references like "same account"
-        // Pass allowedScenarios so LLM only suggests scenarios the user can access
-        Mono<IntentResult> intentMono = llmClient.detectIntent(request.getQuery(), sessionContext, lastUsedParamsJson, allowedScenarios)
+        // Pass lastUsedParamsJson so intelligence system can resolve references like "same account"
+        // Pass allowedScenarios so intelligence system only suggests scenarios the user can access
+        // Pass sessionId and userId for context memory and parameter extraction
+        String userId = request.getUserId();
+        Mono<IntentResult> intentMono = intelligenceClient.detectIntent(request.getQuery(), sessionContext, lastUsedParamsJson, allowedScenarios, sessionId, userId)
                 .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
                 .doOnSuccess(intent -> log.info("Intent detected for streaming: scenario={}, confidence={}",
                         intent.getScenario(), intent.getConfidence()))
@@ -261,6 +279,22 @@ public class ReactiveChatService {
                                                 intent.getScenario(), validation.missingRequiredParams(), intent.getParams());
                                         return generateMissingParamMessage(intent.getScenario(),
                                                 validation.missingRequiredParams(), request.getQuery());
+                                    }
+                                    
+                                    // Handle confirmation request
+                                    if (validation.needsConfirmation()) {
+                                        Map<String, Object> params = intent.getParams() != null ? intent.getParams() : Map.of();
+                                        String confirmationMsg = String.format(
+                                                "I'm %.0f%% sure you want to check %s. Please confirm.",
+                                                intent.getConfidence() * 100, 
+                                                validationService.getScenarioDescription(intent.getScenario())
+                                        );
+                                        
+                                        // Store confirmation state in session for follow-up handling
+                                        storePendingConfirmation(sessionId, intent.getScenario(), params);
+                                        
+                                        saveMessageSync(sessionId, "assistant", confirmationMsg);
+                                        return Flux.just("[RESPONSE]" + confirmationMsg + "\n");
                                     }
 
                                     return Flux.just("\n" + message);
@@ -330,7 +364,7 @@ public class ReactiveChatService {
                                                                         Flux.just("[PROGRESS]📝 Preparing your response...\n"),
 
                                                                         // Final structured response with [RESPONSE] marker
-                                                                        llmClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery())
+                                                                        intelligenceClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery())
                                                                                 .map(jsonResponse -> "[RESPONSE]" + jsonResponse)
                                                                                 .doOnNext(chunk -> responseCollector.append(chunk.replace("[RESPONSE]", "")))
                                                                                 .doOnComplete(() -> {
@@ -365,7 +399,7 @@ public class ReactiveChatService {
      * Keep it simple - just the question, no extra formatting.
      */
     private Flux<String> generateMissingParamMessage(String scenarioCode, List<String> missingParams, String userQuery) {
-        return llmClient.generateFollowUpQuestion(scenarioCode, missingParams)
+        return intelligenceClient.generateFollowUpQuestion(scenarioCode, missingParams)
                 .map(question -> {
                     log.info("Generating structured follow-up for missing params: {}, question : {}", missingParams, question);
                     return "[RESPONSE]" + question;
@@ -479,7 +513,7 @@ public class ReactiveChatService {
                 .flatMap(result -> {
                     // Format response (non-blocking)
                     tracker.startFormatting();
-                    return llmClient.formatResponse(intent.getScenario(), result, request.getQuery())
+                    return intelligenceClient.formatResponse(intent.getScenario(), result, request.getQuery())
                             .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
                             .doOnSuccess(r -> tracker.endFormatting())
                             .map(formattedResponse -> {
@@ -556,7 +590,7 @@ public class ReactiveChatService {
             tracker.withScenario(selectedScenario);
             String sessionContext = getSessionContextSync(sessionId);
             
-            return llmClient.detectIntent(request.getQuery(), sessionContext)
+            return intelligenceClient.detectIntent(request.getQuery(), sessionContext)
                     .map(detectedIntent -> IntentResult.builder()
                             .scenario(selectedScenario)
                             .confidence(0.95)
@@ -569,7 +603,7 @@ public class ReactiveChatService {
                                 validationService.validate(intent, request.getQuery());
                         
                         if (!validation.missingRequiredParams().isEmpty()) {
-                            return llmClient.generateFollowUpQuestion(selectedScenario, validation.missingRequiredParams())
+                            return intelligenceClient.generateFollowUpQuestion(selectedScenario, validation.missingRequiredParams())
                                     .map(followUp -> {
                                         saveMessageSync(sessionId, "assistant", followUp);
                                         return ChatResponse.builder()
@@ -640,7 +674,7 @@ public class ReactiveChatService {
         }
 
         if (!validation.missingRequiredParams().isEmpty()) {
-            return llmClient.generateFollowUpQuestion(intent.getScenario(), validation.missingRequiredParams())
+            return intelligenceClient.generateFollowUpQuestion(intent.getScenario(), validation.missingRequiredParams())
                     .map(followUp -> {
                         saveMessageSync(sessionId, "assistant", followUp);
                         return ChatResponse.builder()
@@ -674,6 +708,9 @@ public class ReactiveChatService {
                 confirmationMsg += " for " + paramStr;
             }
             confirmationMsg += ".\n\nShall I proceed? (Yes/No)";
+            
+            // Store confirmation state in session for follow-up handling
+            storePendingConfirmation(sessionId, intent.getScenario(), params);
             
             saveMessageSync(sessionId, "assistant", confirmationMsg);
             
@@ -722,6 +759,29 @@ public class ReactiveChatService {
             }
         } catch (Exception e) {
             log.error("Failed to store pending follow-up state: {}", e.getMessage());
+        }
+    }
+    
+    /**
+     * Store pending confirmation state in the session.
+     * Called when we ask the user to confirm before execution.
+     */
+    private void storePendingConfirmation(String sessionId, String scenarioCode, Map<String, Object> params) {
+        try {
+            Optional<ChatSession> sessionOpt = sessionRepository.findBySessionId(sessionId);
+            if (sessionOpt.isPresent()) {
+                ChatSession session = sessionOpt.get();
+                // Store confirmation state - reuse pendingScenario and collectedParams
+                session.setPendingScenario(scenarioCode);
+                session.setPendingParams("CONFIRMATION"); // Special marker for confirmation
+                if (params != null && !params.isEmpty()) {
+                    session.setCollectedParams(objectMapper.writeValueAsString(params));
+                }
+                sessionRepository.save(session);
+                log.info("Stored pending confirmation: scenario={}, params={}", scenarioCode, params);
+            }
+        } catch (Exception e) {
+            log.error("Failed to store pending confirmation state: {}", e.getMessage());
         }
     }
 
@@ -788,7 +848,7 @@ public class ReactiveChatService {
                 Flux.just("[PROGRESS]🔍 Processing your response...\n"),
 
                 // Use LLM to extract the parameter from user's response
-                llmClient.detectIntent(request.getQuery(), enhancedContext)
+                intelligenceClient.detectIntent(request.getQuery(), enhancedContext)
                         .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
                         .flatMapMany(detectedIntent -> {
                             // Build the params map combining previously collected params with new ones
@@ -880,7 +940,7 @@ public class ReactiveChatService {
                                                 return Flux.concat(
                                                         Flux.just("[PROGRESS]✅ Data retrieved\n"),
                                                         Flux.just("[PROGRESS]📝 Preparing your response...\n"),
-                                                        llmClient.formatResponseStreaming(pendingScenario, result, request.getQuery())
+                                                        intelligenceClient.formatResponseStreaming(pendingScenario, result, request.getQuery())
                                                                 .map(jsonResponse -> "[RESPONSE]" + jsonResponse)
                                                                 .doOnComplete(() -> {
                                                                     log.debug("Pending follow-up completed successfully");
@@ -903,6 +963,121 @@ public class ReactiveChatService {
         );
     }
 
+    /**
+     * Process pending confirmation response.
+     * User is confirming or providing additional parameter info.
+     */
+    private Flux<String> processPendingConfirmation(ChatRequest request, ChatSession session,
+                                                     String sessionContext, List<String> userRoles, String executionId) {
+        String pendingScenario = session.getPendingScenario();
+        String collectedParamsStr = session.getCollectedParams();
+        
+        log.info("Processing pending confirmation for scenario: {}, user provided: {}",
+                pendingScenario, request.getQuery());
+        
+        try {
+            // Parse collected params
+            Map<String, Object> params = new HashMap<>();
+            if (collectedParamsStr != null && !collectedParamsStr.isEmpty()) {
+                params = objectMapper.readValue(collectedParamsStr, 
+                    new TypeReference<Map<String, Object>>() {});
+            }
+            
+            // If user provided additional info (like "type", "debit"), try to extract it
+            String userQuery = request.getQuery().toLowerCase().trim();
+            if (!isAffirmativeResponse(userQuery) && userQuery.length() < 20) {
+                // Short response - might be providing parameter value
+                // For TRANSACTION_HISTORY, "type" or "debit" could be transactionType filter
+                if (pendingScenario != null && pendingScenario.equals("TRANSACTION_HISTORY")) {
+                    // Check session context for original query with "debit"
+                    if (sessionContext != null && sessionContext.toLowerCase().contains("debit")) {
+                        params.put("transactionType", "DEBIT");
+                    } else if (userQuery.contains("debit")) {
+                        params.put("transactionType", "DEBIT");
+                    } else if (userQuery.contains("credit")) {
+                        params.put("transactionType", "CREDIT");
+                    } else if (userQuery.contains("transfer")) {
+                        params.put("transactionType", "TRANSFER");
+                    }
+                }
+            }
+            
+            // Clear confirmation state
+            clearPendingFollowUp(session.getSessionId());
+            
+            // Authorization check
+            if (!rbacService.anyRoleAuthorized(userRoles, pendingScenario)) {
+                log.warn("User not authorized for pending scenario: {}", pendingScenario);
+                return Flux.just("\n❌ You don't have permission to access this information.");
+            }
+            
+            // Execute the scenario with confirmed params
+            ScenarioRequest scenarioRequest = ScenarioRequest.builder()
+                    .scenario(pendingScenario)
+                    .params(params)
+                    .userId(request.getUserId())
+                    .build();
+            
+            // Store combined params for future context resolution before execution
+            final Map<String, Object> finalParams = params;
+            
+            return Flux.concat(
+                    Flux.just("[PROGRESS]✅ Confirmed\n"),
+                    Flux.just("[PROGRESS]🔐 Verifying permissions...\n"),
+                    Flux.just("[PROGRESS]✅ Access granted\n"),
+                    Flux.just("[PROGRESS]📊 Fetching your data...\n"),
+                    scenarioRouter.routeReactive(scenarioRequest)
+                            .timeout(Duration.ofMillis(maxDbTimeoutMs))
+                            .doOnSuccess(result -> {
+                                log.debug("Scenario executed, starting streaming response");
+                                // Log successful execution to audit
+                                Instant requestTime = Instant.now();
+                                logAuditAsync(executionId, request.getUserId(), pendingScenario,
+                                        requestTime, Instant.now(), true, null, 
+                                        IntentResult.builder().scenario(pendingScenario).confidence(1.0).build(), 
+                                        result);
+                                // Store last used params for future context resolution
+                                storeLastUsedParams(session.getSessionId(), finalParams);
+                            })
+                            .doOnError(e -> {
+                                log.error("Scenario execution failed: {}", e.getMessage());
+                                // Log execution failure to audit
+                                Instant requestTime = Instant.now();
+                                logAuditAsync(executionId, request.getUserId(), pendingScenario,
+                                        requestTime, Instant.now(), false,
+                                        "Scenario execution failed: " + e.getMessage(), 
+                                        IntentResult.builder().scenario(pendingScenario).confidence(1.0).build(), 
+                                        null);
+                            })
+                            .flatMapMany(result -> {
+                                log.debug("Formatting response as stream");
+                                return Flux.concat(
+                                        // Status/progress messages
+                                        Flux.just("[PROGRESS]✅ Data retrieved\n"),
+                                        Flux.just("[PROGRESS]📝 Preparing your response...\n"),
+                                        // Final structured response
+                                        intelligenceClient.formatResponseStreaming(pendingScenario, result, request.getQuery())
+                                                .map(jsonResponse -> "[RESPONSE]" + jsonResponse)
+                                                .doOnComplete(() -> {
+                                                    log.debug("Response streaming completed");
+                                                    saveMessageSync(session.getSessionId(), "assistant", 
+                                                        result.getData() != null ? result.getData().toString() : "Response completed");
+                                                })
+                                                .doOnError(e -> log.error("Response streaming error: {}", e.getMessage()))
+                                );
+                            })
+                            .onErrorResume(e -> {
+                                log.error("Error processing confirmation: {}", e.getMessage());
+                                return Flux.just("\n❌ I encountered an error processing your request. Please try again.");
+                            })
+            );
+        } catch (Exception e) {
+            log.error("Error processing pending confirmation: {}", e.getMessage(), e);
+            clearPendingFollowUp(session.getSessionId());
+            return Flux.just("\n❌ I had trouble processing your confirmation. Please try again.");
+        }
+    }
+    
     private boolean isAffirmativeResponse(String response) {
         if (response == null) return false;
         return response.toLowerCase().trim().matches(AFFIRMATIVE_PATTERN);

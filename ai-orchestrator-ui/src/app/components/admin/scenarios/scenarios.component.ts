@@ -62,7 +62,7 @@ export class ScenariosComponent implements OnInit {
       scenarioCode: '',
       scenarioName: '',
       description: '',
-      llmPromptTemplate: '',
+      llmPromptTemplate: '', // Response Template (Freemarker)
       requiredParams: '',
       executionType: 'DB_QUERY',
       httpMethod: 'GET',
@@ -102,7 +102,7 @@ export class ScenariosComponent implements OnInit {
       scenarioCode: scenario.scenarioCode,
       scenarioName: scenario.scenarioName || '',
       description: scenario.description || '',
-      llmPromptTemplate: scenario.llmPromptTemplate || '',
+      llmPromptTemplate: scenario.llmPromptTemplate || '', // Response template (Freemarker)
       requiredParams: scenario.requiredParams?.join(', ') || '',
       executionType: scenario.executionType,
       httpMethod: scenario.httpMethod || 'GET',

@@ -32,6 +32,10 @@
         </dependency>
         <dependency>
             <groupId>com.enterprise.ai</groupId>
+            <artifactId>ai-orchestrator-intelligence</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.enterprise.ai</groupId>
             <artifactId>ai-orchestrator-security</artifactId>
         </dependency>
         <dependency>

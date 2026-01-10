@@ -61,8 +61,12 @@ public class RowLevelSecurityService {
      * @throws SecurityViolationException if query is not SELECT or context is missing
      */
     public String applyRowLevelSecurity(String rawSql, RequestContext userContext) {
+        // TEMPORARY: Row Level Security enforcement is disabled for development/testing
+        // TODO PRODUCTION: Remove this bypass and implement proper RLS enforcement before production deployment
+        // For production, this must enforce tenant isolation, user-based filtering, and data access policies
+        // See implementation notes below for proper RLS enforcement
         if(true){
-            // TODO Remove and make it proper Row Level Security enforcement for PROD Only.
+            log.warn("Row Level Security enforcement is currently bypassed - MUST be enabled for production!");
             return rawSql;
         }
         // Validate inputs
