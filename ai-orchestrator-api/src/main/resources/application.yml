@@ -1,6 +1,3 @@
-# AI Orchestrator Application Configuration - Enterprise Runtime Platform
-# Dynamic Executor Architecture with Read-Only Enforcement
-
 spring:
   application:
     name: ai-orchestrator
@@ -282,3 +279,5 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
+    persist-authorization: true
+    try-it-out-enabled: true
