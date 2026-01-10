@@ -12,6 +12,9 @@ import { RbacComponent } from './components/admin/rbac/rbac.component';
 import { RbacManagementComponent } from './components/admin/rbac/rbac-management.component';
 import { ResponseMappingsComponent } from './components/admin/response-mappings/response-mappings.component';
 import { FeedbackDashboardComponent } from './components/admin/feedback/feedback-dashboard.component';
+import { FollowUpsComponent } from './components/admin/followups/followups.component';
+import { PoliciesComponent } from './components/admin/policies/policies.component';
+import { SystemConfigComponent } from './components/admin/system-config/system-config.component';
 import { authGuard, adminGuard, operatorGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -25,6 +28,9 @@ export const routes: Routes = [
   { path: 'admin/rbac', component: RbacManagementComponent, canActivate: [adminGuard] },
   { path: 'admin/response-mappings', component: ResponseMappingsComponent, canActivate: [adminGuard] },
   { path: 'admin/feedback', component: FeedbackDashboardComponent, canActivate: [adminGuard] },
+  { path: 'admin/followups', component: FollowUpsComponent, canActivate: [adminGuard] },
+  { path: 'admin/policies', component: PoliciesComponent, canActivate: [adminGuard] },
+  { path: 'admin/system-config', component: SystemConfigComponent, canActivate: [adminGuard] },
   { path: 'admin/audit-logs', component: AuditLogsComponent, canActivate: [operatorGuard] },
   { path: 'admin/sessions', component: SessionsComponent, canActivate: [operatorGuard] },
   { path: 'admin/settings', component: SettingsComponent, canActivate: [adminGuard] },

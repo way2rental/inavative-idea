@@ -1,27 +1,25 @@
-<!-- Axis Bank Admin - Scenario Management -->
 <div class="min-h-screen bg-bank-bg">
-  <!-- Page Title Section -->
   <div class="bg-white border-b">
     <div class="px-6 lg:px-8 py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-          <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
+          <a routerLink="/admin" class="text-gray-400 hover:text-indigo-600 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
           </a>
-          <div class="w-10 h-10 bg-axis-burgundy/10 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-axis-burgundy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
           </div>
           <div>
-            <h1 class="text-xl font-bold text-gray-900">Scenario Management</h1>
-            <p class="text-gray-500 text-sm">Configure and manage AI scenarios</p>
+            <h1 class="text-xl font-bold text-gray-900">AI Scenario Management</h1>
+            <p class="text-gray-500 text-sm">Configure AI scenarios with filters, triggers, and queries</p>
           </div>
         </div>
         <div class="flex items-center gap-3">
-          <span class="text-gray-500 text-sm">Total: {{ filteredScenarios.length }} scenarios</span>
+          <span class="text-gray-500 text-sm">{{ filteredScenarios.length }} of {{ scenarios.length }} scenarios</span>
           <button (click)="openCreateModal()" class="btn-axis text-sm flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -36,305 +34,443 @@
   <div class="px-6 lg:px-8 py-8">
     <!-- Filters -->
     <div class="card-axis p-4 mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div>
           <input type="text" [(ngModel)]="filterScenarioCode" (input)="applyFilters()"
-            placeholder="Filter by Code..." class="input-axis text-sm">
+            placeholder="Search by code or name..." class="input-axis text-sm">
         </div>
         <div>
-          <input type="text" [(ngModel)]="filterScenarioName" (input)="applyFilters()"
-            placeholder="Filter by Name..." class="input-axis text-sm">
+          <select [(ngModel)]="filterCategory" (change)="applyFilters()" class="input-axis text-sm">
+            <option value="">All Categories</option>
+            @for (cat of categories; track cat) {
+              <option [value]="cat">{{ cat }}</option>
+            }
+          </select>
         </div>
         <div>
           <select [(ngModel)]="filterExecutionType" (change)="applyFilters()" class="input-axis text-sm">
             <option value="">All Execution Types</option>
-            <option value="DB_QUERY">Query Executor</option>
-            <option value="HTTP_CALL">HTTP Executor</option>
+            <option value="DB_QUERY">DB Query</option>
+            <option value="HTTP_CALL">HTTP Call</option>
+            <option value="FILE_READ">File Read</option>
           </select>
         </div>
         <div>
           <select [(ngModel)]="filterStatus" (change)="applyFilters()" class="input-axis text-sm">
             <option value="">All Status</option>
-            <option value="active">Active Only</option>
-            <option value="inactive">Inactive Only</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </div>
-      </div>
-      <div class="flex items-center gap-3 mt-3">
-        <button (click)="clearFilters()" class="btn-secondary text-sm">Clear Filters</button>
-        <span class="text-gray-500 text-sm">Showing {{ filteredScenarios.length }} of {{ scenarios.length }} scenarios</span>
+        <div>
+          <button (click)="clearFilters()" class="btn-secondary text-sm w-full">Clear Filters</button>
+        </div>
       </div>
     </div>
 
     @if (isLoading) {
       <div class="flex items-center justify-center h-64">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-axis-burgundy"></div>
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     } @else {
-      <!-- Scenarios Table -->
-      <div class="card-axis overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
-                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Executor</th>
-                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Security</th>
-                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-              @for (scenario of filteredScenarios; track scenario.id) {
-                <tr class="hover:bg-gray-50 transition-colors">
-                  <td class="px-6 py-4">
-                    <span class="text-gray-900 font-mono text-sm">{{ scenario.scenarioCode }}</span>
-                  </td>
-                  <td class="px-6 py-4">
-                    <div>
-                      <p class="text-gray-900 font-medium">{{ scenario.scenarioName }}</p>
-                      <p class="text-gray-500 text-xs line-clamp-1">{{ scenario.description }}</p>
-                    </div>
-                  </td>
-                  <td class="px-6 py-4">
-                    @if (scenario.executionType === 'DB_QUERY') {
-                      <span class="badge bg-blue-100 text-blue-700">
-                        <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z"/>
-                          <path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z"/>
-                          <path d="M17 5c0 1.657-3.134 3-7 3S3 6.657 3 5s3.134-3 7-3 7 1.343 7 3z"/>
-                        </svg>
-                        Query
-                      </span>
-                    } @else {
-                      <span class="badge bg-purple-100 text-purple-700">
-                        <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
-                          <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
-                        </svg>
-                        HTTP
-                      </span>
-                    }
-                  </td>
-                  <td class="px-6 py-4">
-                    <span class="text-gray-700 text-sm">{{ scenario.executorBean || 'N/A' }}</span>
-                  </td>
-                  <td class="px-6 py-4">
-                    @if (scenario.securityLevel === 'HIGH') {
-                      <span class="badge-danger">High</span>
-                    } @else if (scenario.securityLevel === 'MEDIUM') {
-                      <span class="badge-warning">Medium</span>
-                    } @else {
-                      <span class="badge-info">Low</span>
-                    }
-                  </td>
-                  <td class="px-6 py-4">
-                    @if (scenario.active) {
-                      <span class="badge-success">Active</span>
-                    } @else {
-                      <span class="badge bg-gray-100 text-gray-600">Inactive</span>
-                    }
-                  </td>
-                  <td class="px-6 py-4">
-                    <div class="flex items-center gap-2">
-                      <button (click)="viewDetails(scenario)"
-                        class="text-axis-burgundy hover:text-axis-maroon text-sm font-medium">
-                        View Details
-                      </button>
-                      <button (click)="deleteScenario(scenario)"
-                        class="text-red-600 hover:text-red-700 text-sm font-medium">
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              } @empty {
-                <tr>
-                  <td colspan="7" class="px-6 py-12 text-center">
-                    <div class="flex flex-col items-center justify-center">
-                      <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                      </svg>
-                      <p class="text-gray-500 font-medium">No scenarios found</p>
-                      <p class="text-gray-400 text-sm mt-1">Try adjusting your filters or create a new scenario</p>
-                    </div>
-                  </td>
-                </tr>
+      <!-- Scenarios Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        @for (scenario of filteredScenarios; track scenario.id) {
+          <div class="card-axis p-6 hover:shadow-elevated transition-all duration-300 cursor-pointer"
+               (click)="viewDetails(scenario)">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center"
+                     [class]="getCategoryColor(scenario.category)">
+                  <span class="text-xl">{{ scenario.icon || '📋' }}</span>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-gray-900">{{ scenario.scenarioName || scenario.scenarioCode }}</h3>
+                  <p class="text-xl bold axis-burgandy font-mono">{{ scenario.scenarioCode }}</p>
+                </div>
+              </div>
+              <span class="px-2 py-1 rounded-full text-xs font-medium"
+                    [class]="scenario.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'">
+                {{ scenario.active ? 'Active' : 'Inactive' }}
+              </span>
+            </div>
+
+            <p class="text-gray-600 text-sm mb-4 line-clamp-2">{{ scenario.description || 'No description' }}</p>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+              <span class="badge bg-blue-100 text-blue-700">{{ scenario.executionType }}</span>
+              @if (scenario.category) {
+                <span class="badge" [class]="getCategoryColor(scenario.category)">{{ scenario.category }}</span>
               }
-            </tbody>
-          </table>
-        </div>
+              @if (scenario.filterDefinitions) {
+                <span class="badge bg-purple-100 text-purple-700">Multi-Filter</span>
+              }
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t">
+              <div class="flex items-center gap-2">
+                <button (click)="openEditModal(scenario); $event.stopPropagation()"
+                        class="text-indigo-600 hover:text-indigo-800 text-sm">Edit</button>
+                <button (click)="testScenario(scenario); $event.stopPropagation()"
+                        class="text-green-600 hover:text-green-800 text-sm">Test</button>
+              </div>
+              <button (click)="toggleStatus(scenario); $event.stopPropagation()"
+                      class="text-sm" [class]="scenario.active ? 'text-amber-600' : 'text-green-600'">
+                {{ scenario.active ? 'Disable' : 'Enable' }}
+              </button>
+            </div>
+          </div>
+        }
       </div>
+
+      @if (filteredScenarios.length === 0) {
+        <div class="card-axis p-12 text-center">
+          <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">No Scenarios Found</h3>
+          <p class="text-gray-500 mb-6">Create your first AI scenario to get started.</p>
+          <button (click)="openCreateModal()" class="btn-axis">Create Scenario</button>
+        </div>
+      }
     }
   </div>
-</div>
 
-<!-- Details Modal -->
-@if (selectedScenario) {
-  <div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" (click)="closeDetails()">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden" (click)="$event.stopPropagation()">
-      <!-- Modal Header -->
-      <div class="bg-gradient-to-r from-axis-burgundy to-axis-maroon px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
+  <!-- Details Side Panel -->
+  @if (selectedScenario && !showModal) {
+    <div class="fixed inset-0 bg-black/30 backdrop-blur-sm z-40" (click)="closeDetails()"></div>
+    <div class="fixed right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl z-50 overflow-y-auto">
+      <div class="p-6 border-b bg-indigo-600 text-white">
+        <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-xl font-bold text-white">Scenario Details</h2>
-            <p class="text-white/80 text-sm">{{ selectedScenario.scenarioCode }}</p>
+            <h2 class="text-xl font-bold">{{ selectedScenario.scenarioName || selectedScenario.scenarioCode }}</h2>
+            <p class="text-indigo-200 text-sm font-mono">{{ selectedScenario.scenarioCode }}</p>
           </div>
-        </div>
-        <button (click)="closeDetails()" class="text-white/80 hover:text-white transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
-        <!-- Basic Info -->
-        <div class="mb-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-3">Basic Information</h3>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-gray-500 text-sm">Scenario Name</label>
-              <p class="text-gray-900 font-medium">{{ selectedScenario.scenarioName }}</p>
-            </div>
-            <div>
-              <label class="text-gray-500 text-sm">Status</label>
-              <p>
-                @if (selectedScenario.active) {
-                  <span class="badge-success">Active</span>
-                } @else {
-                  <span class="badge bg-gray-100 text-gray-600">Inactive</span>
-                }
-              </p>
-            </div>
-            <div class="col-span-2">
-              <label class="text-gray-500 text-sm">Description</label>
-              <p class="text-gray-900">{{ selectedScenario.description }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Execution Config -->
-        <div class="mb-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-3">Execution Configuration</h3>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-gray-500 text-sm">Execution Type</label>
-              <p class="text-gray-900 font-medium">{{ selectedScenario.executionType }}</p>
-            </div>
-            <div>
-              <label class="text-gray-500 text-sm">Executor Bean</label>
-              <p class="text-gray-900 font-medium">{{ selectedScenario.executorBean || 'N/A' }}</p>
-            </div>
-            <div>
-              <label class="text-gray-500 text-sm">Security Level</label>
-              <p>
-                @if (selectedScenario.securityLevel === 'HIGH') {
-                  <span class="badge-danger">High</span>
-                } @else if (selectedScenario.securityLevel === 'MEDIUM') {
-                  <span class="badge-warning">Medium</span>
-                } @else {
-                  <span class="badge-info">Low</span>
-                }
-              </p>
-            </div>
-            <div>
-              <label class="text-gray-500 text-sm">Timeout</label>
-              <p class="text-gray-900">{{ selectedScenario.timeoutMs }}ms</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Parameters -->
-        <div class="mb-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-3">Parameters</h3>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-gray-500 text-sm">Required Parameters</label>
-              <div class="flex flex-wrap gap-2 mt-1">
-                @for (param of selectedScenario.requiredParams; track param) {
-                  <span class="badge bg-red-100 text-red-700">{{ param }}</span>
-                } @empty {
-                  <span class="text-gray-400 text-sm">None</span>
-                }
-              </div>
-            </div>
-            <div>
-              <label class="text-gray-500 text-sm">Optional Parameters</label>
-              <div class="flex flex-wrap gap-2 mt-1">
-                @for (param of selectedScenario.optionalParams; track param) {
-                  <span class="badge bg-blue-100 text-blue-700">{{ param }}</span>
-                } @empty {
-                  <span class="text-gray-400 text-sm">None</span>
-                }
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- SQL Query (if DB_QUERY) -->
-        @if (selectedScenario.executionType === 'DB_QUERY' && selectedScenario.sqlQuery) {
-          <div class="mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-3">SQL Query</h3>
-            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4">
-              <pre class="text-sm text-gray-800 font-mono whitespace-pre-wrap overflow-x-auto">{{ selectedScenario.sqlQuery }}</pre>
-            </div>
-          </div>
-        }
-
-        <!-- HTTP Config (if HTTP_CALL) -->
-        @if (selectedScenario.executionType === 'HTTP_CALL') {
-          <div class="mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-3">HTTP Configuration</h3>
-            <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-l-4 border-purple-500 rounded-lg p-4 space-y-3">
-              <div>
-                <label class="text-gray-500 text-sm">Method</label>
-                <p class="text-gray-900 font-mono">{{ selectedScenario.httpMethod }}</p>
-              </div>
-              <div>
-                <label class="text-gray-500 text-sm">URL</label>
-                <p class="text-gray-900 font-mono text-sm break-all">{{ selectedScenario.httpUrl }}</p>
-              </div>
-              @if (selectedScenario.httpHeaders) {
-                <div>
-                  <label class="text-gray-500 text-sm">Headers</label>
-                  <pre class="text-sm text-gray-800 font-mono whitespace-pre-wrap">{{ selectedScenario.httpHeaders }}</pre>
-                </div>
-              }
-            </div>
-          </div>
-        }
-
-        <!-- LLM Prompt -->
-        @if (selectedScenario.llmPromptTemplate) {
-          <div class="mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-3">LLM Prompt Template</h3>
-            <div class="bg-gradient-to-br from-amber-50 to-orange-50 border-l-4 border-amber-500 rounded-lg p-4">
-              <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ selectedScenario.llmPromptTemplate }}</p>
-            </div>
-          </div>
-        }
-
-        <!-- Action Buttons -->
-        <div class="flex items-center justify-end gap-3 pt-4 border-t">
-          <button (click)="closeDetails()" class="btn-secondary">Close</button>
-          <button (click)="testScenario(selectedScenario); closeDetails()" class="btn-axis">
-            Test Scenario
+          <button (click)="closeDetails()" class="text-white/70 hover:text-white">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
       </div>
+
+      <div class="p-6 space-y-6">
+        <!-- Basic Info -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-500 mb-2">Description</h3>
+          <p class="text-gray-900">{{ selectedScenario.description || 'No description' }}</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-1">Category</h3>
+            <span class="badge" [class]="getCategoryColor(selectedScenario.category)">{{ selectedScenario.category || 'Other' }}</span>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-1">Execution Type</h3>
+            <span class="badge bg-blue-100 text-blue-700">{{ selectedScenario.executionType }}</span>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-1">Timeout</h3>
+            <span>{{ selectedScenario.timeoutMs }}ms</span>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-1">Max Results</h3>
+            <span>{{ selectedScenario.maxResults || 100 }}</span>
+          </div>
+        </div>
+
+        <!-- AI Intent Detection -->
+        @if (selectedScenario.triggerPhrases) {
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-2">Trigger Phrases (AI Intent Detection)</h3>
+            <pre class="bg-gray-50 p-3 rounded-lg text-sm overflow-x-auto">{{ formatJson(selectedScenario.triggerPhrases) }}</pre>
+          </div>
+        }
+
+        @if (selectedScenario.exampleQueries) {
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-2">Example Queries</h3>
+            <pre class="bg-gray-50 p-3 rounded-lg text-sm overflow-x-auto">{{ formatJson(selectedScenario.exampleQueries) }}</pre>
+          </div>
+        }
+
+        <!-- SQL Query -->
+        @if (selectedScenario.sqlQuery) {
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-2">SQL Query</h3>
+            <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm overflow-x-auto">{{ selectedScenario.sqlQuery }}</pre>
+          </div>
+        }
+
+        <!-- Filter Definitions -->
+        @if (selectedScenario.filterDefinitions) {
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-2">Filter Definitions (Multi-Filter Engine)</h3>
+            <pre class="bg-gray-50 p-3 rounded-lg text-sm overflow-x-auto">{{ formatJson(selectedScenario.filterDefinitions) }}</pre>
+          </div>
+        }
+
+        <!-- Required Params -->
+        @if (selectedScenario.requiredParams && selectedScenario.requiredParams.length > 0) {
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-2">Required Parameters</h3>
+            <div class="flex flex-wrap gap-2">
+              @for (param of selectedScenario.requiredParams; track param) {
+                <span class="badge bg-red-100 text-red-700">{{ param }}</span>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- LLM Prompt Template -->
+        @if (selectedScenario.llmPromptTemplate) {
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-2">LLM Prompt Template</h3>
+            <pre class="bg-gray-50 p-3 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap">{{ selectedScenario.llmPromptTemplate }}</pre>
+          </div>
+        }
+      </div>
+
+      <div class="p-6 border-t flex justify-between">
+        <button (click)="deleteScenario(selectedScenario!)" class="btn-danger">Delete</button>
+        <div class="flex gap-3">
+          <button (click)="testScenario(selectedScenario!)" class="btn-secondary">Test</button>
+          <button (click)="openEditModal(selectedScenario!)" class="btn-axis">Edit</button>
+        </div>
+      </div>
     </div>
-  </div>
-}
+  }
 
-<!-- Create/Edit Modal (existing modal code remains the same) -->
-<!-- ... existing modal code ... -->
+  <!-- Create/Edit Modal with Tabs -->
+  @if (showModal) {
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="card-axis w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-6 border-b border-gray-200 bg-axis-burgundy text-white rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold">{{ isEditing ? 'Edit Scenario' : 'Create New Scenario' }}</h2>
+            <button (click)="closeModal()" class="text-white/70 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
+          <!-- Tabs -->
+          <div class="flex gap-1 mt-4 -mb-6 px-2">
+            <button (click)="activeTab = 'basic'"
+                    class="px-4 py-2 rounded-t-lg text-sm font-medium transition-colors"
+                    [class]="activeTab === 'basic' ? 'bg-white text-indigo-600' : 'text-white/70 hover:text-white'">
+              Basic Info
+            </button>
+            <button (click)="activeTab = 'query'"
+                    class="px-4 py-2 rounded-t-lg text-sm font-medium transition-colors"
+                    [class]="activeTab === 'query' ? 'bg-white text-indigo-600' : 'text-white/70 hover:text-white'">
+              Query & Mapping
+            </button>
+            <button (click)="activeTab = 'filters'"
+                    class="px-4 py-2 rounded-t-lg text-sm font-medium transition-colors"
+                    [class]="activeTab === 'filters' ? 'bg-white text-indigo-600' : 'text-white/70 hover:text-white'">
+              Filters
+            </button>
+            <button (click)="activeTab = 'ai'"
+                    class="px-4 py-2 rounded-t-lg text-sm font-medium transition-colors"
+                    [class]="activeTab === 'ai' ? 'bg-white text-indigo-600' : 'text-white/70 hover:text-white'">
+              AI Settings
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6 overflow-y-auto flex-1">
+          <form class="space-y-4">
+            <!-- Basic Info Tab -->
+            @if (activeTab === 'basic') {
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Scenario Code *</label>
+                  <input type="text" [(ngModel)]="formData.scenarioCode" name="scenarioCode"
+                    class="input-axis font-mono uppercase" placeholder="ACCOUNT_BALANCE" [disabled]="isEditing">
+                  <p class="text-xs text-gray-500 mt-1">Unique identifier (e.g., TRANSACTION_HISTORY)</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Scenario Name *</label>
+                  <input type="text" [(ngModel)]="formData.scenarioName" name="scenarioName"
+                    class="input-axis" placeholder="Check Account Balance">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea [(ngModel)]="formData.description" name="description" rows="2"
+                  class="input-axis" placeholder="What does this scenario do?"></textarea>
+              </div>
+
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                  <select [(ngModel)]="formData.category" name="category" class="input-axis">
+                    @for (cat of categories; track cat) {
+                      <option [value]="cat">{{ cat }}</option>
+                    }
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Execution Type</label>
+                  <select [(ngModel)]="formData.executionType" name="executionType" class="input-axis">
+                    <option value="DB_QUERY">DB Query</option>
+                    <option value="HTTP_CALL">HTTP Call</option>
+                    <option value="FILE_READ">File Read</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Icon</label>
+                  <select [(ngModel)]="formData.icon" name="icon" class="input-axis">
+                    @for (icon of icons; track icon) {
+                      <option [value]="icon">{{ icon }}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Timeout (ms)</label>
+                  <input type="number" [(ngModel)]="formData.timeoutMs" name="timeoutMs" class="input-axis">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Max Results</label>
+                  <input type="number" [(ngModel)]="formData.maxResults" name="maxResults" class="input-axis">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Display Order</label>
+                  <input type="number" [(ngModel)]="formData.displayOrder" name="displayOrder" class="input-axis">
+                </div>
+              </div>
+
+              <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" [(ngModel)]="formData.active" name="active" class="rounded border-gray-300">
+                  <span class="text-sm text-gray-700">Active</span>
+                </label>
+              </div>
+            }
+
+            <!-- Query & Mapping Tab -->
+            @if (activeTab === 'query') {
+              @if (formData.executionType === 'DB_QUERY') {
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">SQL Query</label>
+                  <textarea [(ngModel)]="formData.sqlQuery" name="sqlQuery" rows="6"
+                    class="input-axis font-mono text-sm" placeholder="SELECT * FROM accounts WHERE account_id = :accountId"></textarea>
+                  <p class="text-xs text-gray-500 mt-1">Use :paramName for parameters. Only SELECT allowed.</p>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Default Sort</label>
+                  <input type="text" [(ngModel)]="formData.defaultSort" name="defaultSort"
+                    class="input-axis" placeholder="created_at DESC">
+                </div>
+              }
+
+              @if (formData.executionType === 'HTTP_CALL') {
+                <div class="grid grid-cols-4 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">HTTP Method</label>
+                    <select [(ngModel)]="formData.httpMethod" name="httpMethod" class="input-axis">
+                      <option value="GET">GET</option>
+                      <option value="POST">POST</option>
+                    </select>
+                  </div>
+                  <div class="col-span-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">HTTP URL</label>
+                    <input type="text" [(ngModel)]="formData.httpUrl" name="httpUrl"
+                      class="input-axis" placeholder="/api/accounts/{accountId}">
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">HTTP Headers (JSON)</label>
+                  <textarea [(ngModel)]="formData.httpHeaders" name="httpHeaders" rows="3"
+                    class="input-axis font-mono text-sm" placeholder='{"Authorization": "Bearer {token}"}'></textarea>
+                </div>
+              }
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Request Mapping (JSON)</label>
+                <textarea [(ngModel)]="formData.requestMapping" name="requestMapping" rows="3"
+                  class="input-axis font-mono text-sm" placeholder='{"accountId": "$.params.accountId"}'></textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Response Mapping (JSON)</label>
+                <textarea [(ngModel)]="formData.responseMapping" name="responseMapping" rows="3"
+                  class="input-axis font-mono text-sm" placeholder='{"balance": "$.data.balance"}'></textarea>
+              </div>
+            }
+
+            <!-- Filters Tab -->
+            @if (activeTab === 'filters') {
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Required Parameters (comma-separated)</label>
+                <input type="text" [(ngModel)]="formData.requiredParams" name="requiredParams"
+                  class="input-axis" placeholder="accountId, dateFrom">
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Filter Definitions (JSON Array)</label>
+                <textarea [(ngModel)]="formData.filterDefinitions" name="filterDefinitions" rows="10"
+                  class="input-axis font-mono text-sm" placeholder='[
+  {
+    "name": "accountId",
+    "displayName": "Account ID",
+    "type": "STRING",
+    "dbColumn": "account_id",
+    "operator": "=",
+    "mandatory": true,
+    "validationPattern": "^ACC[0-9]+$"
+  }
+]'></textarea>
+                <p class="text-xs text-gray-500 mt-1">Define filters for the multi-filter engine</p>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Security Filters (JSON - for RLS)</label>
+                <textarea [(ngModel)]="formData.securityFilters" name="securityFilters" rows="4"
+                  class="input-axis font-mono text-sm" placeholder='{"userLevel": {"dbColumn": "user_id", "contextKey": "userId"}}'></textarea>
+              </div>
+            }
+
+            <!-- AI Settings Tab -->
+            @if (activeTab === 'ai') {
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Trigger Phrases (JSON Array)</label>
+                <textarea [(ngModel)]="formData.triggerPhrases" name="triggerPhrases" rows="3"
+                  class="input-axis font-mono text-sm" placeholder='["check balance", "account balance", "how much money"]'></textarea>
+                <p class="text-xs text-gray-500 mt-1">Phrases that help AI detect this scenario</p>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Example Queries (JSON Array)</label>
+                <textarea [(ngModel)]="formData.exampleQueries" name="exampleQueries" rows="3"
+                  class="input-axis font-mono text-sm" placeholder='["What is my balance?", "Show balance for ACC001"]'></textarea>
+                <p class="text-xs text-gray-500 mt-1">Example user queries for AI context</p>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">LLM Prompt Template</label>
+                <textarea [(ngModel)]="formData.llmPromptTemplate" name="llmPromptTemplate" rows="6"
+                  class="input-axis" placeholder="Format this account balance data in a friendly way..."></textarea>
+                <p class="text-xs text-gray-500 mt-1">Custom prompt for formatting responses</p>
+              </div>
+            }
+          </form>
+        </div>
+
+        <div class="p-6 border-t border-gray-200 flex justify-between">
+          <button (click)="closeModal()" class="btn-secondary">Cancel</button>
+          <button (click)="saveScenario()" class="btn-axis">{{ isEditing ? 'Update Scenario' : 'Create Scenario' }}</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

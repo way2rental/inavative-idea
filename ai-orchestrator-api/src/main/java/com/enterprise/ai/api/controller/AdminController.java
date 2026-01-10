@@ -120,6 +120,11 @@ public class AdminController {
                 .requiredParams(form.requiredParams)
                 .llmPromptTemplate(promptTemplate)
                 .active(form.active != null ? form.active : true)
+                // Multi-filter engine fields
+                .filterDefinitions(form.filterDefinitions)
+                .securityFilters(form.securityFilters)
+                .maxResults(form.maxResults != null ? form.maxResults : 100)
+                .defaultSort(form.defaultSort)
                 .build();
         
         // Save via ConfigCacheService - automatically updates cache
@@ -148,6 +153,11 @@ public class AdminController {
                     scenario.setRequiredParams(form.requiredParams);
                     scenario.setLlmPromptTemplate(promptTemplate);
                     scenario.setActive(form.active != null ? form.active : true);
+                    // Multi-filter engine fields
+                    scenario.setFilterDefinitions(form.filterDefinitions);
+                    scenario.setSecurityFilters(form.securityFilters);
+                    scenario.setMaxResults(form.maxResults != null ? form.maxResults : scenario.getMaxResults());
+                    scenario.setDefaultSort(form.defaultSort);
                     
                     // Save via ConfigCacheService - automatically updates cache
                     AiScenario saved = configCacheService.saveScenario(scenario);
@@ -330,6 +340,11 @@ public class AdminController {
         dto.requiredParams = parseJsonArray(scenario.getRequiredParams());
         dto.llmPromptTemplate = scenario.getLlmPromptTemplate();
         dto.active = scenario.getActive();
+        // Multi-filter engine fields
+        dto.filterDefinitions = scenario.getFilterDefinitions();
+        dto.securityFilters = scenario.getSecurityFilters();
+        dto.maxResults = scenario.getMaxResults();
+        dto.defaultSort = scenario.getDefaultSort();
         return dto;
     }
 
@@ -372,7 +387,9 @@ public class AdminController {
         dto.description = whitelist.getDescription();
         dto.allowedMethods = whitelist.getAllowedMethods() != null ? whitelist.getAllowedMethods() : "GET";
         dto.active = whitelist.getActive();
+        dto.addedBy = whitelist.getAddedBy();
         dto.createdAt = whitelist.getCreatedAt() != null ? whitelist.getCreatedAt().toString() : null;
+        dto.updatedAt = whitelist.getUpdatedAt() != null ? whitelist.getUpdatedAt().toString() : null;
         return dto;
     }
 
@@ -446,6 +463,11 @@ public class AdminController {
         public List<String> requiredParams;
         public String llmPromptTemplate;
         public Boolean active;
+        // Multi-filter engine fields
+        public String filterDefinitions;
+        public String securityFilters;
+        public Integer maxResults;
+        public String defaultSort;
     }
 
     public static class ScenarioFormDTO {
@@ -464,6 +486,11 @@ public class AdminController {
         // Legacy field - maps to llmPromptTemplate for backward compatibility
         public String intentPrompt;
         public Boolean active;
+        // Multi-filter engine fields
+        public String filterDefinitions;
+        public String securityFilters;
+        public Integer maxResults;
+        public String defaultSort;
     }
 
     public static class AuditLogDTO {
@@ -497,7 +524,9 @@ public class AdminController {
         public String description;
         public String allowedMethods;
         public Boolean active;
+        public String addedBy;
         public String createdAt;
+        public String updatedAt;
     }
 
     public static class UrlWhitelistFormDTO {

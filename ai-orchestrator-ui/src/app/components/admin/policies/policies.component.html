@@ -1,0 +1,311 @@
+<!-- Admin - Policy Rules Management -->
+<div class="min-h-screen bg-bank-bg">
+  <!-- Page Title Section -->
+  <div class="bg-white border-b">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </a>
+          <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">Policy Rules</h1>
+            <p class="text-gray-500 text-sm">Configure business rules for AI behavior control</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-gray-500 text-sm">Total: {{ policies.length }} policies</span>
+          <button (click)="openCreateModal()" class="btn-axis text-sm flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Policy
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    @if (isLoading) {
+      <div class="flex items-center justify-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-axis-burgundy"></div>
+      </div>
+    } @else {
+      <!-- Policies List -->
+      <div class="space-y-4">
+        @for (policy of policies; track policy.id) {
+          <div class="card-axis p-6 hover:shadow-elevated transition-all duration-300">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex-1">
+                <div class="flex items-center gap-3 mb-1">
+                  <h3 class="text-lg font-semibold text-gray-900">{{ policy.policyName }}</h3>
+                  <span class="font-mono text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{{ policy.policyKey }}</span>
+                  <span class="badge bg-purple-100 text-purple-700">Priority: {{ policy.priority }}</span>
+                </div>
+                <p class="text-gray-500 text-sm">{{ policy.description }}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span [class]="getOnFailClass(policy.onFail)">{{ policy.onFail }}</span>
+                @if (policy.active) {
+                  <span class="badge-success">Active</span>
+                } @else {
+                  <span class="badge bg-gray-100 text-gray-600">Inactive</span>
+                }
+              </div>
+            </div>
+
+            <!-- Rule Expression -->
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+              <p class="text-gray-500 text-xs mb-1">Rule Expression:</p>
+              <code class="text-sm text-gray-800 font-mono">{{ policy.ruleExpression || 'No expression defined' }}</code>
+            </div>
+
+            <!-- Failure Message -->
+            @if (policy.failureMessage) {
+              <div class="mb-4 p-3 bg-red-50 rounded-lg">
+                <p class="text-red-500 text-xs mb-1">Failure Message:</p>
+                <p class="text-sm text-red-700">{{ policy.failureMessage }}</p>
+              </div>
+            }
+
+            <div class="flex flex-wrap gap-4 mb-4">
+              <!-- Applicable Scenarios -->
+              <div>
+                <p class="text-gray-500 text-xs mb-1">Applies to Scenarios:</p>
+                <div class="flex flex-wrap gap-1">
+                  @for (scenario of policy.applicableScenarios; track scenario) {
+                    <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{{ scenario }}</span>
+                  } @empty {
+                    <span class="text-gray-400 text-xs">All scenarios</span>
+                  }
+                </div>
+              </div>
+
+              <!-- Applicable Roles -->
+              <div>
+                <p class="text-gray-500 text-xs mb-1">Applies to Roles:</p>
+                <div class="flex flex-wrap gap-1">
+                  @for (role of policy.applicableRoles; track role) {
+                    <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">{{ role }}</span>
+                  } @empty {
+                    <span class="text-gray-400 text-xs">All roles</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+              <div class="text-gray-400 text-xs">
+                @if (policy.updatedAt) {
+                  Updated: {{ policy.updatedAt | date:'short' }}
+                } @else {
+                  Created: {{ policy.createdAt | date:'short' }}
+                }
+              </div>
+              <div class="flex items-center gap-2">
+                <button (click)="openTestModal(policy)" class="btn-secondary text-sm py-1.5 px-3">Test</button>
+                <button (click)="openEditModal(policy)" class="btn-secondary text-sm py-1.5 px-3">Edit</button>
+                <button (click)="toggleStatus(policy)" class="text-sm py-1.5 px-3 rounded-lg transition-all"
+                  [class]="policy.active ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-green-100 text-green-700 hover:bg-green-200'">
+                  {{ policy.active ? 'Disable' : 'Enable' }}
+                </button>
+                <button (click)="deletePolicy(policy)" class="btn-danger text-sm py-1.5 px-3">Delete</button>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (policies.length === 0) {
+        <div class="card-axis p-12 text-center">
+          <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">No Policy Rules Configured</h3>
+          <p class="text-gray-500 mb-6">Create policies to control AI behavior and enforce business rules.</p>
+          <button (click)="openCreateModal()" class="btn-axis">Add First Policy</button>
+        </div>
+      }
+    }
+  </div>
+
+  <!-- Create/Edit Modal -->
+  @if (showModal) {
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="card-axis w-full max-w-3xl max-h-[90vh] overflow-hidden">
+        <div class="p-6 border-b border-gray-200 bg-red-600 text-white rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold">{{ isEditing ? 'Edit Policy Rule' : 'Create New Policy Rule' }}</h2>
+            <button (click)="closeModal()" class="text-white/70 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6 overflow-y-auto max-h-[60vh]">
+          <form class="space-y-6">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Policy Key</label>
+                <input type="text" [(ngModel)]="formData.policyKey" name="policyKey"
+                  class="input-axis" placeholder="e.g., MAX_QUERY_LENGTH" [disabled]="isEditing">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Policy Name</label>
+                <input type="text" [(ngModel)]="formData.policyName" name="policyName"
+                  class="input-axis" placeholder="e.g., Maximum Query Length">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <textarea [(ngModel)]="formData.description" name="description" rows="2"
+                class="input-axis" placeholder="Describe what this policy enforces..."></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Rule Expression</label>
+              <textarea [(ngModel)]="formData.ruleExpression" name="ruleExpression" rows="3"
+                class="input-axis font-mono text-sm" placeholder="#{query.length() < 1000}"></textarea>
+              <p class="text-gray-400 text-xs mt-1">SpEL-style expressions (demo). Variables: query, userId, role, scenarioCode. Full SpEL integration coming soon.</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">On Fail Action</label>
+                <select [(ngModel)]="formData.onFail" name="onFail" class="input-axis">
+                  @for (option of onFailOptions; track option) {
+                    <option [value]="option">{{ option }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+                <input type="number" [(ngModel)]="formData.priority" name="priority"
+                  class="input-axis" min="0">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Failure Message</label>
+              <input type="text" [(ngModel)]="formData.failureMessage" name="failureMessage"
+                class="input-axis" placeholder="Message to show when rule fails...">
+            </div>
+
+            <!-- Applicable Scenarios -->
+            <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <label class="block text-sm font-medium text-blue-700 mb-3">Applicable Scenarios (empty = all)</label>
+              <div class="flex gap-2 mb-3">
+                <input type="text" [(ngModel)]="newScenario" name="newScenario"
+                  class="input-axis flex-1" placeholder="Add a scenario code..."
+                  (keyup.enter)="addScenario()">
+                <button type="button" (click)="addScenario()" class="btn-axis">Add</button>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                @for (code of formData.applicableScenarios; track code; let i = $index) {
+                  <span class="inline-flex items-center gap-1 px-3 py-1 bg-white border border-blue-200 rounded-full text-sm">
+                    {{ code }}
+                    <button type="button" (click)="removeScenario(i)" class="text-red-500 hover:text-red-700">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                }
+              </div>
+            </div>
+
+            <!-- Applicable Roles -->
+            <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <label class="block text-sm font-medium text-green-700 mb-3">Applicable Roles (empty = all)</label>
+              <div class="flex gap-2 mb-3">
+                <input type="text" [(ngModel)]="newRole" name="newRole"
+                  class="input-axis flex-1" placeholder="Add a role..."
+                  (keyup.enter)="addRole()">
+                <button type="button" (click)="addRole()" class="btn-axis">Add</button>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                @for (role of formData.applicableRoles; track role; let i = $index) {
+                  <span class="inline-flex items-center gap-1 px-3 py-1 bg-white border border-green-200 rounded-full text-sm">
+                    {{ role }}
+                    <button type="button" (click)="removeRole(i)" class="text-red-500 hover:text-red-700">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                }
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <input type="checkbox" [(ngModel)]="formData.active" name="active" id="active" class="rounded border-gray-300 text-axis-burgundy focus:ring-axis-burgundy">
+              <label for="active" class="text-sm text-gray-700">Active</label>
+            </div>
+          </form>
+        </div>
+
+        <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+          <button (click)="closeModal()" class="btn-secondary">Cancel</button>
+          <button (click)="savePolicy()" class="btn-axis">{{ isEditing ? 'Update' : 'Create' }} Policy</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Test Modal -->
+  @if (showTestModal) {
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+      <div class="card-axis w-full max-w-md">
+        <div class="p-6 border-b border-gray-200 bg-purple-600 text-white rounded-t-2xl">
+          <h2 class="text-lg font-bold">Test Policy: {{ selectedPolicy?.policyKey }}</h2>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Query</label>
+            <input type="text" [(ngModel)]="testContext['query']" class="input-axis" placeholder="Enter test query...">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">User ID</label>
+            <input type="text" [(ngModel)]="testContext['userId']" class="input-axis" placeholder="Enter user ID...">
+          </div>
+
+          @if (testResult) {
+            <div class="p-4 rounded-lg" [class]="testResult.passed ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
+              <div class="flex items-center gap-2 mb-2">
+                @if (testResult.passed) {
+                  <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span class="font-medium text-green-700">Policy Passed</span>
+                } @else {
+                  <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span class="font-medium text-red-700">Policy Failed</span>
+                }
+              </div>
+              @if (!testResult.passed && testResult.failureMessage) {
+                <p class="text-sm text-red-600">{{ testResult.failureMessage }}</p>
+              }
+            </div>
+          }
+        </div>
+        <div class="p-6 border-t border-gray-200 flex justify-end gap-3">
+          <button (click)="closeTestModal()" class="btn-secondary">Close</button>
+          <button (click)="runTest()" class="btn-axis">Run Test</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

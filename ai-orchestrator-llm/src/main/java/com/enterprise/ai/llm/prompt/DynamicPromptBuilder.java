@@ -2,6 +2,7 @@ package com.enterprise.ai.llm.prompt;
 
 import com.enterprise.ai.data.entity.AiScenario;
 import com.enterprise.ai.data.service.ConfigCacheService;
+import com.enterprise.ai.data.service.SystemConfigService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -22,23 +23,32 @@ import java.util.stream.Collectors;
  * 3. Filter-aware - Uses filter definitions for smart parameter extraction
  * 4. Friendly - Uses appropriate tone, emojis, and natural language
  * 
- * NOTE: All scenario configurations come from database.
+ * NOTE: All scenario configurations and branding come from database.
+ * NO HARDCODED VALUES - everything is configurable via SystemConfigService.
  */
 @Slf4j
 @Component
 public class DynamicPromptBuilder {
 
     private final ConfigCacheService configCacheService;
+    private final SystemConfigService systemConfigService;
     private final ObjectMapper objectMapper;
     
     // Cache for intent detection prompt to avoid rebuilding on each call
     private volatile String cachedIntentPromptContext;
     private volatile long cacheTimestamp;
-    private static final long CACHE_TTL_MS = 300000; // 5 minutes
 
-    public DynamicPromptBuilder(ConfigCacheService configCacheService) {
+    public DynamicPromptBuilder(ConfigCacheService configCacheService, SystemConfigService systemConfigService) {
         this.configCacheService = configCacheService;
+        this.systemConfigService = systemConfigService;
         this.objectMapper = new ObjectMapper();
+    }
+
+    /**
+     * Get cache TTL from configuration.
+     */
+    private long getCacheTtlMs() {
+        return systemConfigService.getPromptCacheTtlMs();
     }
 
     /**
@@ -69,15 +79,20 @@ public class DynamicPromptBuilder {
     public String buildIntentDetectionPrompt(String userInput, String sessionContext, String lastUsedParamsJson, Set<String> allowedScenarios) {
         StringBuilder prompt = new StringBuilder();
         
-        // System personality and role
+        // Get configurable branding from database
+        String assistantName = systemConfigService.getAssistantName();
+        String assistantFullName = systemConfigService.getAssistantFullName();
+        String orgName = systemConfigService.getOrgName();
+        
+        // System personality and role - using configurable values
         prompt.append("""
             ═══════════════════════════════════════════════════════════════════════════════
-            YOU ARE AHA (AI Helpdesk Assistant) - AXIS BANK'S CORPORATE BANKING ASSISTANT
+            YOU ARE %s (%s) - %s'S BANKING ASSISTANT
             ═══════════════════════════════════════════════════════════════════════════════
             
             YOUR CORE IDENTITY:
             - You are a friendly, professional banking assistant
-            - You work for Axis Bank Corporate Banking
+            - You work for %s
             - You help business customers with their banking needs
             - You are polite, efficient, and always helpful
             
@@ -95,7 +110,7 @@ public class DynamicPromptBuilder {
             - Resolve references like "same account", "that transaction", "previous one"
             - Ask friendly clarifying questions when needed
             
-            """);
+            """.formatted(assistantName, assistantFullName, orgName.toUpperCase(), orgName));
         
         // Available capabilities (filtered by RBAC if provided)
         prompt.append("═══════════════════════════════════════════════════════════════════════════════\n");
@@ -258,9 +273,10 @@ public class DynamicPromptBuilder {
         }
         
         long now = System.currentTimeMillis();
-        if (cachedIntentPromptContext == null || (now - cacheTimestamp) > CACHE_TTL_MS) {
+        long cacheTtl = getCacheTtlMs();
+        if (cachedIntentPromptContext == null || (now - cacheTimestamp) > cacheTtl) {
             synchronized (this) {
-                if (cachedIntentPromptContext == null || (now - cacheTimestamp) > CACHE_TTL_MS) {
+                if (cachedIntentPromptContext == null || (now - cacheTimestamp) > cacheTtl) {
                     cachedIntentPromptContext = buildScenarioContextWithFilters(null);
                     cacheTimestamp = now;
                     log.debug("Rebuilt scenario context cache with {} scenarios", 
@@ -298,12 +314,18 @@ public class DynamicPromptBuilder {
 
         for (AiScenario scenario : scenarios) {
             context.append("📌 ").append(scenario.getScenarioCode()).append("\n");
+            context.append("   Name: ").append(scenario.getScenarioName() != null ? scenario.getScenarioName() : scenario.getScenarioCode()).append("\n");
             context.append("   Description: ").append(scenario.getDescription() != null ? scenario.getDescription() : "No description").append("\n");
             
-            // Add example trigger phrases for better matching
+            // Add trigger phrases from database (NO HARDCODING)
             context.append("   Trigger phrases: ");
-            String triggerPhrases = getTriggerPhrases(scenario.getScenarioCode());
+            String triggerPhrases = getTriggerPhrases(scenario);
             context.append(triggerPhrases).append("\n");
+            
+            // Add example queries if available
+            if (scenario.getExampleQueries() != null && !scenario.getExampleQueries().isBlank()) {
+                context.append("   Example queries: ").append(scenario.getExampleQueries()).append("\n");
+            }
             
             // Parse and display filter definitions if available
             if (scenario.usesFilterEngine() && scenario.getFilterDefinitions() != null) {
@@ -362,22 +384,16 @@ public class DynamicPromptBuilder {
     }
 
     /**
-     * Get trigger phrases for a scenario to help AI match user intent.
+     * Get trigger phrases for a scenario from database.
+     * NO HARDCODING - all trigger phrases come from the scenario entity.
      */
-    private String getTriggerPhrases(String scenarioCode) {
-        return switch (scenarioCode.toUpperCase()) {
-            case "ACCOUNT_BALANCE" -> "\"balance\", \"how much\", \"check balance\", \"available balance\"";
-            case "TRANSACTION_HISTORY" -> "\"transactions\", \"history\", \"recent transactions\", \"show transactions\"";
-            case "FUND_TRANSFER" -> "\"transfer\", \"send money\", \"move funds\", \"pay to\"";
-            case "BILL_PAYMENT" -> "\"pay bill\", \"utility payment\", \"bill\", \"payment\"";
-            case "ACCOUNT_SUMMARY" -> "\"summary\", \"account details\", \"overview\", \"account info\"";
-            case "CARD_DETAILS" -> "\"card\", \"credit card\", \"debit card\", \"card info\"";
-            case "LOAN_STATUS" -> "\"loan\", \"loan status\", \"emi\", \"loan details\"";
-            case "SPENDING_ANALYSIS" -> "\"spending\", \"expenses\", \"analyze spending\", \"where did I spend\"";
-            case "INVESTMENT_PORTFOLIO" -> "\"investments\", \"portfolio\", \"mutual funds\", \"stocks\"";
-            case "PAYMENT_HISTORY" -> "\"payments\", \"payment history\", \"past payments\"";
-            default -> "\"" + scenarioCode.toLowerCase().replace("_", " ") + "\"";
-        };
+    private String getTriggerPhrases(AiScenario scenario) {
+        // Use trigger phrases from database if available
+        if (scenario.hasTriggerPhrases()) {
+            return scenario.getTriggerPhrases();
+        }
+        // Fallback: generate from scenario code
+        return "\"" + scenario.getScenarioCode().toLowerCase().replace("_", " ") + "\"";
     }
 
     /**
@@ -408,12 +424,11 @@ public class DynamicPromptBuilder {
      * Uses friendly, conversational tone.
      */
     public String buildClarificationPrompt(String userQuery, List<String> possibleScenarios) {
+        String assistantName = systemConfigService.getAssistantName();
+        
         StringBuilder prompt = new StringBuilder();
-        prompt.append("""
-            You are AHA, a friendly banking assistant.
-            The customer asked something that could mean multiple things.
-            
-            """);
+        prompt.append("You are ").append(assistantName).append(", a friendly banking assistant.\n");
+        prompt.append("The customer asked something that could mean multiple things.\n\n");
         prompt.append("Customer said: \"").append(userQuery).append("\"\n\n");
         prompt.append("This might mean:\n");
         
@@ -438,16 +453,16 @@ public class DynamicPromptBuilder {
      * Makes the AI ask naturally for missing information.
      */
     public String buildFollowUpPrompt(String scenarioCode, List<String> missingParams) {
+        String assistantName = systemConfigService.getAssistantName();
+        
         StringBuilder prompt = new StringBuilder();
         
         // Get scenario details for context
         AiScenario scenario = configCacheService.getScenarioByCode(scenarioCode).orElse(null);
         String scenarioDescription = scenario != null ? scenario.getDescription() : getScenarioDescription(scenarioCode);
         
-        prompt.append("""
-            You are AHA, a friendly banking assistant helping a customer.
-            
-            The customer wants to: """).append(scenarioDescription).append("\n\n");
+        prompt.append("You are ").append(assistantName).append(", a friendly banking assistant helping a customer.\n\n");
+        prompt.append("The customer wants to: ").append(scenarioDescription).append("\n\n");
         
         // Add filter context if available
         if (scenario != null && scenario.usesFilterEngine()) {
@@ -604,11 +619,14 @@ public class DynamicPromptBuilder {
      * Creates natural, conversational responses.
      */
     public String buildResponseFormattingPrompt(String scenarioCode, String dataJson, String userQuery) {
+        String assistantName = systemConfigService.getAssistantName();
+        String orgName = systemConfigService.getOrgName();
+        
         StringBuilder prompt = new StringBuilder();
         
+        prompt.append("You are ").append(assistantName).append(", a friendly ").append(orgName)
+              .append(" assistant presenting information to a customer.\n\n");
         prompt.append("""
-            You are AHA, a friendly Axis Bank assistant presenting information to a customer.
-            
             YOUR TONE:
             - Warm and professional
             - Use emojis sparingly but appropriately (✅, 📊, 💰, 📅)
@@ -689,11 +707,13 @@ public class DynamicPromptBuilder {
      * Makes the AI respond naturally to greetings and off-topic messages.
      */
     public String buildConversationalPrompt(String userInput, String sessionContext) {
+        String assistantName = systemConfigService.getAssistantName();
+        String orgName = systemConfigService.getOrgName();
+        
         StringBuilder prompt = new StringBuilder();
         
+        prompt.append("You are ").append(assistantName).append(", a friendly ").append(orgName).append(" assistant.\n\n");
         prompt.append("""
-            You are AHA, a friendly Axis Bank assistant.
-            
             The customer said something that isn't a specific banking request.
             Respond naturally and helpfully.
             

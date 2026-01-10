@@ -64,13 +64,12 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
 
     @Override
     public Mono<IntentResult> detectIntentTwoStage(String userInput, String sessionContext) {
-        // Two-stage detection not needed with Spring AI
         return detectIntent(userInput, sessionContext);
     }
 
     @Override
     public Mono<Boolean> isHealthy() {
-        return Mono.just(true);  // Spring AI auto-configuration handles health
+        return Mono.just(true);
     }
 
     @Override
@@ -83,8 +82,6 @@ public class SpringAiLlmClient implements ReactiveLlmClient {
             log.debug("Prompt length: {}, prompt preview: {}", prompt.length(),
                     prompt.length() > 200 ? prompt.substring(0, 200) : prompt);
 
-            // Collect the complete response first, then emit as single message
-            // This ensures the frontend receives a complete JSON payload instead of fragments
             return chatClient.prompt()
                     .user(prompt)
                     .stream()

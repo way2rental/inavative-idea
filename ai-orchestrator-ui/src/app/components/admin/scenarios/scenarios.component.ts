@@ -19,12 +19,17 @@ export class ScenariosComponent implements OnInit {
   showModal = false;
   isEditing = false;
   selectedScenario: Scenario | null = null;
+  activeTab = 'basic'; // basic, query, filters, ai, advanced
 
   // Filter properties
   filterScenarioCode = '';
-  filterScenarioName = '';
+  filterCategory = '';
   filterExecutionType = '';
   filterStatus = '';
+
+  // Categories for dropdown
+  categories = ['Account', 'Transaction', 'Payment', 'Card', 'Loan', 'Investment', 'Analytics', 'Other'];
+  icons = ['wallet', 'receipt', 'send', 'credit-card', 'building-bank', 'piggy-bank', 'chart-pie', 'file-text', 'users', 'settings'];
 
   formData: ScenarioFormData = this.getEmptyFormData();
 
@@ -59,8 +64,6 @@ export class ScenariosComponent implements OnInit {
       description: '',
       llmPromptTemplate: '',
       requiredParams: '',
-      optionalParams: '',
-      securityLevel: 'NORMAL',
       executionType: 'DB_QUERY',
       httpMethod: 'GET',
       httpUrl: '',
@@ -69,8 +72,18 @@ export class ScenariosComponent implements OnInit {
       requestMapping: '',
       responseMapping: '',
       timeoutMs: 5000,
-      executorBean: '',
-      active: true
+      active: true,
+      // AI Intent Detection fields
+      triggerPhrases: '',
+      exampleQueries: '',
+      category: 'Other',
+      displayOrder: 0,
+      icon: 'file-text',
+      // Multi-filter engine fields
+      filterDefinitions: '',
+      securityFilters: '',
+      maxResults: 100,
+      defaultSort: ''
     };
   }
 
@@ -78,6 +91,7 @@ export class ScenariosComponent implements OnInit {
     this.isEditing = false;
     this.selectedScenario = null;
     this.formData = this.getEmptyFormData();
+    this.activeTab = 'basic';
     this.showModal = true;
   }
 
@@ -86,12 +100,10 @@ export class ScenariosComponent implements OnInit {
     this.selectedScenario = scenario;
     this.formData = {
       scenarioCode: scenario.scenarioCode,
-      scenarioName: scenario.scenarioName,
-      description: scenario.description,
+      scenarioName: scenario.scenarioName || '',
+      description: scenario.description || '',
       llmPromptTemplate: scenario.llmPromptTemplate || '',
-      requiredParams: scenario.requiredParams.join(', '),
-      optionalParams: scenario.optionalParams?.join(', ') || '',
-      securityLevel: scenario.securityLevel,
+      requiredParams: scenario.requiredParams?.join(', ') || '',
       executionType: scenario.executionType,
       httpMethod: scenario.httpMethod || 'GET',
       httpUrl: scenario.httpUrl || '',
@@ -100,9 +112,20 @@ export class ScenariosComponent implements OnInit {
       requestMapping: scenario.requestMapping || '',
       responseMapping: scenario.responseMapping || '',
       timeoutMs: scenario.timeoutMs || 5000,
-      executorBean: scenario.executorBean || '',
-      active: scenario.active
+      active: scenario.active,
+      // AI Intent Detection fields
+      triggerPhrases: scenario.triggerPhrases || '',
+      exampleQueries: scenario.exampleQueries || '',
+      category: scenario.category || 'Other',
+      displayOrder: scenario.displayOrder || 0,
+      icon: scenario.icon || 'file-text',
+      // Multi-filter engine fields
+      filterDefinitions: scenario.filterDefinitions || '',
+      securityFilters: scenario.securityFilters || '',
+      maxResults: scenario.maxResults || 100,
+      defaultSort: scenario.defaultSort || ''
     };
+    this.activeTab = 'basic';
     this.showModal = true;
   }
 
@@ -112,6 +135,12 @@ export class ScenariosComponent implements OnInit {
   }
 
   saveScenario(): void {
+    // Validate required fields
+    if (!this.formData.scenarioCode || !this.formData.scenarioName) {
+      this.alertService.error('Validation Error', 'Scenario Code and Name are required');
+      return;
+    }
+
     if (this.isEditing && this.selectedScenario) {
       this.adminService.updateScenario(this.selectedScenario.id, this.formData).subscribe({
         next: () => {
@@ -146,10 +175,11 @@ export class ScenariosComponent implements OnInit {
   applyFilters(): void {
     this.filteredScenarios = this.scenarios.filter(scenario => {
       const matchesCode = !this.filterScenarioCode ||
-        scenario.scenarioCode.toLowerCase().includes(this.filterScenarioCode.toLowerCase());
+        scenario.scenarioCode.toLowerCase().includes(this.filterScenarioCode.toLowerCase()) ||
+        (scenario.scenarioName && scenario.scenarioName.toLowerCase().includes(this.filterScenarioCode.toLowerCase()));
 
-      const matchesName = !this.filterScenarioName ||
-        scenario.scenarioName.toLowerCase().includes(this.filterScenarioName.toLowerCase());
+      const matchesCategory = !this.filterCategory ||
+        scenario.category === this.filterCategory;
 
       const matchesType = !this.filterExecutionType ||
         scenario.executionType === this.filterExecutionType;
@@ -158,13 +188,13 @@ export class ScenariosComponent implements OnInit {
         (this.filterStatus === 'active' && scenario.active) ||
         (this.filterStatus === 'inactive' && !scenario.active);
 
-      return matchesCode && matchesName && matchesType && matchesStatus;
+      return matchesCode && matchesCategory && matchesType && matchesStatus;
     });
   }
 
   clearFilters(): void {
     this.filterScenarioCode = '';
-    this.filterScenarioName = '';
+    this.filterCategory = '';
     this.filterExecutionType = '';
     this.filterStatus = '';
     this.filteredScenarios = this.scenarios;
@@ -181,7 +211,7 @@ export class ScenariosComponent implements OnInit {
   async deleteScenario(scenario: Scenario): Promise<void> {
     const confirmed = await this.alertService.confirm(
       'Delete Scenario',
-      `Are you sure you want to delete "${scenario.scenarioName}"? This action cannot be undone.`,
+      `Are you sure you want to delete "${scenario.scenarioName || scenario.scenarioCode}"? This action cannot be undone.`,
       'Delete',
       'Cancel'
     );
@@ -226,5 +256,39 @@ export class ScenariosComponent implements OnInit {
         error: () => this.alertService.error('Error', 'Test failed')
       });
     }
+  }
+
+  // Helper for JSON formatting
+  formatJson(json: string | undefined): string {
+    if (!json) return '';
+    try {
+      return JSON.stringify(JSON.parse(json), null, 2);
+    } catch {
+      return json;
+    }
+  }
+
+  // Get icon class
+  getIconClass(icon: string | undefined): string {
+    const iconMap: Record<string, string> = {
+      'wallet': 'M21 12V7H5a2 2 0 0 1 0-4h14v4',
+      'receipt': 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+      'credit-card': 'M3 10h18M7 15h.01M11 15h2M6 19h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v10a2 2 0 002 2z',
+      'chart-pie': 'M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z'
+    };
+    return iconMap[icon || 'file-text'] || iconMap['file-text'];
+  }
+
+  getCategoryColor(category: string | undefined): string {
+    const colors: Record<string, string> = {
+      'Account': 'bg-blue-100 text-blue-700',
+      'Transaction': 'bg-green-100 text-green-700',
+      'Payment': 'bg-purple-100 text-purple-700',
+      'Card': 'bg-amber-100 text-amber-700',
+      'Loan': 'bg-red-100 text-red-700',
+      'Investment': 'bg-indigo-100 text-indigo-700',
+      'Analytics': 'bg-pink-100 text-pink-700'
+    };
+    return colors[category || 'Other'] || 'bg-gray-100 text-gray-700';
   }
 }

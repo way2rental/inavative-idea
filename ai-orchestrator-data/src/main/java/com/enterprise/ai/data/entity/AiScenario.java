@@ -19,8 +19,7 @@ import lombok.NoArgsConstructor;
  * AI extracts filter values → Backend builds dynamic WHERE clause → Database executes
  * AI NEVER generates business data - only extracts filters and formats responses.
  * 
- * CLEANUP: Removed unused fields (dbKey, httpHeaders, executorBean, 
- *          securityLevel, optionalParams, promptVersion, promptHistory)
+ * NO HARDCODING: All AI-related configuration comes from database.
  */
 @Data
 @Entity
@@ -34,10 +33,22 @@ public class AiScenario {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "scenario_code", unique = true, length = 100)
+    /**
+     * Unique scenario code (e.g., ACCOUNT_BALANCE, TRANSACTION_HISTORY).
+     */
+    @Column(name = "scenario_code", unique = true, nullable = false, length = 100)
     private String scenarioCode;
 
-    @Column(length = 255)
+    /**
+     * Human-readable name for display.
+     */
+    @Column(name = "scenario_name", length = 255)
+    private String scenarioName;
+
+    /**
+     * Description for AI context and admin display.
+     */
+    @Column(length = 500)
     private String description;
 
     /**
@@ -60,6 +71,12 @@ public class AiScenario {
      */
     @Column(name = "http_url", length = 500)
     private String httpUrl;
+
+    /**
+     * HTTP headers as JSON (e.g., {"Authorization": "Bearer {token}"})
+     */
+    @Column(name = "http_headers", columnDefinition = "TEXT")
+    private String httpHeaders;
 
     /**
      * SQL query for DB_QUERY type (SELECT only - read-only enforcement).
@@ -94,18 +111,62 @@ public class AiScenario {
 
     /**
      * Required parameters (JSON array of strings).
-     * DEPRECATED: Use filterDefinitions with mandatory=true instead.
-     * Kept for backward compatibility.
+     * Used for backward compatibility and quick reference.
      */
     @Column(name = "required_params", columnDefinition = "JSON")
     private String requiredParams;
 
+    /**
+     * LLM prompt template for formatting responses.
+     * Can reference scenario variables with {{variableName}}.
+     */
     @Column(name = "llm_prompt_template", columnDefinition = "TEXT")
     private String llmPromptTemplate;
 
+    /**
+     * Is this scenario active and usable?
+     */
     @Column(name = "active")
     @Builder.Default
     private Boolean active = true;
+
+    // =====================================================================
+    // AI INTENT DETECTION FIELDS (NO HARDCODING)
+    // =====================================================================
+
+    /**
+     * Trigger phrases that help AI detect this scenario.
+     * JSON array of phrases (e.g., ["check balance", "how much money", "account balance"])
+     * Previously hardcoded in DynamicPromptBuilder - now from DB.
+     */
+    @Column(name = "trigger_phrases", columnDefinition = "JSON")
+    private String triggerPhrases;
+
+    /**
+     * Example user queries for AI training/context.
+     * JSON array (e.g., ["What's my balance?", "Show me my account balance for ACC001"])
+     */
+    @Column(name = "example_queries", columnDefinition = "JSON")
+    private String exampleQueries;
+
+    /**
+     * Category for grouping (e.g., "Account", "Transaction", "Payment", "Loan")
+     */
+    @Column(name = "category", length = 100)
+    private String category;
+
+    /**
+     * Display order within category.
+     */
+    @Column(name = "display_order")
+    @Builder.Default
+    private Integer displayOrder = 0;
+
+    /**
+     * Icon name for UI display (e.g., "wallet", "credit-card", "receipt")
+     */
+    @Column(name = "icon", length = 50)
+    private String icon;
 
     // =====================================================================
     // MULTI-FILTER ENGINE FIELDS
@@ -116,51 +177,28 @@ public class AiScenario {
      * Each filter object contains:
      * - name: Filter parameter name (e.g., "accountId", "dateFrom", "minAmount")
      * - displayName: Human-readable name for prompts (e.g., "Account ID")
-     * - description: Description for AI context (e.g., "Bank account identifier starting with ACC")
+     * - description: Description for AI context
      * - type: Data type - STRING, NUMBER, DECIMAL, DATE, DATETIME, BOOLEAN, ENUM
      * - dbColumn: Database column name for WHERE clause (e.g., "account_id")
      * - operator: SQL operator - =, !=, <, >, <=, >=, LIKE, IN, BETWEEN
      * - mandatory: Boolean - if true, user MUST provide this filter
-     * - defaultValue: Default value if not provided (for non-mandatory filters)
-     * - validationPattern: Regex for validation (e.g., "^ACC[0-9]+$")
+     * - defaultValue: Default value if not provided
+     * - validationPattern: Regex for validation
      * - validationError: Error message on validation failure
      * - enumValues: Array of allowed values for ENUM type
-     * 
-     * Example:
-     * [
-     *   {"name": "accountId", "displayName": "Account ID", "type": "STRING", 
-     *    "dbColumn": "account_id", "operator": "=", "mandatory": true,
-     *    "validationPattern": "^ACC[0-9]+$", "validationError": "Account ID must start with ACC"},
-     *   {"name": "dateFrom", "displayName": "Start Date", "type": "DATE",
-     *    "dbColumn": "transaction_date", "operator": ">=", "mandatory": false},
-     *   {"name": "transactionType", "displayName": "Transaction Type", "type": "ENUM",
-     *    "dbColumn": "txn_type", "operator": "=", "mandatory": false,
-     *    "enumValues": ["CREDIT", "DEBIT", "TRANSFER"]}
-     * ]
      */
     @Column(name = "filter_definitions", columnDefinition = "JSON")
     private String filterDefinitions;
 
     /**
      * JSON object defining security-level filters applied automatically.
-     * These filters are ALWAYS applied and cannot be overridden by user.
      * Used for Row-Level Security (RLS) enforcement.
-     * 
-     * Structure:
-     * {
-     *   "userLevel": {"dbColumn": "user_id", "contextKey": "userId"},
-     *   "orgLevel": {"dbColumn": "org_id", "contextKey": "orgId"},
-     *   "tenantLevel": {"dbColumn": "tenant_id", "contextKey": "tenantId"}
-     * }
-     * 
-     * If not specified, default RLS from RowLevelSecurityService is applied.
      */
     @Column(name = "security_filters", columnDefinition = "JSON")
     private String securityFilters;
 
     /**
      * Maximum number of results to return (pagination).
-     * Prevents memory exhaustion from large result sets.
      */
     @Column(name = "max_results")
     @Builder.Default
@@ -178,7 +216,6 @@ public class AiScenario {
 
     /**
      * Check if this scenario uses the multi-filter engine.
-     * True if filterDefinitions is configured.
      */
     public boolean usesFilterEngine() {
         return filterDefinitions != null && !filterDefinitions.isBlank();
@@ -189,5 +226,12 @@ public class AiScenario {
      */
     public boolean hasCustomSecurityFilters() {
         return securityFilters != null && !securityFilters.isBlank();
+    }
+
+    /**
+     * Check if this scenario has trigger phrases configured.
+     */
+    public boolean hasTriggerPhrases() {
+        return triggerPhrases != null && !triggerPhrases.isBlank();
     }
 }

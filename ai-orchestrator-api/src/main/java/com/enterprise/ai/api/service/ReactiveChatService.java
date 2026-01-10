@@ -8,6 +8,7 @@ import com.enterprise.ai.data.entity.ChatSession;
 import com.enterprise.ai.data.repository.AiAuditLogRepository;
 import com.enterprise.ai.data.repository.ChatMessageRepository;
 import com.enterprise.ai.data.repository.ChatSessionRepository;
+import com.enterprise.ai.llm.client.ConversationalAiService;
 import com.enterprise.ai.llm.client.ReactiveLlmClient;
 // Removed: import com.enterprise.ai.llm.config.OllamaProperties; - No longer needed
 import com.enterprise.ai.security.rbac.RbacService;
@@ -45,8 +46,7 @@ public class ReactiveChatService {
     private final ChatMessageRepository messageRepository;
     private final AiAuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
-    private final com.enterprise.ai.llm.client.ConversationalAiService conversationalAiService;
-    // Removed: OllamaProperties - No longer needed with Spring AI
+    private final ConversationalAiService conversationalAiService;
 
     // Configurable runtime protection limits
     private final long maxExecutionTimeMs;
@@ -84,7 +84,6 @@ public class ReactiveChatService {
         this.auditLogRepository = auditLogRepository;
         this.objectMapper = objectMapper;
         this.conversationalAiService = conversationalAiService;
-        // Removed: this.ollamaProperties = ollamaProperties;
         this.maxExecutionTimeMs = maxExecutionTimeMs;
         this.maxOllamaTimeoutMs = maxOllamaTimeoutMs;
         this.maxDbTimeoutMs = maxDbTimeoutMs;
@@ -123,8 +122,7 @@ public class ReactiveChatService {
             
             // Get session context
             String sessionContext = getSessionContextSync(sessionId);
-            
-            // Intent detection (non-blocking)
+
             tracker.startIntentDetection();
             
             Mono<IntentResult> intentMono = twoStageDetection

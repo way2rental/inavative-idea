@@ -181,6 +181,13 @@ public class FilterEngine {
 
     /**
      * Build complete SQL query with dynamic filters.
+     * 
+     * Handles various SQL patterns:
+     * - Simple queries (SELECT ... FROM ...)
+     * - Queries with WHERE clause
+     * - Queries with GROUP BY (filters must go before GROUP BY)
+     * - Queries with ORDER BY (filters must go before ORDER BY if no GROUP BY)
+     * - Queries with LIMIT
      */
     public String buildDynamicQuery(AiScenario scenario, FilterResult filterResult) {
         String baseQuery = scenario.getSqlQuery();
@@ -188,35 +195,71 @@ public class FilterEngine {
             throw new IllegalStateException("No base SQL query configured for scenario: " + scenario.getScenarioCode());
         }
 
-        StringBuilder query = new StringBuilder(baseQuery.trim());
-
-        // Add WHERE clause if we have filters
+        String upperQuery = baseQuery.toUpperCase();
         String whereClauses = filterResult.whereClauses();
-        if (whereClauses != null && !whereClauses.isEmpty()) {
-            // Check if base query already has WHERE
-            String upperQuery = baseQuery.toUpperCase();
-            if (upperQuery.contains(" WHERE ")) {
-                query.append(" AND ").append(whereClauses);
+        
+        // Find clause positions
+        int groupByIndex = upperQuery.indexOf(" GROUP BY ");
+        int orderByIndex = upperQuery.indexOf(" ORDER BY ");
+        int limitIndex = upperQuery.indexOf(" LIMIT ");
+        int whereIndex = upperQuery.indexOf(" WHERE ");
+        
+        StringBuilder query = new StringBuilder();
+        
+        if (whereClauses == null || whereClauses.isEmpty()) {
+            query.append(baseQuery);
+        } else {
+            // Determine where to insert filters
+            // Priority: before GROUP BY > before ORDER BY > before LIMIT > at end
+            int insertPoint = -1;
+            
+            if (groupByIndex > 0) {
+                insertPoint = groupByIndex;
+            } else if (orderByIndex > 0) {
+                insertPoint = orderByIndex;
+            } else if (limitIndex > 0) {
+                insertPoint = limitIndex;
+            }
+            
+            if (insertPoint > 0) {
+                // Check if WHERE exists before the insert point
+                String beforeInsert = baseQuery.substring(0, insertPoint);
+                String afterInsert = baseQuery.substring(insertPoint);
+                boolean hasWhereBefore = beforeInsert.toUpperCase().contains(" WHERE ");
+                
+                if (hasWhereBefore) {
+                    query.append(beforeInsert).append(" AND ").append(whereClauses).append(afterInsert);
+                } else {
+                    query.append(beforeInsert).append(" WHERE ").append(whereClauses).append(afterInsert);
+                }
             } else {
-                query.append(" WHERE ").append(whereClauses);
+                // No GROUP BY, ORDER BY, or LIMIT - append at end
+                if (whereIndex > 0) {
+                    query.append(baseQuery).append(" AND ").append(whereClauses);
+                } else {
+                    query.append(baseQuery).append(" WHERE ").append(whereClauses);
+                }
             }
         }
 
-        // Add default sort if configured
+        String resultQuery = query.toString();
+        String upperResult = resultQuery.toUpperCase();
+
+        // Add default sort if configured and not already present
         if (scenario.getDefaultSort() != null && !scenario.getDefaultSort().isBlank()) {
-            if (!baseQuery.toUpperCase().contains(" ORDER BY ")) {
-                query.append(" ORDER BY ").append(scenario.getDefaultSort());
+            if (!upperResult.contains(" ORDER BY ")) {
+                resultQuery = resultQuery + " ORDER BY " + scenario.getDefaultSort();
             }
         }
 
-        // Add limit if configured
+        // Add limit if configured and not already present
         if (scenario.getMaxResults() != null && scenario.getMaxResults() > 0) {
-            if (!baseQuery.toUpperCase().contains(" LIMIT ")) {
-                query.append(" LIMIT ").append(scenario.getMaxResults());
+            if (!upperResult.contains(" LIMIT ")) {
+                resultQuery = resultQuery + " LIMIT " + scenario.getMaxResults();
             }
         }
 
-        return query.toString();
+        return resultQuery;
     }
 
     /**
