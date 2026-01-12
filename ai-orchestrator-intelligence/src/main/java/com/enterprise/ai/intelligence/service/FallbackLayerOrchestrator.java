@@ -11,6 +11,7 @@ import com.enterprise.ai.intelligence.service.keyword.KeywordMatcher;
 import com.enterprise.ai.intelligence.service.parameter.ParameterExtractionService;
 import com.enterprise.ai.intelligence.service.rules.RuleEngineMatcher;
 import com.enterprise.ai.intelligence.service.scenario.ScenarioTriggerMatcher;
+import com.enterprise.ai.intelligence.service.ml.MlIntentClassifierService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,7 @@ public class FallbackLayerOrchestrator {
     private final ConversationalHandler conversationalHandler;
     private final EntityExtractionService entityExtractionService;
     private final ParameterExtractionService parameterExtractionService;
+    private final MlIntentClassifierService mlIntentClassifierService;
     
     private List<FallbackLayer> enabledLayers = new ArrayList<>();
     private Map<String, FallbackLayerService> layerServiceMap = new HashMap<>();
@@ -53,17 +55,12 @@ public class FallbackLayerOrchestrator {
         enabledLayers = layerRepository.findAllEnabledOrderByPriorityAsc();
         
         // Map layer codes to services
+        layerServiceMap.put("ML_INTENT_CLASSIFIER", mlIntentClassifierService);
         layerServiceMap.put("EMBEDDING_SIMILARITY", embeddingMatcher);
         layerServiceMap.put("RULE_ENGINE", ruleEngineMatcher);
         layerServiceMap.put("KEYWORD_MATCHER", keywordMatcher);
         layerServiceMap.put("SCENARIO_TRIGGER_MATCHER", scenarioTriggerMatcher);
         layerServiceMap.put("CONVERSATIONAL_HANDLER", conversationalHandler);
-        
-        // ML layer: Will be added when ML model integration is ready
-        // Requires: MlModelLoaderService, MlIntentClassifierService
-        // The ML layer will use ONNX models for intent classification (highest priority)
-        // Placeholder for future ML integration - uncomment when ML services are implemented:
-        // layerServiceMap.put("ML_INTENT_CLASSIFIER", mlIntentClassifier);
     }
 
     /**
@@ -252,17 +249,12 @@ public class FallbackLayerOrchestrator {
         enabledLayers = layerRepository.findAllEnabledOrderByPriorityAsc();
         
         // Re-map layer codes to services
+        layerServiceMap.put("ML_INTENT_CLASSIFIER", mlIntentClassifierService);
         layerServiceMap.put("EMBEDDING_SIMILARITY", embeddingMatcher);
         layerServiceMap.put("RULE_ENGINE", ruleEngineMatcher);
         layerServiceMap.put("KEYWORD_MATCHER", keywordMatcher);
         layerServiceMap.put("SCENARIO_TRIGGER_MATCHER", scenarioTriggerMatcher);
         layerServiceMap.put("CONVERSATIONAL_HANDLER", conversationalHandler);
-        
-        // ML layer: Will be added when ML model integration is ready
-        // Requires: MlModelLoaderService, MlIntentClassifierService
-        // The ML layer will use ONNX models for intent classification (highest priority)
-        // Placeholder for future ML integration - uncomment when ML services are implemented:
-        // layerServiceMap.put("ML_INTENT_CLASSIFIER", mlIntentClassifier);
         
         log.info("Layers refreshed: {} enabled layers", enabledLayers.size());
     }

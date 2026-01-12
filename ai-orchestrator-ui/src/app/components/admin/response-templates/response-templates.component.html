@@ -1,8 +1,8 @@
 <!-- Axis Bank Admin - Response Templates -->
-<div class="min-h-screen bg-bank-bg">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
   <!-- Page Title Section -->
-  <div class="bg-white border-b">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+  <div class="bg-white border-b border-gray-200/60">
+    <div class="page-container py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
@@ -30,9 +30,9 @@
     </div>
   </div>
 
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="page-container py-8">
     <!-- Filter Section -->
-    <div class="card-axis mb-6">
+    <div class="card-ai-primary mb-6">
       <div class="flex items-center gap-4">
         <label class="text-sm font-medium text-gray-700">{{ labels.filterByScenario }}</label>
         <select [(ngModel)]="filterScenario" (ngModelChange)="applyFilter()" class="input-field flex-1 max-w-xs">
@@ -50,7 +50,7 @@
       </div>
     } @else {
       <!-- Templates Table -->
-      <div class="card-axis overflow-x-auto">
+      <div class="card-ai-primary overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>

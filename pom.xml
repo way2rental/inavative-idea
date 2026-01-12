@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
 
     <name>AI Orchestrator Parent</name>
-    <description>Enterprise Scenario-Driven AI Orchestrator using Ollama</description>
+    <description>Axis AI - Bank-Grade AI System for Banking Domain (Java/Spring)</description>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -22,7 +22,7 @@
     <modules>
         <module>ai-orchestrator-common</module>
         <module>ai-orchestrator-core</module>
-        <module>ai-orchestrator-llm</module>
+<!--        <module>ai-orchestrator-llm</module>-->
         <module>ai-orchestrator-intelligence</module>
         <module>ai-orchestrator-security</module>
         <module>ai-orchestrator-data</module>

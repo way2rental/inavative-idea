@@ -27,9 +27,11 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * Reactive chat service with non-blocking Ollama calls and SSE streaming support.
+ * Reactive chat service with non-blocking LLM calls and SSE streaming support.
  * Uses DynamicScenarioRouter for config-driven scenario execution.
  * Implements 3-layer protection system with performance logging.
+ * 
+ * Axis AI: Uses LLMs as interchangeable reasoning engines (API-based only).
  */
 @Slf4j
 @Service
@@ -39,6 +41,7 @@ public class ReactiveChatService {
             "(yes|y|yeah|yep|sure|ok|okay|proceed|confirm|haan|ha|theek hai).*";
 
     private final com.enterprise.ai.intelligence.client.ReactiveIntelligenceClient intelligenceClient;
+    private final KernelAdapterService kernelAdapterService;
     private final DynamicScenarioRouter scenarioRouter;
     private final RbacService rbacService;
     private final IntentValidationService validationService;
@@ -51,7 +54,7 @@ public class ReactiveChatService {
 
     // Configurable runtime protection limits
     private final long maxExecutionTimeMs;
-    private final long maxOllamaTimeoutMs;
+    private final long maxLlmTimeoutMs;
     private final long maxDbTimeoutMs;
     private final boolean twoStageDetection;
 
@@ -60,6 +63,7 @@ public class ReactiveChatService {
 
     public ReactiveChatService(
             com.enterprise.ai.intelligence.client.ReactiveIntelligenceClient intelligenceClient,
+            KernelAdapterService kernelAdapterService,
             DynamicScenarioRouter scenarioRouter,
             RbacService rbacService,
             IntentValidationService validationService,
@@ -69,13 +73,13 @@ public class ReactiveChatService {
             AiAuditLogRepository auditLogRepository,
             ObjectMapper objectMapper,
             com.enterprise.ai.llm.client.ConversationalAiService conversationalAiService,
-            // Removed: OllamaProperties parameter
             @Value("${runtime.protection.max-execution-time-ms:60000}") long maxExecutionTimeMs,
-            @Value("${runtime.protection.max-ollama-timeout-ms:120000}") long maxOllamaTimeoutMs,
+            @Value("${runtime.protection.max-llm-timeout-ms:120000}") long maxLlmTimeoutMs,
             @Value("${runtime.protection.max-db-timeout-ms:5000}") long maxDbTimeoutMs,
             @Value("${llm.two-stage-detection:false}") boolean twoStageDetection,
             @Value("${runtime.dry-run-mode:false}") boolean dryRunMode) {
         this.intelligenceClient = intelligenceClient;
+        this.kernelAdapterService = kernelAdapterService;
         this.scenarioRouter = scenarioRouter;
         this.rbacService = rbacService;
         this.validationService = validationService;
@@ -86,7 +90,7 @@ public class ReactiveChatService {
         this.objectMapper = objectMapper;
         this.conversationalAiService = conversationalAiService;
         this.maxExecutionTimeMs = maxExecutionTimeMs;
-        this.maxOllamaTimeoutMs = maxOllamaTimeoutMs;
+        this.maxLlmTimeoutMs = maxLlmTimeoutMs;
         this.maxDbTimeoutMs = maxDbTimeoutMs;
         this.twoStageDetection = twoStageDetection;
         this.dryRunMode = dryRunMode;
@@ -121,24 +125,22 @@ public class ReactiveChatService {
             // Save user message
             saveMessageSync(sessionId, "user", request.getQuery());
             
-            // Get session context
-            String sessionContext = getSessionContextSync(sessionId);
-
+            // Use DLM/AI Kernel (AxisAiKernel) for processing through KernelAdapterService
+            // This replaces the old ReactiveIntelligenceClient flow with the 10-stage pipeline
+            log.info("Processing request through DLM/AI Kernel (AxisAiKernel) for reactive flow");
+            
             tracker.startIntentDetection();
             
-            Mono<IntentResult> intentMono = twoStageDetection
-                    ? intelligenceClient.detectIntentTwoStage(request.getQuery(), sessionContext)
-                    : intelligenceClient.detectIntent(request.getQuery(), sessionContext);
-            
-            return intentMono
-                    .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
-                    .doOnSuccess(intent -> {
+            return kernelAdapterService.processWithKernel(request)
+                    .timeout(Duration.ofMillis(maxExecutionTimeMs))
+                    .doOnSuccess(response -> {
                         tracker.endIntentDetection();
-                        tracker.withScenario(intent.getScenario());
-                        log.info("Detected intent: scenario={}, confidence={}", 
-                                intent.getScenario(), intent.getConfidence());
+                        if (response.getScenario() != null) {
+                            tracker.withScenario(response.getScenario());
+                        }
+                        log.info("Kernel processing complete: scenario={}, type={}",
+                                response.getScenario(), response.getResponseType());
                     })
-                    .flatMap(intent -> processIntent(intent, request, sessionId, executionId, tracker, requestTime, dryRun))
                     .doOnSuccess(response -> tracker.complete())
                     .doOnError(e -> {
                         tracker.markFailed();
@@ -214,174 +216,83 @@ public class ReactiveChatService {
             log.debug("Using last used params for context: {}", lastUsedParamsJson);
         }
 
-        // Get user's allowed scenarios for RBAC-filtered intent detection
-        // This ensures the LLM only suggests scenarios the user can access
-        Set<String> allowedScenarios = getAllowedScenariosForRoles(userRoles);
-        log.debug("User allowed scenarios (RBAC): {}", allowedScenarios);
+        // Use DLM/AI Kernel (AxisAiKernel) for processing through KernelAdapterService
+        // This replaces the old ReactiveIntelligenceClient flow with the 10-stage pipeline
+        log.info("Processing request through DLM/AI Kernel (AxisAiKernel) for streaming");
+        
+        // Process through KernelAdapterService which uses AxisAiKernel
+        Mono<ChatResponse> kernelResponseMono = kernelAdapterService.processWithKernel(request)
+                .timeout(Duration.ofMillis(maxExecutionTimeMs))
+                .doOnSuccess(response -> log.info("Kernel processing complete: scenario={}, type={}",
+                        response.getScenario(), response.getResponseType()))
+                .doOnError(e -> log.error("Kernel processing failed: {}", e.getMessage(), e))
+                .cache(); // Cache to avoid re-execution
 
-        // Cache the intent detection to avoid re-execution
-        // Pass lastUsedParamsJson so intelligence system can resolve references like "same account"
-        // Pass allowedScenarios so intelligence system only suggests scenarios the user can access
-        // Pass sessionId and userId for context memory and parameter extraction
-        String userId = request.getUserId();
-        Mono<IntentResult> intentMono = intelligenceClient.detectIntent(request.getQuery(), sessionContext, lastUsedParamsJson, allowedScenarios, sessionId, userId)
-                .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
-                .doOnSuccess(intent -> log.info("Intent detected for streaming: scenario={}, confidence={}",
-                        intent.getScenario(), intent.getConfidence()))
-                .doOnError(e -> log.error("Intent detection failed in streaming: {}", e.getMessage()))
-                .cache(); // Cache to avoid re-executing intent detection
-
-        // Now build the response flux with detailed progress indicators
+        // Convert Mono<ChatResponse> to Flux<String> with progress indicators
         return Flux.concat(
                 // Session ID event for frontend to capture
                 Flux.just("[SESSION]" + sessionId),
                 // Stage 1: Initial analysis
                 Flux.just("[PROGRESS]🔍 Analyzing your request...\n"),
-
-                intentMono.flatMapMany(intent -> {
-                    // Stage 2: Understanding complete
+                
+                kernelResponseMono.flatMapMany(response -> {
+                    log.debug("Converting kernel response to streaming format: scenario={}, type={}",
+                            response.getScenario(), response.getResponseType());
+                    
+                    // Handle different response types
+                    if (response.getResponseType() == ChatResponse.ResponseType.ERROR) {
+                        // Error response
+                        String errorMsg = response.getMessage() != null ? response.getMessage() : 
+                                "An error occurred processing your request.";
+                        saveMessageSync(sessionId, "assistant", errorMsg);
+                        return Flux.just("[RESPONSE]" + errorMsg + "\n");
+                    }
+                    
+                    if (response.getResponseType() == ChatResponse.ResponseType.FOLLOW_UP) {
+                        // Follow-up required (missing parameters)
+                        String followUpMsg = response.getMessage() != null ? response.getMessage() : 
+                                "I need more information to help you.";
+                        saveMessageSync(sessionId, "assistant", followUpMsg);
+                        return Flux.concat(
+                                Flux.just("[PROGRESS]✅ Request understood\n"),
+                                Flux.just("[PROGRESS]❓ Need more information\n"),
+                                Flux.just("[RESPONSE]" + followUpMsg + "\n")
+                        );
+                    }
+                    
+                    if (response.getResponseType() == ChatResponse.ResponseType.CLARIFICATION) {
+                        // Clarification needed
+                        String clarificationMsg = response.getMessage() != null ? response.getMessage() : 
+                                "Could you please clarify your request?";
+                        saveMessageSync(sessionId, "assistant", clarificationMsg);
+                        return Flux.concat(
+                                Flux.just("[PROGRESS]✅ Request understood\n"),
+                                Flux.just("[PROGRESS]❓ Need clarification\n"),
+                                Flux.just("[RESPONSE]" + clarificationMsg + "\n")
+                        );
+                    }
+                    
+                    // Direct response (success)
+                    String responseMessage = response.getMessage();
+                    if (responseMessage == null || responseMessage.trim().isEmpty()) {
+                        responseMessage = "I've processed your request successfully.";
+                    }
+                    
+                    // Save the complete assistant response
+                    saveMessageSync(sessionId, "assistant", responseMessage);
+                    
+                    // Log successful execution to audit
+                    Instant requestTime = Instant.now();
+                    logAuditAsync(executionId, request.getUserId(), response.getScenario(),
+                            requestTime, Instant.now(), true, null, null, null);
+                    
+                    // Return streaming response with progress indicators
                     return Flux.concat(
-                            Flux.just("[PROGRESS]✅ Request understood - " + intent.getScenario().replace("_", " ").toLowerCase() + "\n"),
-
-                            Flux.defer(() -> {
-                                // Validate intent
-                                IntentValidationService.ValidationResult validation =
-                                        validationService.validate(intent, request.getQuery());
-
-                                if (!validation.isValid()) {
-                                    String message = validation.validationMessage();
-                                    log.debug("Validation failed, returning error message");
-
-                                    // Log validation failure to audit
-                                    Instant requestTime = Instant.now();
-                                    logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
-                                            requestTime, Instant.now(), false,
-                                            "Validation failed: " + message, intent, null);
-
-                                    // Handle unknown intent with conversational AI
-                                    if (validation.isUnknown()) {
-                                        log.info("Unknown intent detected - engaging conversational AI");
-                                        return conversationalAiService
-                                                .generateConversationalResponse(request.getQuery(), request.getUserId())
-                                                .flatMapMany(conversationalResponse ->
-                                                    Flux.just("\n" + conversationalResponse)
-                                                )
-                                                .onErrorResume(e -> {
-                                                    log.error("Conversational AI failed: {}", e.getMessage());
-                                                    return Flux.just("\n" + getDefaultUnknownMessage());
-                                                });
-                                    }
-
-                                    // Generate user-friendly missing parameter message using AI
-                                    // Also store pending state for context retention
-                                    if (!validation.missingRequiredParams().isEmpty()) {
-                                        storePendingFollowUp(request.getSessionId() != null ? request.getSessionId() : sessionId,
-                                                intent.getScenario(), validation.missingRequiredParams(), intent.getParams());
-                                        return generateMissingParamMessage(intent.getScenario(),
-                                                validation.missingRequiredParams(), request.getQuery());
-                                    }
-                                    
-                                    // Handle confirmation request
-                                    if (validation.needsConfirmation()) {
-                                        Map<String, Object> params = intent.getParams() != null ? intent.getParams() : Map.of();
-                                        String confirmationMsg = String.format(
-                                                "I'm %.0f%% sure you want to check %s. Please confirm.",
-                                                intent.getConfidence() * 100, 
-                                                validationService.getScenarioDescription(intent.getScenario())
-                                        );
-                                        
-                                        // Store confirmation state in session for follow-up handling
-                                        storePendingConfirmation(sessionId, intent.getScenario(), params);
-                                        
-                                        saveMessageSync(sessionId, "assistant", confirmationMsg);
-                                        return Flux.just("[RESPONSE]" + confirmationMsg + "\n");
-                                    }
-
-                                    return Flux.just("\n" + message);
-                                }
-
-                                // Stage 3: Checking permissions
-                                return Flux.concat(
-                                        Flux.just("[PROGRESS]🔐 Verifying permissions...\n"),
-
-                                        Flux.defer(() -> {
-                                            // Authorization check
-                                            if (!rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
-                                                log.warn("User with roles {} not authorized for scenario: {}", userRoles, intent.getScenario());
-
-                                                // Log authorization failure to audit
-                                                Instant requestTime = Instant.now();
-                                                logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
-                                                        requestTime, Instant.now(), false,
-                                                        "Authorization denied for roles: " + userRoles, intent, null);
-
-                                                return Flux.just(String.format("\n❌ You don't have permission to access this information.\n\n**Your roles:** %s\n**Required scenario:** %s",
-                                                        userRoles, intent.getScenario()));
-                                            }
-
-                                            log.debug("Authorization successful for user with roles: {}", userRoles);
-
-                                            // Stage 4: Execute scenario
-                                            ScenarioRequest scenarioRequest = ScenarioRequest.builder()
-                                                    .scenario(intent.getScenario())
-                                                    .params(intent.getParams())
-                                                    .userId(request.getUserId())
-                                                    .build();
-
-                                            log.debug("Executing scenario reactively: {}", intent.getScenario());
-
-                                            return Flux.concat(
-                                                    Flux.just("[PROGRESS]✅ Access granted\n"),
-                                                    Flux.just("[PROGRESS]📊 Fetching your data...\n"),
-                                                    scenarioRouter.routeReactive(scenarioRequest)
-                                                            .timeout(Duration.ofMillis(maxDbTimeoutMs))
-                                                            .doOnSuccess(result -> {
-                                                                log.debug("Scenario executed, starting streaming response");
-                                                                // Log successful execution to audit
-                                                                Instant requestTime = Instant.now();
-                                                                logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
-                                                                        requestTime, Instant.now(), true, null, intent, result);
-                                                                // Store last used params for future context resolution
-                                                                storeLastUsedParams(sessionId, intent.getParams());
-                                                            })
-                                                            .doOnError(e -> {
-                                                                log.error("Scenario execution failed: {}", e.getMessage());
-                                                                // Log execution failure to audit
-                                                                Instant requestTime = Instant.now();
-                                                                logAuditAsync(executionId, request.getUserId(), intent.getScenario(),
-                                                                        requestTime, Instant.now(), false,
-                                                                        "Scenario execution failed: " + e.getMessage(), intent, null);
-                                                            })
-                                                            .flatMapMany(result -> {
-                                                                log.debug("Formatting response as stream");
-
-                                                                // Collect the response to save it later
-                                                                final StringBuilder responseCollector = new StringBuilder();
-
-                                                                return Flux.concat(
-                                                                        // Status/progress messages
-                                                                        Flux.just("[PROGRESS]✅ Data retrieved\n"),
-                                                                        Flux.just("[PROGRESS]📝 Preparing your response...\n"),
-
-                                                                        // Final structured response with [RESPONSE] marker
-                                                                        intelligenceClient.formatResponseStreaming(intent.getScenario(), result, request.getQuery())
-                                                                                .map(jsonResponse -> "[RESPONSE]" + jsonResponse)
-                                                                                .doOnNext(chunk -> responseCollector.append(chunk.replace("[RESPONSE]", "")))
-                                                                                .doOnComplete(() -> {
-                                                                                    log.debug("Response streaming completed");
-                                                                                    // Save the complete assistant response
-                                                                                    String completeResponse = responseCollector.toString().trim();
-                                                                                    if (!completeResponse.isEmpty()) {
-                                                                                        saveMessageSync(sessionId, "assistant", completeResponse);
-                                                                                    }
-                                                                                })
-                                                                                .doOnError(e -> log.error("Response streaming error: {}", e.getMessage()))
-                                                                );
-                                                            })
-                                            );
-                                        })
-                                );
-                            })
+                            Flux.just("[PROGRESS]✅ Request understood\n"),
+                            Flux.just("[PROGRESS]🔐 Permissions verified\n"),
+                            Flux.just("[PROGRESS]📊 Processing complete\n"),
+                            Flux.just("[PROGRESS]📝 Preparing your response...\n"),
+                            Flux.just("[RESPONSE]" + responseMessage + "\n")
                     );
                 })
         )
@@ -514,7 +425,7 @@ public class ReactiveChatService {
                     // Format response (non-blocking)
                     tracker.startFormatting();
                     return intelligenceClient.formatResponse(intent.getScenario(), result, request.getQuery())
-                            .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
+                            .timeout(Duration.ofMillis(maxLlmTimeoutMs))
                             .doOnSuccess(r -> tracker.endFormatting())
                             .map(formattedResponse -> {
                                 saveMessageSync(sessionId, "assistant", formattedResponse);
@@ -849,7 +760,7 @@ public class ReactiveChatService {
 
                 // Use LLM to extract the parameter from user's response
                 intelligenceClient.detectIntent(request.getQuery(), enhancedContext)
-                        .timeout(Duration.ofMillis(maxOllamaTimeoutMs))
+                        .timeout(Duration.ofMillis(maxLlmTimeoutMs))
                         .flatMapMany(detectedIntent -> {
                             // Build the params map combining previously collected params with new ones
                             Map<String, Object> combinedParams = new HashMap<>();

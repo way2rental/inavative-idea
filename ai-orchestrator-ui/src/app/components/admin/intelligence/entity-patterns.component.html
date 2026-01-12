@@ -1,6 +1,6 @@
-<div class="min-h-screen bg-bank-bg">
-  <div class="bg-white border-b">
-    <div class="px-6 lg:px-8 py-4">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
+  <div class="bg-white/80 backdrop-blur-sm border-b border-gray-200/60">
+    <div class="page-container py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <a routerLink="/admin/intelligence/layers" class="text-gray-400 hover:text-indigo-600 transition-colors">
@@ -45,9 +45,9 @@
     </div>
   </div>
 
-  <div class="px-6 lg:px-8 py-8">
+  <div class="page-container py-8">
     <!-- Filters -->
-    <div class="card-axis p-4 mb-6">
+    <div class="card-ai-primary p-4 mb-6">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <input type="text" [(ngModel)]="filterEntityType" (input)="applyFilters()"
@@ -78,7 +78,7 @@
     </div>
 
     <div *ngIf="!isLoading" class="space-y-4">
-      <div *ngFor="let pattern of filteredPatterns" class="card-axis p-6 hover:shadow-lg transition-shadow">
+      <div *ngFor="let pattern of filteredPatterns" class="card-ai-primary p-6 hover:shadow-lg transition-shadow">
         <div class="flex items-start justify-between mb-4">
           <div class="flex items-center gap-3">
             <span class="px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
@@ -141,7 +141,7 @@
       </div>
     </div>
 
-    <div *ngIf="!isLoading && filteredPatterns.length === 0" class="card-axis p-12 text-center">
+    <div *ngIf="!isLoading && filteredPatterns.length === 0" class="card-ai-primary p-12 text-center">
       <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
       </svg>

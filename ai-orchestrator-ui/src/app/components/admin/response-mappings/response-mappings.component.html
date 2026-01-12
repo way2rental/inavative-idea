@@ -1,9 +1,9 @@
 <!-- Response Mappings Management with Shared Layout -->
 
-<div class="min-h-screen bg-bank-bg">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
   <!-- Page Header -->
-  <div class="bg-white border-b">
-    <div class="px-6 lg:px-8 py-4">
+  <div class="bg-white/80 backdrop-blur-sm border-b border-gray-200/60">
+    <div class="page-container py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -30,9 +30,9 @@
     </div>
   </div>
 
-  <div class="px-6 lg:px-8 py-8">
+  <div class="page-container py-8">
     <!-- Filters -->
-    <div class="card-axis p-4 mb-6">
+    <div class="card-ai-primary p-4 mb-6">
       <div class="flex items-center gap-4">
         <label class="text-sm font-medium text-gray-700">Filter by Scenario:</label>
         <select [(ngModel)]="selectedScenario" (change)="filterByScenario()" class="input-axis text-sm">
@@ -50,7 +50,7 @@
       </div>
     } @else {
       <!-- Mappings Table -->
-      <div class="card-axis overflow-hidden">
+      <div class="card-ai-primary overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead class="bg-gray-50">
@@ -146,7 +146,7 @@
   <!-- Create/Edit Modal -->
   @if (showFormModal) {
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="card-axis w-full max-w-2xl max-h-[90vh] overflow-hidden">
+      <div class="card-ai-primary w-full max-w-2xl max-h-[90vh] overflow-hidden">
         <div class="p-6 border-b border-gray-200 bg-axis-burgundy text-white rounded-t-2xl">
           <div class="flex items-center justify-between">
             <h2 class="text-xl font-bold">{{isEditMode ? 'Edit' : 'Create'}} Response Mapping</h2>
@@ -225,7 +225,7 @@
   <!-- JSONPath Test Modal -->
   @if (showTestModal) {
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="card-axis w-full max-w-3xl max-h-[90vh] overflow-hidden">
+      <div class="card-ai-primary w-full max-w-3xl max-h-[90vh] overflow-hidden">
         <div class="p-6 border-b border-gray-200 bg-purple-600 text-white rounded-t-2xl">
           <div class="flex items-center justify-between">
             <h2 class="text-xl font-bold">Test JSONPath Expression</h2>

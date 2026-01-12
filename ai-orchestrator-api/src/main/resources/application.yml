@@ -50,23 +50,7 @@ spring:
         multiplier: 2
         max-interval: 5000
 
-    # Ollama Configuration
-#    ollama:
-#      base-url: http://localhost:11434
-#      chat:
-#        enabled: true
-#        options:
-#          model: mistral:7b          # Model for general responses
-#          temperature: 0.3
-#          num-predict: 1024
-#          top-k: 40
-#          top-p: 0.9
-#      timeout:
-#        connection: 5s
-#        read: 120s
-#        write: 60s
-
-    # OpenAI Configuration (enable when needed)
+    # OpenAI Configuration
     openai:
       api-key: ${OPENAI_API_KEY:${OPEN_API_KEY:}}
       chat:
@@ -110,8 +94,8 @@ llm:
     generation-seconds: 120      # Response generation timeout
     streaming-seconds: 150       # Streaming response timeout
   models:
-    intent: mistral:7b          # Model for intent detection
-    formatter: mistral:7b        # Model for response formatting
+    intent: gpt-4o-mini          # Model for intent detection
+    formatter: gpt-4o-mini        # Model for response formatting
   two-stage-detection: false    # Enable for 150+ scenarios
   streaming-enabled: true       # Enable SSE streaming
 
@@ -155,7 +139,7 @@ intent:
 runtime:
   protection:
     max-execution-time-ms: 150000      # 150s total execution limit (to accommodate slow LLM responses)
-    max-ollama-timeout-ms: 120000      # 120s LLM timeout
+    max-llm-timeout-ms: 120000         # 120s LLM timeout
     max-db-timeout-ms: 5000            # 5s DB query timeout
     max-scenario-timeout-ms: 30000     # 30s per scenario
   dry-run-mode: false                  # Global dry-run mode (for testing)
@@ -184,7 +168,7 @@ jwt:
 resilience4j:
   circuitbreaker:
     instances:
-      ollama:
+      llm:
         slidingWindowSize: 10
         minimumNumberOfCalls: 3
         failureRateThreshold: 50
@@ -194,7 +178,7 @@ resilience4j:
         slowCallRateThreshold: 80
   retry:
     instances:
-      ollama:
+      llm:
         maxAttempts: 3
         waitDuration: 1000
         enableExponentialBackoff: true
@@ -204,13 +188,13 @@ resilience4j:
           - org.springframework.web.reactive.function.client.WebClientResponseException
   ratelimiter:
     instances:
-      ollama:
+      llm:
         limitForPeriod: 10
         limitRefreshPeriod: 1s
         timeoutDuration: 5s
   timelimiter:
     instances:
-      ollama:
+      llm:
         timeoutDuration: 120s
         cancelRunningFuture: true
 

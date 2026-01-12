@@ -11,7 +11,10 @@ import java.util.Map;
 
 /**
  * Spring AI Configuration.
- * Provides abstraction over different LLM providers (Ollama, OpenAI, etc.)
+ * Provides abstraction over different LLM providers (OpenAI, Azure OpenAI, etc.)
+ * 
+ * Axis AI uses LLMs as interchangeable reasoning engines (API-based only).
+ * No local model runtimes are supported.
  */
 @Configuration
 public class SpringAiConfig {
@@ -19,18 +22,18 @@ public class SpringAiConfig {
     /**
      * Create a ChatClient by resolving the appropriate ChatModel bean at runtime.
      * We avoid direct single-bean injection because multiple ChatModel beans may exist
-     * (e.g. `ollamaChatModel` and `openAiChatModel`).
+     * (e.g. `openAiChatModel` and `azureOpenAiChatModel`).
      */
     @Bean
     public ChatClient chatClient(ApplicationContext ctx, Environment env) {
-        String active = env.getProperty("spring.ai.active-provider", "ollama").toLowerCase();
+        String active = env.getProperty("spring.ai.active-provider", "openai").toLowerCase();
 
         // Common auto-configured bean names used by Spring AI starters
         String targetBeanName = null;
-        if (active.contains("open")) {
+        if (active.contains("open") && !active.contains("azure")) {
             targetBeanName = "openAiChatModel"; // auto-configured name for OpenAI model
-        } else if (active.contains("ollama")) {
-            targetBeanName = "ollamaChatModel"; // auto-configured name for Ollama model
+        } else if (active.contains("azure")) {
+            targetBeanName = "azureOpenAiChatModel"; // auto-configured name for Azure OpenAI model
         }
 
         // If we have a provider-specific bean name and it's available, use it
@@ -42,7 +45,7 @@ public class SpringAiConfig {
         // Otherwise fall back to any available ChatModel bean
         Map<String, ChatModel> beans = ctx.getBeansOfType(ChatModel.class);
         if (beans.isEmpty()) {
-            throw new IllegalStateException("No ChatModel bean available on the classpath. Ensure a Spring AI starter is present and configured (e.g. openai or ollama).");
+            throw new IllegalStateException("No ChatModel bean available on the classpath. Ensure a Spring AI starter is present and configured (e.g. openai or azure).");
         }
 
         // If there is exactly one ChatModel, use it. Otherwise use the first one as a best-effort.

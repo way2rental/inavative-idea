@@ -1,8 +1,8 @@
 <!-- Admin - System Configuration Management -->
-<div class="min-h-screen bg-bank-bg">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
   <!-- Page Title Section -->
-  <div class="bg-white border-b">
-    <div class="mx-auto px-4 sm:px-6 lg:px-8 py-4">
+  <div class="bg-white/80 backdrop-blur-sm border-b border-gray-200/60">
+    <div class="page-container py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
@@ -39,9 +39,9 @@
     </div>
   </div>
 
-  <div class="mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="page-container py-8">
     <!-- Filters -->
-    <div class="card-axis p-4 mb-6">
+    <div class="card-ai-primary p-4 mb-6">
       <div class="flex flex-wrap gap-4">
         <div class="flex-1 min-w-[200px]">
           <input type="text" [(ngModel)]="searchTerm" (ngModelChange)="applyFilters()"
@@ -74,7 +74,7 @@
 
             <div class="space-y-3">
               @for (config of getConfigsByCategory(category); track config.id) {
-                <div class="card-axis p-4 hover:shadow-elevated transition-all duration-300">
+                <div class="card-ai-primary p-4 hover:shadow-elevated transition-all duration-300">
                   <div class="flex items-start justify-between">
                     <div class="flex-1">
                       <div class="flex items-center gap-2 mb-1">
@@ -120,7 +120,7 @@
       }
 
       @if (filteredConfigs.length === 0) {
-        <div class="card-axis p-12 text-center">
+        <div class="card-ai-primary p-12 text-center">
           <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -136,7 +136,7 @@
   <!-- Create/Edit Modal -->
   @if (showModal) {
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="card-axis w-full max-w-2xl max-h-[90vh] overflow-hidden">
+      <div class="card-ai-primary w-full max-w-2xl max-h-[90vh] overflow-hidden">
         <div class="p-6 border-b border-gray-200 bg-indigo-600 text-white rounded-t-2xl">
           <div class="flex items-center justify-between">
             <h2 class="text-xl font-bold">{{ isEditing ? 'Edit Configuration' : 'Add New Configuration' }}</h2>

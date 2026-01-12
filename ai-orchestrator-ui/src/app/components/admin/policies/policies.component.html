@@ -1,8 +1,8 @@
 <!-- Admin - Policy Rules Management -->
-<div class="min-h-screen bg-bank-bg">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
   <!-- Page Title Section -->
-  <div class="bg-white border-b">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+  <div class="bg-white border-b border-gray-200/60">
+    <div class="page-container py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
@@ -33,7 +33,7 @@
     </div>
   </div>
 
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="page-container py-8">
     @if (isLoading) {
       <div class="flex items-center justify-center h-64">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-axis-burgundy"></div>
@@ -42,7 +42,7 @@
       <!-- Policies List -->
       <div class="space-y-4">
         @for (policy of policies; track policy.id) {
-          <div class="card-axis p-6 hover:shadow-elevated transition-all duration-300">
+          <div class="card-ai-primary group">
             <div class="flex items-start justify-between mb-4">
               <div class="flex-1">
                 <div class="flex items-center gap-3 mb-1">
@@ -125,7 +125,7 @@
       </div>
 
       @if (policies.length === 0) {
-        <div class="card-axis p-12 text-center">
+        <div class="card-ai-primary p-12 text-center">
           <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
@@ -140,7 +140,7 @@
   <!-- Create/Edit Modal -->
   @if (showModal) {
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="card-axis w-full max-w-3xl max-h-[90vh] overflow-hidden">
+      <div class="card-ai-primary w-full max-w-3xl max-h-[90vh] overflow-hidden">
         <div class="p-6 border-b border-gray-200 bg-red-600 text-white rounded-t-2xl">
           <div class="flex items-center justify-between">
             <h2 class="text-xl font-bold">{{ isEditing ? 'Edit Policy Rule' : 'Create New Policy Rule' }}</h2>
@@ -266,7 +266,7 @@
   <!-- Test Modal -->
   @if (showTestModal) {
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-      <div class="card-axis w-full max-w-md">
+      <div class="card-ai-primary w-full max-w-md">
         <div class="p-6 border-b border-gray-200 bg-purple-600 text-white rounded-t-2xl">
           <h2 class="text-lg font-bold">Test Policy: {{ selectedPolicy?.policyKey }}</h2>
         </div>

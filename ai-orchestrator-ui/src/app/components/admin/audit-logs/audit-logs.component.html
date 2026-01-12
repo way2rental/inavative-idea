@@ -1,8 +1,8 @@
 <!-- Axis Bank Admin - Audit Logs -->
-<div class="min-h-screen bg-bank-bg">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
   <!-- Page Title Section -->
-  <div class="bg-white border-b">
-    <div class="px-6 lg:px-8 py-4">
+  <div class="bg-white/80 backdrop-blur-sm border-b border-gray-200/60">
+    <div class="page-container py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
@@ -27,9 +27,9 @@
     </div>
   </div>
 
-  <div class="px-6 lg:px-8 py-8">
+  <div class="page-container py-8">
     <!-- Filters -->
-    <div class="card-axis p-4 mb-6">
+    <div class="card-ai-primary p-4 mb-6">
       <div class="flex flex-wrap items-center gap-4">
         <div class="flex-1 min-w-[200px]">
           <input type="text" [(ngModel)]="filterUserId" placeholder="Filter by User ID..."
@@ -50,7 +50,7 @@
       </div>
     } @else {
       <!-- Logs Table -->
-      <div class="card-axis overflow-hidden">
+      <div class="card-ai-primary overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead class="bg-gray-50">
@@ -137,7 +137,7 @@
   <!-- Detail Modal -->
   @if (selectedLog) {
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="card-axis w-full max-w-2xl max-h-[90vh] overflow-hidden">
+      <div class="card-ai-primary w-full max-w-2xl max-h-[90vh] overflow-hidden">
         <div class="p-6 border-b border-gray-200 bg-axis-burgundy text-white rounded-t-2xl">
           <div class="flex items-center justify-between">
             <h2 class="text-xl font-bold">Log Details</h2>

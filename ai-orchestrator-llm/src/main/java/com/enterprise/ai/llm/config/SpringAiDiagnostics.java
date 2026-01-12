@@ -20,7 +20,7 @@ public class SpringAiDiagnostics {
     private final Environment env;
     private final ApplicationContext ctx;
 
-    @Value("${spring.ai.active-provider:ollama}")
+    @Value("${spring.ai.active-provider:openai}")
     private String activeProvider;
 
     @PostConstruct

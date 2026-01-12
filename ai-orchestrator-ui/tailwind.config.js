@@ -6,19 +6,59 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Global Semantic Colors - Manageable from here
         primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+          DEFAULT: '#97144D', // axis-burgundy
+          50: '#fdf2f8',
+          100: '#fce7f3',
+          200: '#fbcfe8',
+          300: '#f9a8d4',
+          400: '#f472b6',
+          500: '#97144D', // axis-burgundy
+          600: '#6D0F37', // axis-maroon
+          700: '#5a0e2d',
+          800: '#4a0c24',
+          900: '#3a091b',
         },
-        // Axis Bank Brand Colors
+        secondary: {
+          DEFAULT: '#6D0F37', // axis-maroon
+          50: '#f9fafb',
+          100: '#f3f4f6',
+          200: '#e5e7eb',
+          300: '#d1d5db',
+          400: '#9ca3af',
+          500: '#6b7280',
+          600: '#4b5563',
+          700: '#374151',
+          800: '#1f2937',
+          900: '#111827',
+        },
+        action: {
+          DEFAULT: '#97144D', // Primary action button
+          hover: '#6D0F37',
+          light: '#B91C5E',
+        },
+        success: {
+          DEFAULT: '#10b981',
+          light: '#d1fae5',
+          dark: '#059669',
+        },
+        warning: {
+          DEFAULT: '#f59e0b',
+          light: '#fef3c7',
+          dark: '#d97706',
+        },
+        danger: {
+          DEFAULT: '#ef4444',
+          light: '#fee2e2',
+          dark: '#dc2626',
+        },
+        info: {
+          DEFAULT: '#3b82f6',
+          light: '#dbeafe',
+          dark: '#2563eb',
+        },
+        // Axis Bank Brand Colors (kept for backward compatibility)
         axis: {
           burgundy: '#97144D',
           maroon: '#6D0F37',

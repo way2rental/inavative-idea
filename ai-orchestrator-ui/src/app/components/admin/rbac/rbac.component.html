@@ -1,8 +1,8 @@
 <!-- Axis Bank Admin - RBAC Management -->
-<div class="min-h-screen bg-bank-bg">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
   <!-- Page Title Section -->
-  <div class="bg-white border-b">
-    <div class="px-6 lg:px-8 py-4">
+  <div class="bg-white/80 backdrop-blur-sm border-b border-gray-200/60">
+    <div class="page-container py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
@@ -38,10 +38,10 @@
     </div>
   </div>
 
-  <div class="px-6 lg:px-8 py-8">
+  <div class="page-container py-8">
     <!-- Status Card -->
     @if (rbacStatus) {
-      <div class="card-axis p-6 mb-8">
+      <div class="card-ai-primary p-6 mb-8">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-full flex items-center justify-center"
@@ -85,7 +85,7 @@
       <!-- Role Mappings Grid -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         @for (mapping of roleMappings; track mapping.role) {
-          <div class="card-axis p-6">
+          <div class="card-ai-primary p-6">
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg flex items-center justify-center"
@@ -128,7 +128,7 @@
         }
 
         @if (roleMappings.length === 0) {
-          <div class="col-span-3 card-axis p-12 text-center">
+          <div class="col-span-3 card-ai-primary p-12 text-center">
             <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
@@ -144,7 +144,7 @@
   <!-- Add Mapping Modal -->
   @if (showAddModal) {
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="card-axis w-full max-w-md overflow-hidden">
+      <div class="card-ai-primary w-full max-w-md overflow-hidden">
         <div class="p-6 border-b border-gray-200 bg-axis-burgundy text-white rounded-t-2xl">
           <div class="flex items-center justify-between">
             <h2 class="text-xl font-bold">Add Role-Scenario Mapping</h2>

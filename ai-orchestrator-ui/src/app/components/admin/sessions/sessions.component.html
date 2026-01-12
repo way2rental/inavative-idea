@@ -1,8 +1,8 @@
 <!-- Axis Bank Admin - Chat Sessions -->
-<div class="min-h-screen bg-bank-bg">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
   <!-- Page Title Section -->
-  <div class="bg-white border-b">
-    <div class="px-6 lg:px-8 py-4">
+  <div class="bg-white/80 backdrop-blur-sm border-b border-gray-200/60">
+    <div class="page-container py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
@@ -27,9 +27,9 @@
     </div>
   </div>
 
-  <div class="px-6 lg:px-8 py-8">
+  <div class="page-container py-8">
     <!-- Filters -->
-    <div class="card-axis p-4 mb-6">
+    <div class="card-ai-primary p-4 mb-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <input type="text" [(ngModel)]="filterUserId" (input)="applyFilters()"
@@ -52,7 +52,7 @@
       </div>
     } @else {
       <!-- Sessions Table -->
-      <div class="card-axis overflow-hidden">
+      <div class="card-ai-primary overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full">
             <thead class="bg-gray-50">

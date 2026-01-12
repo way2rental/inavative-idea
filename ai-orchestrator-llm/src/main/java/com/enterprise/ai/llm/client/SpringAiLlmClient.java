@@ -18,8 +18,9 @@ import java.util.*;
 
 /**
  * Spring AI-based LLM Client.
- * Provider-agnostic implementation - works with Ollama, OpenAI, Azure OpenAI, etc.
+ * Provider-agnostic implementation - works with OpenAI, Azure OpenAI, etc. (API-based only)
  * 
+ * Axis AI uses LLMs as interchangeable reasoning engines - no local model runtimes.
  * Uses DynamicPromptBuilder to load prompts from database - NO HARDCODED prompts.
  * To switch providers, just change spring.ai.active-provider in application.yml
  */

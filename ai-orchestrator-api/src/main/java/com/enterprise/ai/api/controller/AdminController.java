@@ -109,10 +109,12 @@ public class AdminController {
         
         AiScenario scenario = AiScenario.builder()
                 .scenarioCode(form.scenarioCode)
+                .scenarioName(form.scenarioName)
                 .description(form.description)
                 .executionType(form.executionType)
                 .httpMethod(form.httpMethod)
                 .httpUrl(form.httpUrl)
+                .httpHeaders(form.httpHeaders)
                 .sqlQuery(form.sqlQuery)
                 .requestMapping(form.requestMapping)
                 .responseMapping(form.responseMapping)
@@ -120,6 +122,12 @@ public class AdminController {
                 .requiredParams(form.requiredParams)
                 .llmPromptTemplate(promptTemplate)
                 .active(form.active != null ? form.active : true)
+                // AI Intent Detection fields
+                .triggerPhrases(form.triggerPhrases)
+                .exampleQueries(form.exampleQueries)
+                .category(form.category)
+                .displayOrder(form.displayOrder != null ? form.displayOrder : 0)
+                .icon(form.icon)
                 // Multi-filter engine fields
                 .filterDefinitions(form.filterDefinitions)
                 .securityFilters(form.securityFilters)
@@ -142,10 +150,12 @@ public class AdminController {
                     // Handle legacy field - intentPrompt maps to llmPromptTemplate
                     String promptTemplate = form.llmPromptTemplate != null ? form.llmPromptTemplate : form.intentPrompt;
                     
+                    scenario.setScenarioName(form.scenarioName);
                     scenario.setDescription(form.description);
                     scenario.setExecutionType(form.executionType);
                     scenario.setHttpMethod(form.httpMethod);
                     scenario.setHttpUrl(form.httpUrl);
+                    scenario.setHttpHeaders(form.httpHeaders);
                     scenario.setSqlQuery(form.sqlQuery);
                     scenario.setRequestMapping(form.requestMapping);
                     scenario.setResponseMapping(form.responseMapping);
@@ -153,6 +163,12 @@ public class AdminController {
                     scenario.setRequiredParams(form.requiredParams);
                     scenario.setLlmPromptTemplate(promptTemplate);
                     scenario.setActive(form.active != null ? form.active : true);
+                    // AI Intent Detection fields
+                    scenario.setTriggerPhrases(form.triggerPhrases);
+                    scenario.setExampleQueries(form.exampleQueries);
+                    scenario.setCategory(form.category);
+                    scenario.setDisplayOrder(form.displayOrder != null ? form.displayOrder : scenario.getDisplayOrder());
+                    scenario.setIcon(form.icon);
                     // Multi-filter engine fields
                     scenario.setFilterDefinitions(form.filterDefinitions);
                     scenario.setSecurityFilters(form.securityFilters);
@@ -328,11 +344,13 @@ public class AdminController {
         ScenarioDTO dto = new ScenarioDTO();
         dto.id = scenario.getId();
         dto.scenarioCode = scenario.getScenarioCode();
-        dto.scenarioName = scenario.getDescription() != null ? scenario.getDescription().split(" - ")[0] : scenario.getScenarioCode();
+        dto.scenarioName = scenario.getScenarioName() != null ? scenario.getScenarioName() : 
+                           (scenario.getDescription() != null ? scenario.getDescription().split(" - ")[0] : scenario.getScenarioCode());
         dto.description = scenario.getDescription();
         dto.executionType = scenario.getExecutionType();
         dto.httpMethod = scenario.getHttpMethod();
         dto.httpUrl = scenario.getHttpUrl();
+        dto.httpHeaders = scenario.getHttpHeaders();
         dto.sqlQuery = scenario.getSqlQuery();
         dto.requestMapping = scenario.getRequestMapping();
         dto.responseMapping = scenario.getResponseMapping();
@@ -340,6 +358,12 @@ public class AdminController {
         dto.requiredParams = parseJsonArray(scenario.getRequiredParams());
         dto.llmPromptTemplate = scenario.getLlmPromptTemplate();
         dto.active = scenario.getActive();
+        // AI Intent Detection fields
+        dto.triggerPhrases = scenario.getTriggerPhrases();
+        dto.exampleQueries = scenario.getExampleQueries();
+        dto.category = scenario.getCategory();
+        dto.displayOrder = scenario.getDisplayOrder();
+        dto.icon = scenario.getIcon();
         // Multi-filter engine fields
         dto.filterDefinitions = scenario.getFilterDefinitions();
         dto.securityFilters = scenario.getSecurityFilters();
@@ -456,6 +480,7 @@ public class AdminController {
         public String executionType;
         public String httpMethod;
         public String httpUrl;
+        public String httpHeaders;
         public String sqlQuery;
         public String requestMapping;
         public String responseMapping;
@@ -463,6 +488,12 @@ public class AdminController {
         public List<String> requiredParams;
         public String llmPromptTemplate;
         public Boolean active;
+        // AI Intent Detection fields
+        public String triggerPhrases;
+        public String exampleQueries;
+        public String category;
+        public Integer displayOrder;
+        public String icon;
         // Multi-filter engine fields
         public String filterDefinitions;
         public String securityFilters;
@@ -486,6 +517,12 @@ public class AdminController {
         // Legacy field - maps to llmPromptTemplate for backward compatibility
         public String intentPrompt;
         public Boolean active;
+        // AI Intent Detection fields
+        public String triggerPhrases;
+        public String exampleQueries;
+        public String category;
+        public Integer displayOrder;
+        public String icon;
         // Multi-filter engine fields
         public String filterDefinitions;
         public String securityFilters;

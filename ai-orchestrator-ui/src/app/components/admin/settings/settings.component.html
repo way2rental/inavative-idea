@@ -1,8 +1,8 @@
 <!-- Axis Bank Admin - System Settings & Monitoring -->
-<div class="min-h-screen bg-bank-bg">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
   <!-- Page Title Section -->
-  <div class="bg-white border-b">
-    <div class="px-6 lg:px-8 py-4">
+  <div class="bg-white/80 backdrop-blur-sm border-b border-gray-200/60">
+    <div class="page-container py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <a routerLink="/admin" class="text-gray-400 hover:text-axis-burgundy transition-colors">
@@ -31,14 +31,14 @@
     </div>
   </div>
 
-  <div class="px-6 lg:px-8 py-8">
+  <div class="page-container py-8">
     @if (isLoading) {
       <div class="flex items-center justify-center h-64">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-axis-burgundy"></div>
       </div>
     } @else {
       <!-- Tabs -->
-      <div class="card-axis mb-6">
+      <div class="card-ai-primary mb-6">
         <div class="border-b border-gray-200">
           <nav class="flex -mb-px">
             <button (click)="setActiveTab('health')"
@@ -91,7 +91,7 @@
       @if (activeTab === 'health' && health) {
         <div class="space-y-6">
           <!-- Overall Health Status -->
-          <div class="card-axis p-6">
+          <div class="card-ai-primary p-6">
             <div class="flex items-center justify-between">
               <div>
                 <h3 class="text-lg font-semibold text-gray-900 mb-2">System Health Status</h3>
@@ -108,7 +108,7 @@
           @if (health.components) {
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               @for (component of health.components | keyvalue; track component.key) {
-                <div class="card-axis p-6">
+                <div class="card-ai-primary p-6">
                   <div class="flex items-center justify-between mb-4">
                     <h4 class="font-semibold text-gray-900">{{ component.key }}</h4>
                     <span [class]="getHealthStatusColor(component.value.status)"
@@ -134,7 +134,7 @@
         <div class="space-y-6">
           <!-- Application Info -->
           @if (info.app) {
-            <div class="card-axis p-6">
+            <div class="card-ai-primary p-6">
               <h3 class="text-lg font-semibold text-gray-900 mb-4">Application Information</h3>
               <div class="grid grid-cols-2 gap-4">
                 <div>
@@ -155,7 +155,7 @@
 
           <!-- Java Info -->
           @if (info.java) {
-            <div class="card-axis p-6">
+            <div class="card-ai-primary p-6">
               <h3 class="text-lg font-semibold text-gray-900 mb-4">Java Runtime</h3>
               <div class="grid grid-cols-2 gap-4">
                 <div>
@@ -176,7 +176,7 @@
 
           <!-- OS Info -->
           @if (info.os) {
-            <div class="card-axis p-6">
+            <div class="card-ai-primary p-6">
               <h3 class="text-lg font-semibold text-gray-900 mb-4">Operating System</h3>
               <div class="grid grid-cols-2 gap-4">
                 <div>
@@ -203,7 +203,7 @@
           <!-- Key Metrics Grid -->
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             @for (metric of commonMetrics; track metric.key) {
-              <div class="card-axis p-6">
+              <div class="card-ai-primary p-6">
                 <div class="flex items-start justify-between mb-3">
                   <div class="flex-1">
                     <h4 class="text-sm text-gray-500 mb-1">{{ metric.label }}</h4>
@@ -231,7 +231,7 @@
 
           <!-- All Metrics List -->
           @if (metrics) {
-            <div class="card-axis p-6">
+            <div class="card-ai-primary p-6">
               <h3 class="text-lg font-semibold text-gray-900 mb-4">All Available Metrics</h3>
               <div class="max-h-96 overflow-auto">
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -251,7 +251,7 @@
       <!-- Configuration Tab -->
       @if (activeTab === 'config') {
         <div class="space-y-6">
-          <div class="card-axis p-6">
+          <div class="card-ai-primary p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Actuator Endpoints</h3>
             <p class="text-gray-600 mb-6">Available Spring Boot Actuator endpoints for monitoring and management</p>
 
@@ -323,7 +323,7 @@
           </div>
 
           <!-- Intelligence System Configuration -->
-          <div class="card-axis p-6">
+          <div class="card-ai-primary p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Intelligence System Configuration</h3>
             <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-4">
               <div class="flex items-center gap-3">

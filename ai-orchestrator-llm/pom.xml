@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>AI Orchestrator LLM</name>
-    <description>Ollama LLM client integration and prompt management</description>
+    <description>LLM client abstraction for interchangeable reasoning engines (API-based only)</description>
 
     <properties>
         <spring-ai.version>1.0.0-M6</spring-ai.version>
@@ -49,13 +49,7 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Spring AI - Ollama -->
-<!--        <dependency>-->
-<!--            <groupId>org.springframework.ai</groupId>-->
-<!--            <artifactId>spring-ai-ollama-spring-boot-starter</artifactId>-->
-<!--        </dependency>-->
-
-        <!-- Spring AI - OpenAI (enable at runtime by including the starter) -->
+        <!-- Spring AI - OpenAI (API-based LLM provider) -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-openai-spring-boot-starter</artifactId>

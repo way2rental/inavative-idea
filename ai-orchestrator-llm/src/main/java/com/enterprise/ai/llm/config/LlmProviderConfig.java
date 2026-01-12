@@ -25,7 +25,7 @@ public class LlmProviderConfig {
 
     private final SpringAiLlmClient springAiLlmClient;
 
-    @Value("${spring.ai.active-provider:ollama}")
+    @Value("${spring.ai.active-provider:openai}")
     private String activeProvider;
 
     /**

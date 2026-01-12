@@ -1,15 +1,21 @@
-<div class="min-h-screen bg-bank-bg">
-  <div class="bg-white border-b">
-    <div class="px-6 lg:px-8 py-4">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/30
+            relative overflow-hidden
+            before:absolute before:inset-0 
+            before:bg-[radial-gradient(circle_at_20%_50%,rgba(151,20,77,0.03),transparent_50%),
+                      radial-gradient(circle_at_80%_80%,rgba(59,130,246,0.02),transparent_50%),
+                      radial-gradient(circle_at_40%_20%,rgba(16,185,129,0.02),transparent_50%)]
+            before:pointer-events-none">
+  <div class="bg-white border-b border-gray-200/60">
+    <div class="page-container py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-          <a routerLink="/admin" class="text-gray-400 hover:text-indigo-600 transition-colors">
+          <a routerLink="/admin" class="text-gray-400 hover:text-primary transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
           </a>
-          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+            <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
           </div>
@@ -20,7 +26,7 @@
         </div>
         <div class="flex items-center gap-3">
           <span class="text-gray-500 text-sm">{{ filteredScenarios.length }} of {{ scenarios.length }} scenarios</span>
-          <button (click)="openCreateModal()" class="btn-axis text-sm flex items-center gap-2">
+          <button (click)="openCreateModal()" class="btn-action text-sm flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
@@ -31,9 +37,14 @@
     </div>
   </div>
 
-  <div class="px-6 lg:px-8 py-8">
-    <!-- Filters -->
-    <div class="card-axis p-4 mb-6">
+  <div class="page-container py-8 relative z-10">
+    <!-- Advanced Filters Card -->
+    <div class="relative bg-white/90 backdrop-blur-xl rounded-2xl p-6 mb-8
+                shadow-[0_4px_12px_0_rgba(0,0,0,0.08),0_2px_4px_0_rgba(0,0,0,0.04)]
+                border border-gray-200/50
+                before:absolute before:inset-0 before:bg-gradient-to-br 
+                before:from-primary/[0.02] before:via-transparent before:to-transparent before:rounded-2xl
+                before:pointer-events-none">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div>
           <input type="text" [(ngModel)]="filterScenarioCode" (input)="applyFilters()"
@@ -70,173 +81,666 @@
 
     @if (isLoading) {
       <div class="flex items-center justify-center h-64">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     } @else {
       <!-- Scenarios Grid -->
       <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         @for (scenario of filteredScenarios; track scenario.id) {
-          <div class="card-axis p-6 hover:shadow-elevated transition-all duration-300 cursor-pointer"
+          <div class="group relative 
+                      bg-gradient-to-br from-white via-white to-gray-50/30
+                      backdrop-blur-2xl rounded-3xl 
+                      shadow-[0_1px_3px_0_rgba(0,0,0,0.05),0_4px_12px_0_rgba(0,0,0,0.08)]
+                      border border-gray-200/40
+                      hover:shadow-[0_8px_24px_0_rgba(151,20,77,0.12),0_4px_12px_0_rgba(0,0,0,0.1)]
+                      hover:border-primary/40
+                      hover:-translate-y-2 hover:scale-[1.02]
+                      transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]
+                      cursor-pointer overflow-hidden
+                      before:absolute before:inset-0 before:bg-gradient-to-br 
+                      before:from-primary/[0.03] before:via-transparent before:to-transparent
+                      before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-700
+                      after:absolute after:inset-0 after:bg-[radial-gradient(circle_at_50%_0%,rgba(151,20,77,0.08),transparent_70%)]
+                      after:opacity-0 hover:after:opacity-100 after:transition-opacity after:duration-700"
                (click)="viewDetails(scenario)">
-            <div class="flex items-start justify-between mb-4">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center"
-                     [class]="getCategoryColor(scenario.category)">
-                  <span class="text-xl">{{ scenario.icon || '📋' }}</span>
+            <!-- Animated Status Indicator Bar -->
+            <div class="absolute top-0 left-0 right-0 h-1.5 overflow-hidden"
+                 [class]="scenario.active ? 'bg-gradient-to-r from-success via-success-dark to-success' : 'bg-gradient-to-r from-gray-300 to-gray-400'">
+              <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent 
+                          animate-shimmer" 
+                   [class]="scenario.active ? '' : 'hidden'"></div>
+            </div>
+            
+            <!-- Advanced Glow Effect on Hover -->
+            <div class="absolute -inset-1 bg-gradient-to-r from-primary/30 via-primary/15 to-primary/30 
+                        rounded-3xl opacity-0 group-hover:opacity-100 blur-2xl transition-opacity duration-700 -z-10"></div>
+            <div class="absolute -inset-0.5 bg-gradient-to-br from-primary/10 via-transparent to-transparent 
+                        rounded-3xl opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500 -z-10"></div>
+            
+            <div class="relative p-6">
+              <!-- Header Section -->
+              <div class="flex items-start justify-between mb-5">
+                <div class="flex items-start gap-4 flex-1 min-w-0">
+                  <!-- Modern Icon with Glassmorphism -->
+                  <div class="flex-shrink-0 relative">
+                    <div class="w-16 h-16 rounded-2xl flex items-center justify-center
+                                bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5
+                                backdrop-blur-sm border border-primary/20 shadow-lg
+                                group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500"
+                         [class]="getCategoryColor(scenario.category)">
+                      <span class="text-3xl relative z-10">{{ scenario.icon || '📋' }}</span>
+                      <div class="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl"></div>
+                    </div>
+                  </div>
+                  
+                  <!-- Title Section with Advanced Typography -->
+                  <div class="flex-1 min-w-0 pt-1">
+                    <h3 class="font-extrabold text-gray-900 text-xl mb-1.5 truncate 
+                               group-hover:text-primary transition-all duration-500
+                               leading-tight tracking-tight">
+                      {{ scenario.scenarioName || scenario.scenarioCode }}
+                    </h3>
+                    <p class="text-xs font-mono text-gray-500/80 truncate 
+                              group-hover:text-primary/70 transition-all duration-300
+                              font-medium tracking-wide">
+                      {{ scenario.scenarioCode }}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 class="font-semibold text-gray-900">{{ scenario.scenarioName || scenario.scenarioCode }}</h3>
-                  <p class="text-xl bold axis-burgandy font-mono">{{ scenario.scenarioCode }}</p>
+                
+                <!-- Modern Status Badge -->
+                <div class="flex-shrink-0 ml-2">
+                  <span class="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-bold 
+                               shadow-md backdrop-blur-sm border transition-all duration-300
+                               group-hover:scale-105"
+                        [class]="scenario.active 
+                                 ? 'bg-gradient-to-r from-success-light to-success/20 text-success-dark border-success/30' 
+                                 : 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-600 border-gray-200'">
+                    <span class="relative w-2 h-2">
+                      <span class="absolute inset-0 rounded-full"
+                            [class]="scenario.active ? 'bg-success animate-ping opacity-75' : ''"></span>
+                      <span class="relative w-2 h-2 rounded-full"
+                            [class]="scenario.active ? 'bg-success' : 'bg-gray-400'"></span>
+                    </span>
+                    {{ scenario.active ? 'Active' : 'Inactive' }}
+                  </span>
                 </div>
               </div>
-              <span class="px-2 py-1 rounded-full text-xs font-medium"
-                    [class]="scenario.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'">
-                {{ scenario.active ? 'Active' : 'Inactive' }}
-              </span>
-            </div>
 
-            <p class="text-gray-600 text-sm mb-4 line-clamp-2">{{ scenario.description || 'No description' }}</p>
+              <!-- Description with Gradient Text -->
+              <p class="text-gray-600 text-sm mb-6 line-clamp-2 leading-relaxed 
+                        group-hover:text-gray-700 transition-colors">
+                {{ scenario.description || 'No description available' }}
+              </p>
 
-            <div class="flex flex-wrap gap-2 mb-4">
-              <span class="badge bg-blue-100 text-blue-700">{{ scenario.executionType }}</span>
-              @if (scenario.category) {
-                <span class="badge" [class]="getCategoryColor(scenario.category)">{{ scenario.category }}</span>
-              }
-              @if (scenario.filterDefinitions) {
-                <span class="badge bg-purple-100 text-purple-700">Multi-Filter</span>
-              }
-            </div>
-
-            <div class="flex items-center justify-between pt-4 border-t">
-              <div class="flex items-center gap-2">
-                <button (click)="openEditModal(scenario); $event.stopPropagation()"
-                        class="text-indigo-600 hover:text-indigo-800 text-sm">Edit</button>
-                <button (click)="testScenario(scenario); $event.stopPropagation()"
-                        class="text-green-600 hover:text-green-800 text-sm">Test</button>
+              <!-- Modern Tags Section -->
+              <div class="flex flex-wrap gap-2.5 mb-6">
+                <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold 
+                           bg-gradient-to-r from-info-light to-info/20 text-info-dark
+                           border border-info/20 shadow-sm backdrop-blur-sm
+                           group-hover:shadow-md transition-shadow">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {{ scenario.executionType }}
+                </span>
+                @if (scenario.category) {
+                  <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-semibold badge shadow-sm
+                               border backdrop-blur-sm transition-all group-hover:shadow-md" 
+                        [class]="getCategoryColor(scenario.category)">
+                    {{ scenario.category }}
+                  </span>
+                }
+                @if (scenario.filterDefinitions) {
+                  <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold 
+                             bg-gradient-to-r from-primary/20 to-primary/10 text-primary-dark
+                             border border-primary/20 shadow-sm backdrop-blur-sm
+                             group-hover:shadow-md transition-shadow">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                    Multi-Filter
+                  </span>
+                }
               </div>
-              <button (click)="toggleStatus(scenario); $event.stopPropagation()"
-                      class="text-sm" [class]="scenario.active ? 'text-amber-600' : 'text-green-600'">
-                {{ scenario.active ? 'Disable' : 'Enable' }}
-              </button>
+
+              <!-- Ultra Modern Actions Section -->
+              <div class="flex items-center justify-between pt-5 
+                          border-t border-gradient-to-r from-gray-200/50 via-gray-100/30 to-transparent">
+                <div class="flex items-center gap-2.5">
+                  <button (click)="openEditModal(scenario); $event.stopPropagation()"
+                          class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-primary 
+                                 bg-primary/5 hover:bg-primary/10 
+                                 rounded-xl 
+                                 border border-primary/20
+                                 shadow-[0_1px_2px_0_rgba(151,20,77,0.08)]
+                                 hover:shadow-[0_4px_8px_0_rgba(151,20,77,0.15)]
+                                 hover:border-primary/30
+                                 transition-all duration-300 ease-out
+                                 hover:scale-105 active:scale-95
+                                 backdrop-blur-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit
+                  </button>
+                  <button (click)="testScenario(scenario); $event.stopPropagation()"
+                          class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-success 
+                                 bg-success/5 hover:bg-success-light
+                                 rounded-xl 
+                                 border border-success/20
+                                 shadow-[0_1px_2px_0_rgba(16,185,129,0.08)]
+                                 hover:shadow-[0_4px_8px_0_rgba(16,185,129,0.15)]
+                                 hover:border-success/30
+                                 transition-all duration-300 ease-out
+                                 hover:scale-105 active:scale-95
+                                 backdrop-blur-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Test
+                  </button>
+                </div>
+                <button (click)="toggleStatus(scenario); $event.stopPropagation()"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl 
+                               border backdrop-blur-sm
+                               shadow-[0_1px_2px_0_rgba(0,0,0,0.05)]
+                               hover:shadow-[0_4px_8px_0_rgba(0,0,0,0.1)]
+                               transition-all duration-300 ease-out
+                               hover:scale-105 active:scale-95"
+                        [class]="scenario.active 
+                                 ? 'text-warning bg-warning/5 hover:bg-warning-light border-warning/20 hover:border-warning/30' 
+                                 : 'text-success bg-success/5 hover:bg-success-light border-success/20 hover:border-success/30'">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" 
+                          [attr.d]="scenario.active ? 'M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z' : 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'" />
+                  </svg>
+                  {{ scenario.active ? 'Disable' : 'Enable' }}
+                </button>
+              </div>
             </div>
           </div>
         }
       </div>
 
       @if (filteredScenarios.length === 0) {
-        <div class="card-axis p-12 text-center">
+        <div class="card-ai-primary p-12 text-center">
           <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
           <h3 class="text-xl font-semibold text-gray-900 mb-2">No Scenarios Found</h3>
           <p class="text-gray-500 mb-6">Create your first AI scenario to get started.</p>
-          <button (click)="openCreateModal()" class="btn-axis">Create Scenario</button>
+          <button (click)="openCreateModal()" class="btn-action">Create Scenario</button>
         </div>
       }
     }
   </div>
 
-  <!-- Details Side Panel -->
+  <!-- Advanced Centered Details Modal - Complete Rewrite -->
   @if (selectedScenario && !showModal) {
-    <div class="fixed inset-0 bg-black/30 backdrop-blur-sm z-40" (click)="closeDetails()"></div>
-    <div class="fixed right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl z-50 overflow-y-auto">
-      <div class="p-6 border-b bg-indigo-600 text-white">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-xl font-bold">{{ selectedScenario.scenarioName || selectedScenario.scenarioCode }}</h2>
-            <p class="text-indigo-200 text-sm font-mono">{{ selectedScenario.scenarioCode }}</p>
+    <!-- Backdrop with Advanced Blur -->
+    <div class="fixed inset-0 bg-gradient-to-br from-black/60 via-black/50 to-black/60 
+                backdrop-blur-xl z-50 animate-fade-in" (click)="closeDetails()">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(151,20,77,0.1),transparent_70%)]"></div>
+    </div>
+    
+    <!-- Centered Modal Container -->
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div class="relative w-full max-w-5xl max-h-[92vh] 
+                  bg-gradient-to-br from-white via-white to-gray-50/30
+                  backdrop-blur-2xl 
+                  rounded-3xl 
+                  shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25),0_0_0_1px_rgba(255,255,255,0.6)]
+                  border border-gray-200/50
+                  overflow-hidden flex flex-col
+                  pointer-events-auto
+                  animate-scale-in
+                  before:absolute before:inset-0 
+                  before:bg-gradient-to-br 
+                  before:from-primary/[0.02] before:via-transparent before:to-transparent 
+                  before:pointer-events-none
+                  after:absolute after:inset-0 
+                  after:bg-[radial-gradient(circle_at_50%_0%,rgba(151,20,77,0.06),transparent_60%)]
+                  after:pointer-events-none">
+        <!-- Advanced Header Section -->
+        <div class="relative bg-gradient-to-br from-primary via-primary-600 to-primary-700 
+                    text-white p-8 overflow-hidden border-b border-primary-800/30">
+          <!-- Animated Background Effects -->
+          <div class="absolute inset-0 opacity-20">
+            <div class="absolute top-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-float"></div>
+            <div class="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl animate-float" style="animation-delay: 1s;"></div>
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.15),transparent_60%)]"></div>
           </div>
-          <button (click)="closeDetails()" class="text-white/70 hover:text-white">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="p-6 space-y-6">
-        <!-- Basic Info -->
-        <div>
-          <h3 class="text-sm font-semibold text-gray-500 mb-2">Description</h3>
-          <p class="text-gray-900">{{ selectedScenario.description || 'No description' }}</p>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 mb-1">Category</h3>
-            <span class="badge" [class]="getCategoryColor(selectedScenario.category)">{{ selectedScenario.category || 'Other' }}</span>
-          </div>
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 mb-1">Execution Type</h3>
-            <span class="badge bg-blue-100 text-blue-700">{{ selectedScenario.executionType }}</span>
-          </div>
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 mb-1">Timeout</h3>
-            <span>{{ selectedScenario.timeoutMs }}ms</span>
-          </div>
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 mb-1">Max Results</h3>
-            <span>{{ selectedScenario.maxResults || 100 }}</span>
-          </div>
-        </div>
-
-        <!-- AI Intent Detection -->
-        @if (selectedScenario.triggerPhrases) {
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 mb-2">Trigger Phrases (AI Intent Detection)</h3>
-            <pre class="bg-gray-50 p-3 rounded-lg text-sm overflow-x-auto">{{ formatJson(selectedScenario.triggerPhrases) }}</pre>
-          </div>
-        }
-
-        @if (selectedScenario.exampleQueries) {
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 mb-2">Example Queries</h3>
-            <pre class="bg-gray-50 p-3 rounded-lg text-sm overflow-x-auto">{{ formatJson(selectedScenario.exampleQueries) }}</pre>
-          </div>
-        }
-
-        <!-- SQL Query -->
-        @if (selectedScenario.sqlQuery) {
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 mb-2">SQL Query</h3>
-            <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm overflow-x-auto">{{ selectedScenario.sqlQuery }}</pre>
-          </div>
-        }
-
-        <!-- Filter Definitions -->
-        @if (selectedScenario.filterDefinitions) {
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 mb-2">Filter Definitions (Multi-Filter Engine)</h3>
-            <pre class="bg-gray-50 p-3 rounded-lg text-sm overflow-x-auto">{{ formatJson(selectedScenario.filterDefinitions) }}</pre>
-          </div>
-        }
-
-        <!-- Required Params -->
-        @if (selectedScenario.requiredParams && selectedScenario.requiredParams.length > 0) {
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 mb-2">Required Parameters</h3>
-            <div class="flex flex-wrap gap-2">
-              @for (param of selectedScenario.requiredParams; track param) {
-                <span class="badge bg-red-100 text-red-700">{{ param }}</span>
-              }
+          
+          <!-- Header Content -->
+          <div class="relative z-10">
+            <!-- Top Bar with Close Button -->
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md 
+                            border border-white/20 flex items-center justify-center">
+                  <span class="text-2xl">{{ selectedScenario.icon || '📋' }}</span>
+                </div>
+                <div>
+                  <p class="text-xs font-bold text-white/70 uppercase tracking-wider">Scenario Details</p>
+                  <p class="text-xs font-mono text-white/60 mt-0.5">{{ selectedScenario.scenarioCode }}</p>
+                </div>
+              </div>
+              <button (click)="closeDetails()" 
+                      class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 
+                             backdrop-blur-md border border-white/20 flex items-center justify-center 
+                             transition-all duration-300 hover:scale-110 hover:rotate-90 
+                             shadow-lg hover:shadow-xl">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <!-- Title and Status Section -->
+            <div class="flex items-start gap-6">
+              <!-- Large Icon -->
+              <div class="flex-shrink-0">
+                <div class="w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-xl 
+                            border-2 border-white/30 shadow-2xl flex items-center justify-center
+                            relative overflow-hidden
+                            hover:scale-105 transition-transform duration-300">
+                  <span class="text-4xl relative z-10 drop-shadow-lg">{{ selectedScenario.icon || '📋' }}</span>
+                  <div class="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent"></div>
+                  <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.2),transparent_70%)]"></div>
+                </div>
+              </div>
+              
+              <!-- Title and Metadata -->
+              <div class="flex-1 min-w-0">
+                <h2 class="text-4xl font-extrabold mb-3 drop-shadow-lg leading-tight">
+                  {{ selectedScenario.scenarioName || selectedScenario.scenarioCode }}
+                </h2>
+                <p class="text-white/80 text-sm font-mono mb-5">{{ selectedScenario.scenarioCode }}</p>
+                
+                <!-- Status Badges Row -->
+                <div class="flex items-center gap-3 flex-wrap">
+                  <span class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold 
+                             bg-white/15 backdrop-blur-md border border-white/25 shadow-lg
+                             hover:bg-white/20 transition-colors"
+                        [class]="selectedScenario.active ? 'bg-success/30 border-success/40' : 'bg-gray-500/20 border-gray-400/30'">
+                    <span class="relative w-2.5 h-2.5">
+                      <span class="absolute inset-0 rounded-full"
+                            [class]="selectedScenario.active ? 'bg-white animate-ping opacity-75' : ''"></span>
+                      <span class="relative w-2.5 h-2.5 rounded-full bg-white"></span>
+                    </span>
+                    {{ selectedScenario.active ? 'Active' : 'Inactive' }}
+                  </span>
+                  <span class="px-4 py-2 rounded-xl text-xs font-bold 
+                             bg-white/15 backdrop-blur-md border border-white/25 shadow-lg">
+                    {{ selectedScenario.executionType }}
+                  </span>
+                  @if (selectedScenario.category) {
+                    <span class="px-4 py-2 rounded-xl text-xs font-bold 
+                               bg-white/15 backdrop-blur-md border border-white/25 shadow-lg">
+                      {{ selectedScenario.category }}
+                    </span>
+                  }
+                </div>
+              </div>
             </div>
           </div>
-        }
+        </div>
 
-        <!-- Response Template -->
-        @if (selectedScenario.llmPromptTemplate) {
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 mb-2">Response Template</h3>
-            <pre class="bg-gray-50 p-3 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap">{{ selectedScenario.llmPromptTemplate }}</pre>
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-y-auto p-8 space-y-6 
+                    bg-gradient-to-b from-gray-50/60 via-white to-white
+                    custom-scrollbar">
+          <!-- Description Section -->
+          <div class="relative bg-white/95 backdrop-blur-xl rounded-2xl p-6 
+                      shadow-[0_4px_16px_0_rgba(0,0,0,0.08),0_2px_4px_0_rgba(0,0,0,0.04)]
+                      border border-gray-200/50
+                      hover:shadow-[0_8px_24px_0_rgba(0,0,0,0.12)]
+                      transition-all duration-300
+                      before:absolute before:inset-0 before:bg-gradient-to-br 
+                      before:from-primary/[0.02] before:via-transparent before:to-transparent before:rounded-2xl
+                      before:pointer-events-none">
+            <div class="relative z-10 flex items-center gap-4 mb-4">
+              <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 
+                          flex items-center justify-center shadow-lg border border-primary/20">
+                <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-lg font-extrabold text-gray-900 uppercase tracking-wider">Description</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Overview of this scenario</p>
+              </div>
+            </div>
+            <p class="relative z-10 text-gray-700 leading-relaxed text-base pl-16">
+              {{ selectedScenario.description || 'No description available' }}
+            </p>
           </div>
-        }
-      </div>
 
-      <div class="p-6 border-t flex justify-between">
-        <button (click)="deleteScenario(selectedScenario!)" class="btn-danger">Delete</button>
-        <div class="flex gap-3">
-          <button (click)="testScenario(selectedScenario!)" class="btn-secondary">Test</button>
-          <button (click)="openEditModal(selectedScenario!)" class="btn-axis">Edit</button>
+          <!-- Configuration Grid - Advanced Cards -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="relative bg-white/95 backdrop-blur-xl rounded-2xl p-5 
+                        shadow-[0_4px_12px_0_rgba(0,0,0,0.08)]
+                        border border-gray-200/50
+                        hover:shadow-[0_8px_20px_0_rgba(151,20,77,0.12)]
+                        hover:border-primary/30
+                        hover:scale-[1.02]
+                        transition-all duration-300
+                        group cursor-default
+                        before:absolute before:inset-0 before:bg-gradient-to-br 
+                        before:from-primary/[0.03] before:via-transparent before:to-transparent before:rounded-2xl
+                        before:opacity-0 group-hover:before:opacity-100 before:transition-opacity before:duration-300
+                        before:pointer-events-none">
+              <div class="relative z-10">
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Category</p>
+                <span class="inline-block badge" [class]="getCategoryColor(selectedScenario.category)">
+                  {{ selectedScenario.category || 'Other' }}
+                </span>
+              </div>
+            </div>
+            <div class="relative bg-white/95 backdrop-blur-xl rounded-2xl p-5 
+                        shadow-[0_4px_12px_0_rgba(0,0,0,0.08)]
+                        border border-gray-200/50
+                        hover:shadow-[0_8px_20px_0_rgba(59,130,246,0.12)]
+                        hover:border-info/30
+                        hover:scale-[1.02]
+                        transition-all duration-300
+                        group cursor-default
+                        before:absolute before:inset-0 before:bg-gradient-to-br 
+                        before:from-info/[0.03] before:via-transparent before:to-transparent before:rounded-2xl
+                        before:opacity-0 group-hover:before:opacity-100 before:transition-opacity before:duration-300
+                        before:pointer-events-none">
+              <div class="relative z-10">
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Execution Type</p>
+                <span class="inline-block badge-info">{{ selectedScenario.executionType }}</span>
+              </div>
+            </div>
+            <div class="relative bg-white/95 backdrop-blur-xl rounded-2xl p-5 
+                        shadow-[0_4px_12px_0_rgba(0,0,0,0.08)]
+                        border border-gray-200/50
+                        hover:shadow-[0_8px_20px_0_rgba(245,158,11,0.12)]
+                        hover:border-warning/30
+                        hover:scale-[1.02]
+                        transition-all duration-300
+                        group cursor-default
+                        before:absolute before:inset-0 before:bg-gradient-to-br 
+                        before:from-warning/[0.03] before:via-transparent before:to-transparent before:rounded-2xl
+                        before:opacity-0 group-hover:before:opacity-100 before:transition-opacity before:duration-300
+                        before:pointer-events-none">
+              <div class="relative z-10">
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Timeout</p>
+                <p class="text-gray-900 font-extrabold text-2xl">{{ selectedScenario.timeoutMs }}<span class="text-sm font-normal text-gray-500 ml-1">ms</span></p>
+              </div>
+            </div>
+            <div class="relative bg-white/95 backdrop-blur-xl rounded-2xl p-5 
+                        shadow-[0_4px_12px_0_rgba(0,0,0,0.08)]
+                        border border-gray-200/50
+                        hover:shadow-[0_8px_20px_0_rgba(16,185,129,0.12)]
+                        hover:border-success/30
+                        hover:scale-[1.02]
+                        transition-all duration-300
+                        group cursor-default
+                        before:absolute before:inset-0 before:bg-gradient-to-br 
+                        before:from-success/[0.03] before:via-transparent before:to-transparent before:rounded-2xl
+                        before:opacity-0 group-hover:before:opacity-100 before:transition-opacity before:duration-300
+                        before:pointer-events-none">
+              <div class="relative z-10">
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Max Results</p>
+                <p class="text-gray-900 font-extrabold text-2xl">{{ selectedScenario.maxResults || 100 }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Intent Detection Section -->
+          @if (selectedScenario.triggerPhrases) {
+            <div class="relative bg-white/95 backdrop-blur-xl rounded-2xl p-6 
+                        shadow-[0_4px_16px_0_rgba(0,0,0,0.08)]
+                        border border-gray-200/50
+                        hover:shadow-[0_8px_24px_0_rgba(151,20,77,0.12)]
+                        transition-all duration-300
+                        before:absolute before:inset-0 before:bg-gradient-to-br 
+                        before:from-primary/[0.02] before:via-transparent before:to-transparent before:rounded-2xl
+                        before:pointer-events-none">
+              <div class="relative z-10 flex items-center gap-4 mb-5">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 
+                            flex items-center justify-center shadow-lg border border-primary/20">
+                  <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-extrabold text-gray-900 uppercase tracking-wider">Trigger Phrases</h3>
+                  <p class="text-xs text-gray-500 mt-0.5">AI intent detection keywords</p>
+                </div>
+              </div>
+              <div class="relative z-10 bg-gradient-to-br from-gray-900 via-gray-850 to-gray-900 
+                          rounded-xl p-6 overflow-x-auto 
+                          shadow-[0_8px_24px_0_rgba(0,0,0,0.25)]
+                          border border-gray-700/50">
+                <pre class="text-sm text-green-400 font-mono leading-relaxed">{{ formatJson(selectedScenario.triggerPhrases) }}</pre>
+              </div>
+            </div>
+          }
+
+          @if (selectedScenario.exampleQueries) {
+            <div class="relative bg-white/90 backdrop-blur-xl rounded-2xl p-6 
+                        shadow-[0_4px_16px_0_rgba(0,0,0,0.08)]
+                        border border-gray-200/60
+                        hover:shadow-[0_8px_24px_0_rgba(59,130,246,0.12)]
+                        transition-all duration-300
+                        before:absolute before:inset-0 before:bg-gradient-to-br 
+                        before:from-info/[0.03] before:via-transparent before:to-transparent before:rounded-2xl
+                        before:pointer-events-none">
+              <div class="relative z-10 flex items-center gap-4 mb-5">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-info/20 via-info/10 to-info/5 
+                            flex items-center justify-center shadow-lg border border-info/20">
+                  <svg class="w-6 h-6 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-extrabold text-gray-900 uppercase tracking-wider">Example Queries</h3>
+                  <p class="text-xs text-gray-500 mt-0.5">Sample user queries for AI training</p>
+                </div>
+              </div>
+              <div class="relative z-10 bg-gradient-to-br from-gray-900 via-gray-850 to-gray-900 
+                          rounded-xl p-6 overflow-x-auto 
+                          shadow-[0_8px_24px_0_rgba(0,0,0,0.25)]
+                          border border-gray-700/50">
+                <pre class="text-sm text-green-400 font-mono leading-relaxed">{{ formatJson(selectedScenario.exampleQueries) }}</pre>
+              </div>
+            </div>
+          }
+
+          <!-- SQL Query Section -->
+          @if (selectedScenario.sqlQuery) {
+            <div class="relative bg-white/95 backdrop-blur-xl rounded-2xl p-6 
+                        shadow-[0_4px_16px_0_rgba(0,0,0,0.08)]
+                        border border-gray-200/50
+                        hover:shadow-[0_8px_24px_0_rgba(245,158,11,0.12)]
+                        transition-all duration-300
+                        before:absolute before:inset-0 before:bg-gradient-to-br 
+                        before:from-warning/[0.02] before:via-transparent before:to-transparent before:rounded-2xl
+                        before:pointer-events-none">
+              <div class="relative z-10 flex items-center gap-4 mb-5">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-warning/20 via-warning/10 to-warning/5 
+                            flex items-center justify-center shadow-lg border border-warning/20">
+                  <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-extrabold text-gray-900 uppercase tracking-wider">SQL Query</h3>
+                  <p class="text-xs text-gray-500 mt-0.5">Database query for execution</p>
+                </div>
+              </div>
+              <div class="relative z-10 bg-gradient-to-br from-gray-900 via-gray-850 to-gray-900 
+                          rounded-xl p-6 overflow-x-auto 
+                          shadow-[0_8px_24px_0_rgba(0,0,0,0.25)]
+                          border border-gray-700/50">
+                <pre class="text-sm text-green-400 font-mono leading-relaxed">{{ selectedScenario.sqlQuery }}</pre>
+              </div>
+            </div>
+          }
+
+          <!-- Filter Definitions Section -->
+          @if (selectedScenario.filterDefinitions) {
+            <div class="relative bg-white/95 backdrop-blur-xl rounded-2xl p-6 
+                        shadow-[0_4px_16px_0_rgba(0,0,0,0.08)]
+                        border border-gray-200/50
+                        hover:shadow-[0_8px_24px_0_rgba(151,20,77,0.12)]
+                        transition-all duration-300
+                        before:absolute before:inset-0 before:bg-gradient-to-br 
+                        before:from-primary/[0.02] before:via-transparent before:to-transparent before:rounded-2xl
+                        before:pointer-events-none">
+              <div class="relative z-10 flex items-center gap-4 mb-5">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 
+                            flex items-center justify-center shadow-lg border border-primary/20">
+                  <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-extrabold text-gray-900 uppercase tracking-wider">Filter Definitions</h3>
+                  <p class="text-xs text-gray-500 mt-0.5">Multi-filter engine configuration</p>
+                </div>
+              </div>
+              <div class="relative z-10 bg-gradient-to-br from-gray-50 via-white to-gray-50 
+                          rounded-xl p-6 overflow-x-auto 
+                          shadow-[0_4px_12px_0_rgba(0,0,0,0.08)]
+                          border border-gray-200/50">
+                <pre class="text-sm text-gray-800 font-mono leading-relaxed">{{ formatJson(selectedScenario.filterDefinitions) }}</pre>
+              </div>
+            </div>
+          }
+
+          <!-- Required Parameters Section -->
+          @if (selectedScenario.requiredParams && selectedScenario.requiredParams.length > 0) {
+            <div class="relative bg-white/95 backdrop-blur-xl rounded-2xl p-6 
+                        shadow-[0_4px_16px_0_rgba(0,0,0,0.08)]
+                        border border-gray-200/50
+                        hover:shadow-[0_8px_24px_0_rgba(239,68,68,0.12)]
+                        transition-all duration-300
+                        before:absolute before:inset-0 before:bg-gradient-to-br 
+                        before:from-danger/[0.02] before:via-transparent before:to-transparent before:rounded-2xl
+                        before:pointer-events-none">
+              <div class="relative z-10 flex items-center gap-4 mb-5">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-danger/20 via-danger/10 to-danger/5 
+                            flex items-center justify-center shadow-lg border border-danger/20">
+                  <svg class="w-6 h-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-extrabold text-gray-900 uppercase tracking-wider">Required Parameters</h3>
+                  <p class="text-xs text-gray-500 mt-0.5">Mandatory input parameters</p>
+                </div>
+              </div>
+              <div class="relative z-10 flex flex-wrap gap-3">
+                @for (param of selectedScenario.requiredParams; track param) {
+                  <span class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold 
+                             bg-gradient-to-r from-danger-light via-danger/25 to-danger-light
+                             text-danger-dark
+                             border border-danger/30 
+                             shadow-[0_2px_8px_0_rgba(239,68,68,0.15)]
+                             hover:shadow-[0_4px_12px_0_rgba(239,68,68,0.2)]
+                             hover:scale-105
+                             transition-all duration-300">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {{ param }}
+                  </span>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Response Template Section -->
+          @if (selectedScenario.llmPromptTemplate) {
+            <div class="relative bg-white/90 backdrop-blur-xl rounded-2xl p-6 
+                        shadow-[0_4px_16px_0_rgba(0,0,0,0.08)]
+                        border border-gray-200/60
+                        hover:shadow-[0_8px_24px_0_rgba(16,185,129,0.12)]
+                        transition-all duration-300
+                        before:absolute before:inset-0 before:bg-gradient-to-br 
+                        before:from-success/[0.03] before:via-transparent before:to-transparent before:rounded-2xl
+                        before:pointer-events-none">
+              <div class="relative z-10 flex items-center gap-4 mb-5">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-success/20 via-success/10 to-success/5 
+                            flex items-center justify-center shadow-lg border border-success/20">
+                  <svg class="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-lg font-extrabold text-gray-900 uppercase tracking-wider">Response Template</h3>
+                  <p class="text-xs text-gray-500 mt-0.5">LLM prompt template (Freemarker)</p>
+                </div>
+              </div>
+              <div class="relative z-10 bg-gradient-to-br from-gray-50 via-white to-gray-50 
+                          rounded-xl p-6 overflow-x-auto 
+                          shadow-[0_4px_12px_0_rgba(0,0,0,0.08)]
+                          border border-gray-200/50">
+                <pre class="text-sm text-gray-800 font-mono leading-relaxed whitespace-pre-wrap">{{ selectedScenario.llmPromptTemplate }}</pre>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Advanced Footer Actions -->
+        <div class="relative p-6 border-t border-gray-200/50 
+                    bg-gradient-to-b from-white via-white/98 to-white
+                    backdrop-blur-xl flex items-center justify-between 
+                    shadow-[0_-4px_16px_0_rgba(0,0,0,0.08)]
+                    before:absolute before:inset-0 before:bg-gradient-to-t 
+                    before:from-white before:via-white/90 before:to-transparent 
+                    before:pointer-events-none">
+          <button (click)="deleteScenario(selectedScenario!)" 
+                  class="relative z-10 inline-flex items-center gap-2.5 px-6 py-3.5 
+                         bg-gradient-to-r from-danger via-danger-dark to-danger
+                         text-white rounded-xl font-bold 
+                         shadow-[0_4px_12px_0_rgba(239,68,68,0.25)]
+                         hover:shadow-[0_8px_20px_0_rgba(239,68,68,0.35)]
+                         transition-all duration-300 
+                         hover:scale-105 active:scale-95">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete
+          </button>
+          <div class="relative z-10 flex items-center gap-3">
+            <button (click)="testScenario(selectedScenario!)" 
+                    class="inline-flex items-center gap-2.5 px-6 py-3.5 
+                           bg-white border-2 border-gray-300 text-gray-700
+                           rounded-xl font-bold
+                           shadow-[0_2px_8px_0_rgba(0,0,0,0.08)]
+                           hover:shadow-[0_4px_12px_0_rgba(0,0,0,0.12)]
+                           hover:border-gray-400
+                           hover:bg-gray-50
+                           transition-all duration-300 
+                           hover:scale-105 active:scale-95">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Test
+            </button>
+            <button (click)="openEditModal(selectedScenario!)" 
+                    class="inline-flex items-center gap-2.5 px-6 py-3.5 
+                           bg-gradient-to-r from-primary via-primary-600 to-primary
+                           text-white rounded-xl font-bold
+                           shadow-[0_4px_12px_0_rgba(151,20,77,0.25)]
+                           hover:shadow-[0_8px_20px_0_rgba(151,20,77,0.35)]
+                           transition-all duration-300 
+                           hover:scale-105 active:scale-95">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -245,7 +749,7 @@
   <!-- Create/Edit Modal with Tabs -->
   @if (showModal) {
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="card-axis w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="card-ai-primary w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <div class="p-6 border-b border-gray-200 bg-axis-burgundy text-white rounded-t-2xl">
           <div class="flex items-center justify-between">
             <h2 class="text-xl font-bold">{{ isEditing ? 'Edit Scenario' : 'Create New Scenario' }}</h2>
@@ -468,7 +972,7 @@
 
         <div class="p-6 border-t border-gray-200 flex justify-between">
           <button (click)="closeModal()" class="btn-secondary">Cancel</button>
-          <button (click)="saveScenario()" class="btn-axis">{{ isEditing ? 'Update Scenario' : 'Create Scenario' }}</button>
+          <button (click)="saveScenario()" class="btn-action">{{ isEditing ? 'Update Scenario' : 'Create Scenario' }}</button>
         </div>
       </div>
     </div>

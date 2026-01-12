@@ -36,7 +36,9 @@ public class ChatService {
     private static final String AFFIRMATIVE_PATTERN = 
             "(yes|y|yeah|yep|sure|ok|okay|proceed|confirm|haan|ha|theek hai).*";
 
+    @Deprecated // Using KernelAdapterService now - kept for backward compatibility
     private final ReactiveIntelligenceClient intelligenceClient;
+    private final KernelAdapterService kernelAdapterService;
     private final ScenarioRouter scenarioRouter;
     private final RbacService rbacService;
     private final IntentValidationService validationService;
@@ -56,48 +58,58 @@ public class ChatService {
             // Get or create session
             String sessionId = getOrCreateSession(request);
 
-            // Handle confirmation response
-            if (request.isConfirmationResponse()) {
-                return handleConfirmationResponse(request, sessionId, executionId, requestTime);
-            }
-
-            // Handle clarification response
-            if (request.isClarificationResponse()) {
-                return handleClarificationResponse(request, sessionId, executionId);
+            // Handle confirmation/clarification responses - these can be processed through kernel too
+            // but we check them first to handle edge cases
+            if (request.isConfirmationResponse() || request.isClarificationResponse()) {
+                // For now, handle through kernel - it will handle missing params and follow-ups
+                // Can be enhanced later to use special confirmation handling if needed
+                saveMessage(sessionId, "user", request.getQuery());
+                ChatResponse response = kernelAdapterService.processWithKernel(request).block();
+                if (response != null && response.getMessage() != null) {
+                    saveMessage(sessionId, "assistant", response.getMessage());
+                }
+                if (response != null && response.getMeta() != null) {
+                    auditService.logAuditAsync(
+                            response.getMeta().getExecutionId() != null ? response.getMeta().getExecutionId() : executionId,
+                            request.getUserId(),
+                            response.getScenario(),
+                            requestTime,
+                            Instant.now(),
+                            response.getResponseType() != ChatResponse.ResponseType.ERROR,
+                            response.getResponseType() == ChatResponse.ResponseType.ERROR ? response.getMessage() : null,
+                            null, null
+                    );
+                }
+                return response != null ? response : buildErrorResponse(sessionId, "Failed to process request");
             }
 
             // Save user message
             saveMessage(sessionId, "user", request.getQuery());
 
-            // Get session context
-            String sessionContext = getSessionContext(sessionId);
-
-            // Detect intent
-            IntentResult intent = intelligenceClient.detectIntent(request.getQuery(), sessionContext).block();
-            log.info("Detected intent: scenario={}, confidence={}, params={}", 
-                    intent.getScenario(), intent.getConfidence(), intent.getParams());
-
-            // === 3-LAYER PROTECTION SYSTEM ===
+            // Process through AxisAiKernel (DLM-based) - replaces old ReactiveIntelligenceClient
+            ChatResponse response = kernelAdapterService.processWithKernel(request).block();
             
-            // Validate intent using 3-layer protection
-            IntentValidationService.ValidationResult validation = 
-                    validationService.validate(intent, request.getQuery());
-
-            if (!validation.isValid()) {
-                return handleValidationFailure(validation, intent, request, sessionId, executionId);
+            // Save assistant response
+            if (response != null && response.getMessage() != null) {
+                saveMessage(sessionId, "assistant", response.getMessage());
             }
 
-            // Check authorization
-            List<String> userRoles = getCurrentUserRoles();
-            if (!rbacService.anyRoleAuthorized(userRoles, intent.getScenario())) {
-                String response = "You don't have permission to access this information.";
-                saveMessage(sessionId, "assistant", response);
-                return buildResponse(sessionId, response, ChatResponse.ResponseType.ERROR, 
-                        null, intent.getScenario(), null, intent.getConfidence(), executionId);
+            // Log audit
+            if (response != null && response.getMeta() != null) {
+                auditService.logAuditAsync(
+                        response.getMeta().getExecutionId() != null ? response.getMeta().getExecutionId() : executionId,
+                        request.getUserId(),
+                        response.getScenario(),
+                        requestTime,
+                        Instant.now(),
+                        response.getResponseType() != ChatResponse.ResponseType.ERROR,
+                        response.getResponseType() == ChatResponse.ResponseType.ERROR ? response.getMessage() : null,
+                        null, // IntentResult - can be extracted from KernelResponse metadata if needed
+                        null  // ScenarioResult - can be extracted from KernelResponse metadata if needed
+                );
             }
 
-            // Execute scenario (all validations passed)
-            return executeScenario(intent, request, sessionId, executionId, requestTime);
+            return response != null ? response : buildErrorResponse(sessionId, "Failed to process request");
 
         } catch (Exception e) {
             log.error("Error processing chat request", e);

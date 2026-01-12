@@ -39,11 +39,11 @@ public class EntityPatternMatcher {
                 case "REGEX":
                     return matchRegex(pattern, text);
                 case "NER_MODEL":
-                    // NER_MODEL pattern type: Will be implemented when ML models (ONNX/BERT) are ready
-                    // This requires loading a Named Entity Recognition model and using it for inference
-                    // Placeholder for future ML integration - EntityPatternMatcher will be enhanced
-                    // to support ONNX-based NER models when MlModelLoaderService is implemented
-                    log.debug("NER_MODEL pattern type not yet implemented for pattern: {} (requires ML model files)", pattern.getId());
+                    // NER_MODEL pattern type: Uses ML-based NER model
+                    // Note: MlNerService integration should be done via EntityExtractionService
+                    // EntityPatternMatcher focuses on pattern matching, not ML inference
+                    // ML NER is handled separately by MlNerService and integrated at service level
+                    log.debug("NER_MODEL pattern type - ML NER handled by MlNerService (pattern: {})", pattern.getId());
                     return Optional.empty();
                 case "CONTEXT_BASED":
                     // CONTEXT_BASED pattern type: Will be implemented for context-aware entity extraction

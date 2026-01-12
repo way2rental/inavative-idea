@@ -281,14 +281,14 @@ export class ScenariosComponent implements OnInit {
 
   getCategoryColor(category: string | undefined): string {
     const colors: Record<string, string> = {
-      'Account': 'bg-blue-100 text-blue-700',
-      'Transaction': 'bg-green-100 text-green-700',
-      'Payment': 'bg-purple-100 text-purple-700',
-      'Card': 'bg-amber-100 text-amber-700',
-      'Loan': 'bg-red-100 text-red-700',
-      'Investment': 'bg-indigo-100 text-indigo-700',
-      'Analytics': 'bg-pink-100 text-pink-700'
+      'Account': 'badge-info',
+      'Transaction': 'badge-success',
+      'Payment': 'badge-primary',
+      'Card': 'badge-warning',
+      'Loan': 'badge-danger',
+      'Investment': 'badge-primary',
+      'Analytics': 'badge-info'
     };
-    return colors[category || 'Other'] || 'bg-gray-100 text-gray-700';
+    return colors[category || 'Other'] || 'badge-secondary';
   }
 }
